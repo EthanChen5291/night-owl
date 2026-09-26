@@ -1,6 +1,6 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 14:35** (binning feature added).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 14:50** (building-level list added).
 
 ## Headline results
 
@@ -16,6 +16,7 @@ Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day
 | Silent blocks (high B, low A) | **508 cells**, median income **$69k vs $92k**, limited-English households 14.5% vs 9.2% | `out/cells.json` (`is_silent`) |
 | Sensor picks | 20 sites on real tree pits, 95% never swept, median income $61k | `out/plan.json` |
 | Model B accuracy | AUC **0.633** on held-out community districts (logistic baseline 0.567) | `out/metrics.json` |
+| **Which buildings first** | building-level model ranks swept buildings at AUC **0.692** (vs 0.630 for the cell model); top 5 buildings for each of 519 silent blocks / node sites | `out/buildings.json` |
 
 Backtests are scored **only on cells DOHMH actually swept that month**. Silent blocks are rarely
 inspected, so scoring on "any inspection found rats" grades the model on where DOHMH goes, not where rats are.
@@ -44,6 +45,23 @@ Pitch version (place features only): *"The city ranks blocks by who calls. We ra
 rats: low-rise old buildings and heavy trash."* Per-cell `reasons[]` in `cells.json` already exclude the
 seasonal features (temperature, month, district tonnage).
 
+## Building level: which buildings to inspect first
+
+`lots.py` trains Model B on each swept building (1.5M inspections) with the lot's own PLUTO attributes
+(age, floors, units, building class, areas, vacant, has a restaurant) plus the cell features. Same spatial CV:
+
+| | AUC (held-out districts) |
+|---|---|
+| cell model, same score for every building in a cell | 0.630 |
+| **building model, per building** | **0.692** |
+| building model averaged per cell | 0.649 |
+
+In the backtest (ranking cells) it's a tie: 19.7% vs 19.5% of swept lots with rats, but it wins fewer months
+(107 vs 108 against complaints, 91 vs 96 against prior positives). So the **cell model stays the main Model B**
+(map, backtest, silence, planner), and the building model powers the per-block list in `out/buildings.json`.
+Bigger buildings score higher (more units, more chances for signs), which is right for "where will an inspector
+find rats". Neighbour (ring-1) features were also tested: no gain (0.633 → 0.632), not used.
+
 ## Honest limits (say these before a judge does)
 
 - **Never-swept areas can't be validated with existing data.** We tried restaurant rat violations (04K) as an
@@ -66,6 +84,8 @@ seasonal features (temperature, month, district tonnage).
 | 5 | `05_backtest.py` | rolling backtest on sweeps, refit every 6 months | ~40 s |
 | – | `validate_silence.py` | tests 1–4 above | ~60 s |
 | – | `binning_effect.py` | before/after test of the Nov 2024 bin rule | ~20 s |
+| 6 | `06_buildings.py` | top 5 buildings per silent block / node site (building-level Model B, `lots.py`) | ~15 s |
+| – | `lot_model.py` | building- vs cell-level comparison (spatial CV) | ~50 s |
 | – | `export.py` | `out/cells.json`, `out/plan.json` in the `web/src/types.ts` / `api/` contract | ~10 s |
 
 ```

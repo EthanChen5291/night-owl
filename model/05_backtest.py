@@ -45,7 +45,9 @@ def pick_rate(month_rows: pd.DataFrame, score: pd.Series, k: int, rng) -> float:
     return top.n_sweep_rat.sum() / top.n_sweep.sum()
 
 
-def main(k: int, start: str) -> None:
+def main(k: int, start: str, level: str = "cell", out: str = "backtest.json") -> None:
+    if level == "lot":
+        lots = importlib.import_module("lots")
     df = models.load().sort_values(["h3", "month"]).reset_index(drop=True)
     df["rats_12m"] = lagged(df, "n_rat", 12)          # any Initial inspection that found rats
     # The latest month is still in progress (data ends mid-month), so it's left out.
@@ -55,12 +57,18 @@ def main(k: int, start: str) -> None:
     series, model = [], None
     for i, m in enumerate(months):
         if model is None or i % REFIT_EVERY == 0:
-            hist = df[(df.month < m) & (df.n_sweep > 0)]
-            model = models.fit_b(hist)
+            prev = str(pd.Period(m, "M") - 1)
+            if level == "lot":
+                model = lots.fit(lots.training_rows(df, prev))
+            else:
+                model = models.fit_b(df[(df.month < m) & (df.n_sweep > 0)])
         rows = df[(df.month == m) & (df.n_sweep > 0) & df.real_cd].reset_index(drop=True)
         if len(rows) < k:
             continue
-        risk = pd.Series(model.predict(rows[models.B_FEATS]))
+        if level == "lot":  # mean risk over ALL lots in each cell (not only the swept ones)
+            risk = rows.h3.map(lots.cell_scores(model, rows)).fillna(0).reset_index(drop=True)
+        else:
+            risk = pd.Series(model.predict(rows[models.B_FEATS]))
         # Quiet blocks only (bottom half of prior-12-month complaints among swept cells):
         # the silent-block claim itself. Complaints can't rank these, so compare to random.
         quiet = (rows.complaints_12m <= rows.complaints_12m.median()).to_numpy()
@@ -98,7 +106,8 @@ def main(k: int, start: str) -> None:
         "scored_on": "cells swept (proactive Initial inspections, >=10 lots on a block in a day) that month",
     }
     OUT.mkdir(exist_ok=True)
-    (OUT / "backtest.json").write_text(json.dumps(
+    summary["model_level"] = level
+    (OUT / out).write_text(json.dumps(
         {"window": [s.month.min(), s.month.max()], "k": k, "series": series,
          "summary": summary, "synthetic": False}, indent=1))
     print(json.dumps(summary, indent=2))
@@ -108,5 +117,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--k", type=int, default=50)
     ap.add_argument("--start", default="2016-01")
+    ap.add_argument("--model", choices=["cell", "lot"], default="cell", help="cell- or building-level Model B")
+    ap.add_argument("--out", default="backtest.json")
     a = ap.parse_args()
-    main(a.k, a.start)
+    main(a.k, a.start, a.model, a.out)
