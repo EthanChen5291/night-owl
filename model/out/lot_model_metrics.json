@@ -1,0 +1,18 @@
+{
+  "n_swept_lots": 1529358,
+  "auc_cell_model": 0.6303,
+  "auc_lot_model": 0.6915,
+  "auc_lot_model_averaged_per_cell": 0.6485,
+  "top_features_lot_model": {
+    "floors_mean": 11.7,
+    "lot_units_res": 11.2,
+    "lot_bldg_class": 8.6,
+    "temp_c": 6.4,
+    "lot_year_built": 5.8,
+    "share_binned": 5.4,
+    "refuse_tons_cd": 4.9,
+    "lot_area": 4.6,
+    "bldg_area": 3.9,
+    "median_income": 3.6
+  }
+}

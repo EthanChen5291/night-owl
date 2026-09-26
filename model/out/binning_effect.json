@@ -1,0 +1,58 @@
+{
+  "table": [
+    {
+      "group": "few small homes",
+      "period": "after",
+      "cells": 1769,
+      "complaints_per_cell_month": 0.805,
+      "lots_swept": 66542,
+      "rats_found": 8760,
+      "sweep_rat_rate": 0.1316
+    },
+    {
+      "group": "few small homes",
+      "period": "before",
+      "cells": 1769,
+      "complaints_per_cell_month": 0.9573,
+      "lots_swept": 75718,
+      "rats_found": 13275,
+      "sweep_rat_rate": 0.1753
+    },
+    {
+      "group": "many small homes",
+      "period": "after",
+      "cells": 1769,
+      "complaints_per_cell_month": 0.1504,
+      "lots_swept": 4044,
+      "rats_found": 263,
+      "sweep_rat_rate": 0.065
+    },
+    {
+      "group": "many small homes",
+      "period": "before",
+      "cells": 1769,
+      "complaints_per_cell_month": 0.171,
+      "lots_swept": 4118,
+      "rats_found": 274,
+      "sweep_rat_rate": 0.0665
+    }
+  ],
+  "summary": {
+    "few small homes": {
+      "complaints_change": -0.1591,
+      "sweep_rat_rate_change": -0.2491,
+      "lots_swept_before": 75718,
+      "lots_swept_after": 66542
+    },
+    "many small homes": {
+      "complaints_change": -0.1205,
+      "sweep_rat_rate_change": -0.0226,
+      "lots_swept_before": 4118,
+      "lots_swept_after": 4044
+    },
+    "difference_in_differences": {
+      "complaints_change": 0.0386,
+      "sweep_rat_rate_change": 0.2265
+    }
+  }
+}

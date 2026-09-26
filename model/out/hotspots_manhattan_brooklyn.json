@@ -1,0 +1,383 @@
+{
+ "month": "2026-09",
+ "scope": [
+  "Manhattan",
+  "Brooklyn"
+ ],
+ "n_cells": 1704,
+ "top_risk": [
+  {
+   "rank": 1,
+   "h3": "892a100a12bffff",
+   "neighborhood": "Inwood",
+   "borough": "Manhattan",
+   "cd": "112",
+   "lat": 40.865457,
+   "lon": -73.919465,
+   "rat_risk": 0.1468,
+   "silence": 36.3,
+   "complaints_12m": 12,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "population_density"
+   ],
+   "top_building": "232 SHERMAN AVENUE"
+  },
+  {
+   "rank": 2,
+   "h3": "892a1008d57ffff",
+   "neighborhood": "Harlem (South)",
+   "borough": "Manhattan",
+   "cd": "110",
+   "lat": 40.801097,
+   "lon": -73.951312,
+   "rat_risk": 0.138,
+   "silence": 3.7,
+   "complaints_12m": 36,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "median_income"
+   ],
+   "top_building": "89 LENOX AVENUE"
+  },
+  {
+   "rank": 3,
+   "h3": "892a100aed7ffff",
+   "neighborhood": "Washington Heights (North)",
+   "borough": "Manhattan",
+   "cd": "112",
+   "lat": 40.862529,
+   "lon": -73.93008,
+   "rat_risk": 0.136,
+   "silence": 1.9,
+   "complaints_12m": 7,
+   "reasons": [
+    "trash_bins_required",
+    "many_properties",
+    "building_height"
+   ],
+   "top_building": "38 SICKLES STREET"
+  },
+  {
+   "rank": 4,
+   "h3": "892a100ae77ffff",
+   "neighborhood": "Washington Heights (South)",
+   "borough": "Manhattan",
+   "cd": "112",
+   "lat": 40.849136,
+   "lon": -73.936005,
+   "rat_risk": 0.1354,
+   "silence": 19.4,
+   "complaints_12m": 11,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "population_density"
+   ],
+   "top_building": "701 WEST 179 STREET"
+  },
+  {
+   "rank": 5,
+   "h3": "892a100ab57ffff",
+   "neighborhood": "Harlem (North)",
+   "borough": "Manhattan",
+   "cd": "110",
+   "lat": 40.819997,
+   "lon": -73.937036,
+   "rat_risk": 0.1328,
+   "silence": 14.5,
+   "complaints_12m": 121,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "population_density"
+   ],
+   "top_building": "680 LENOX AVENUE"
+  },
+  {
+   "rank": 6,
+   "h3": "892a100ae63ffff",
+   "neighborhood": "Washington Heights (North)",
+   "borough": "Manhattan",
+   "cd": "112",
+   "lat": 40.849022,
+   "lon": -73.940289,
+   "rat_risk": 0.129,
+   "silence": 17.4,
+   "complaints_12m": 6,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "building_area"
+   ],
+   "top_building": "700 WEST 178 STREET"
+  },
+  {
+   "rank": 7,
+   "h3": "892a1008d0bffff",
+   "neighborhood": "Harlem (South)",
+   "borough": "Manhattan",
+   "cd": "110",
+   "lat": 40.798511,
+   "lon": -73.94907,
+   "rat_risk": 0.1262,
+   "silence": 54.8,
+   "complaints_12m": 20,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "many_properties"
+   ],
+   "top_building": "90 LENOX AVENUE"
+  },
+  {
+   "rank": 8,
+   "h3": "892a100ae93ffff",
+   "neighborhood": "Inwood",
+   "borough": "Manhattan",
+   "cd": "112",
+   "lat": 40.862756,
+   "lon": -73.921508,
+   "rat_risk": 0.1256,
+   "silence": 1.1,
+   "complaints_12m": 4,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "building_area"
+   ],
+   "top_building": "101 POST AVENUE"
+  },
+  {
+   "rank": 9,
+   "h3": "892a1008d2bffff",
+   "neighborhood": "East Harlem (South)",
+   "borough": "Manhattan",
+   "cd": "111",
+   "lat": 40.790641,
+   "lon": -73.946626,
+   "rat_risk": 0.1218,
+   "silence": 9.9,
+   "complaints_12m": 26,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "storm_drains"
+   ],
+   "top_building": "167 EAST 105 STREET"
+  },
+  {
+   "rank": 10,
+   "h3": "892a100a167ffff",
+   "neighborhood": "Inwood",
+   "borough": "Manhattan",
+   "cd": "112",
+   "lat": 40.865344,
+   "lon": -73.923751,
+   "rat_risk": 0.1204,
+   "silence": 21.6,
+   "complaints_12m": 18,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "population_density"
+   ],
+   "top_building": "590 WEST 204 STREET"
+  }
+ ],
+ "top_silent": [
+  {
+   "rank": 1,
+   "h3": "892a100abdbffff",
+   "neighborhood": "Harlem (North)",
+   "borough": "Manhattan",
+   "cd": "110",
+   "lat": 40.827984,
+   "lon": -73.935198,
+   "rat_risk": 0.0851,
+   "silence": 94.0,
+   "complaints_12m": 5,
+   "reasons": [
+    "trash_bins_required",
+    "pre_1940_buildings",
+    "building_height"
+   ],
+   "top_building": "2918 FREDRICK DOUGLASS BL"
+  },
+  {
+   "rank": 2,
+   "h3": "892a100de33ffff",
+   "neighborhood": "South Williamsburg",
+   "borough": "Brooklyn",
+   "cd": "301",
+   "lat": 40.700622,
+   "lon": -73.951728,
+   "rat_risk": 0.0723,
+   "silence": 87.5,
+   "complaints_12m": 1,
+   "reasons": [
+    "pre_1940_buildings",
+    "trash_bins_required",
+    "population_density"
+   ],
+   "top_building": "265 LEE AVENUE"
+  },
+  {
+   "rank": 3,
+   "h3": "892a100a1bbffff",
+   "neighborhood": "Kingsbridge-Marble Hill",
+   "borough": "Manhattan",
+   "cd": "207",
+   "lat": 40.873674,
+   "lon": -73.909047,
+   "rat_risk": 0.0847,
+   "silence": 80.3,
+   "complaints_12m": 9,
+   "reasons": [
+    "trash_bins_required",
+    "many_properties",
+    "street_trees"
+   ],
+   "top_building": "5210 BROADWAY"
+  },
+  {
+   "rank": 4,
+   "h3": "892a1008d97ffff",
+   "neighborhood": "East Harlem (North)",
+   "borough": "Manhattan",
+   "cd": "111",
+   "lat": 40.804252,
+   "lon": -73.93215,
+   "rat_risk": 0.0819,
+   "silence": 79.9,
+   "complaints_12m": 0,
+   "reasons": [
+    "trash_bins_required",
+    "pre_1940_buildings",
+    "building_height"
+   ],
+   "top_building": "322 EAST 126 STREET"
+  },
+  {
+   "rank": 5,
+   "h3": "892a100f24bffff",
+   "neighborhood": "Upper East Side-Yorkville",
+   "borough": "Manhattan",
+   "cd": "108",
+   "lat": 40.782771,
+   "lon": -73.944182,
+   "rat_risk": 0.107,
+   "silence": 77.4,
+   "complaints_12m": 7,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "many_properties"
+   ],
+   "top_building": "1810 1 AVENUE"
+  },
+  {
+   "rank": 6,
+   "h3": "892a1074007ffff",
+   "neighborhood": "Gravesend (South)",
+   "borough": "Brooklyn",
+   "cd": "313",
+   "lat": 40.591619,
+   "lon": -73.979538,
+   "rat_risk": 0.0524,
+   "silence": 76.0,
+   "complaints_12m": 1,
+   "reasons": [
+    "building_height",
+    "trash_bins_required",
+    "pre_1940_buildings"
+   ],
+   "top_building": "2295 WEST 11 STREET"
+  },
+  {
+   "rank": 7,
+   "h3": "892a100a187ffff",
+   "neighborhood": "Kingsbridge-Marble Hill",
+   "borough": "Manhattan",
+   "cd": "208",
+   "lat": 40.876376,
+   "lon": -73.907003,
+   "rat_risk": 0.1136,
+   "silence": 74.9,
+   "complaints_12m": 6,
+   "reasons": [
+    "trash_bins_required",
+    "pre_1940_buildings",
+    "many_properties"
+   ],
+   "top_building": "2811 EXTERIOR STREET"
+  },
+  {
+   "rank": 8,
+   "h3": "892a100d2b3ffff",
+   "neighborhood": "Murray Hill-Kips Bay",
+   "borough": "Manhattan",
+   "cd": "106",
+   "lat": 40.74229,
+   "lon": -73.974729,
+   "rat_risk": 0.0587,
+   "silence": 74.8,
+   "complaints_12m": 0,
+   "reasons": [
+    "trash_bins_required",
+    "median_income",
+    "building_height"
+   ],
+   "top_building": "333 EAST 30 STREET"
+  },
+  {
+   "rank": 9,
+   "h3": "892a1008c2fffff",
+   "neighborhood": "Morningside Heights",
+   "borough": "Manhattan",
+   "cd": "109",
+   "lat": 40.806153,
+   "lon": -73.960078,
+   "rat_risk": 0.0621,
+   "silence": 73.3,
+   "complaints_12m": 1,
+   "reasons": [
+    "median_income",
+    "trash_bins_required",
+    "retail_space"
+   ],
+   "top_building": "1145 AMSTERDAM AVENUE"
+  },
+  {
+   "rank": 10,
+   "h3": "892a10728bbffff",
+   "neighborhood": "Financial District-Battery Park City",
+   "borough": "Manhattan",
+   "cd": "101",
+   "lat": 40.704401,
+   "lon": -74.007465,
+   "rat_risk": 0.0506,
+   "silence": 72.1,
+   "complaints_12m": 6,
+   "reasons": [
+    "building_area",
+    "trash_bins_required",
+    "median_income"
+   ],
+   "top_building": "10 HANOVER SQUARE"
+  }
+ ],
+ "tiers": {
+  "top_1pct_risk_cells": 17,
+  "top_1pct_risk_by_borough": {
+   "Manhattan": 16,
+   "Brooklyn": 1
+  },
+  "top_1pct_silent_by_borough": {
+   "Manhattan": 12,
+   "Brooklyn": 5
+  }
+ }
+}

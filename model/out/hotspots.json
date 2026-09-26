@@ -1,0 +1,383 @@
+{
+ "month": "2026-09",
+ "scope": "all NYC",
+ "n_cells": 5170,
+ "top_risk": [
+  {
+   "rank": 1,
+   "h3": "892a1001317ffff",
+   "neighborhood": "Pelham Parkway-Van Nest",
+   "borough": "Bronx",
+   "cd": "211",
+   "lat": 40.856224,
+   "lon": -73.867639,
+   "rat_risk": 0.1571,
+   "silence": 20.7,
+   "complaints_12m": 7,
+   "reasons": [
+    "trash_bins_required",
+    "building_age",
+    "building_height"
+   ],
+   "top_building": "2167 CRUGER AVENUE"
+  },
+  {
+   "rank": 2,
+   "h3": "892a100120fffff",
+   "neighborhood": "Bedford Park",
+   "borough": "Bronx",
+   "cd": "207",
+   "lat": 40.871535,
+   "lon": -73.889656,
+   "rat_risk": 0.1528,
+   "silence": 26.4,
+   "complaints_12m": 18,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "building_area"
+   ],
+   "top_building": "2914 JEROME AVENUE"
+  },
+  {
+   "rank": 3,
+   "h3": "892a100a12bffff",
+   "neighborhood": "Inwood",
+   "borough": "Manhattan",
+   "cd": "112",
+   "lat": 40.865457,
+   "lon": -73.919465,
+   "rat_risk": 0.1468,
+   "silence": 36.3,
+   "complaints_12m": 12,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "population_density"
+   ],
+   "top_building": "232 SHERMAN AVENUE"
+  },
+  {
+   "rank": 4,
+   "h3": "892a100a80fffff",
+   "neighborhood": "Concourse-Concourse Village",
+   "borough": "Bronx",
+   "cd": "204",
+   "lat": 40.833725,
+   "lon": -73.918265,
+   "rat_risk": 0.1436,
+   "silence": 29.9,
+   "complaints_12m": 15,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "population_density"
+   ],
+   "top_building": "111 EAST 167 STREET"
+  },
+  {
+   "rank": 5,
+   "h3": "892a100a813ffff",
+   "neighborhood": "Mount Eden-Claremont (West)",
+   "borough": "Bronx",
+   "cd": "204",
+   "lat": 40.839126,
+   "lon": -73.914181,
+   "rat_risk": 0.1404,
+   "silence": 21.0,
+   "complaints_12m": 11,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "population_density"
+   ],
+   "top_building": "1420 GRAND CONCOURSE"
+  },
+  {
+   "rank": 6,
+   "h3": "892a100a8c7ffff",
+   "neighborhood": "Mount Eden-Claremont (West)",
+   "borough": "Bronx",
+   "cd": "204",
+   "lat": 40.841714,
+   "lon": -73.916423,
+   "rat_risk": 0.1391,
+   "silence": 37.9,
+   "complaints_12m": 8,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "population_density"
+   ],
+   "top_building": "1460 MACOMBS ROAD"
+  },
+  {
+   "rank": 7,
+   "h3": "892a100a833ffff",
+   "neighborhood": "Concourse-Concourse Village",
+   "borough": "Bronx",
+   "cd": "204",
+   "lat": 40.831251,
+   "lon": -73.91174,
+   "rat_risk": 0.1384,
+   "silence": 35.5,
+   "complaints_12m": 6,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "building_area"
+   ],
+   "top_building": "1150 COLLEGE AVENUE"
+  },
+  {
+   "rank": 8,
+   "h3": "892a1008d57ffff",
+   "neighborhood": "Harlem (South)",
+   "borough": "Manhattan",
+   "cd": "110",
+   "lat": 40.801097,
+   "lon": -73.951312,
+   "rat_risk": 0.138,
+   "silence": 3.7,
+   "complaints_12m": 36,
+   "reasons": [
+    "trash_bins_required",
+    "building_height",
+    "median_income"
+   ],
+   "top_building": "89 LENOX AVENUE"
+  },
+  {
+   "rank": 9,
+   "h3": "892a100a897ffff",
+   "neighborhood": "Claremont Village-Claremont (East)",
+   "borough": "Bronx",
+   "cd": "203",
+   "lat": 40.842052,
+   "lon": -73.90357,
+   "rat_risk": 0.1365,
+   "silence": 75.4,
+   "complaints_12m": 1,
+   "reasons": [
+    "building_height",
+    "industrial_land",
+    "residential_share"
+   ],
+   "top_building": "1674 CARTER AVENUE"
+  },
+  {
+   "rank": 10,
+   "h3": "892a100aed7ffff",
+   "neighborhood": "Washington Heights (North)",
+   "borough": "Manhattan",
+   "cd": "112",
+   "lat": 40.862529,
+   "lon": -73.93008,
+   "rat_risk": 0.136,
+   "silence": 1.9,
+   "complaints_12m": 7,
+   "reasons": [
+    "trash_bins_required",
+    "many_properties",
+    "building_height"
+   ],
+   "top_building": "38 SICKLES STREET"
+  }
+ ],
+ "top_silent": [
+  {
+   "rank": 1,
+   "h3": "892a100abdbffff",
+   "neighborhood": "Harlem (North)",
+   "borough": "Manhattan",
+   "cd": "110",
+   "lat": 40.827984,
+   "lon": -73.935198,
+   "rat_risk": 0.0851,
+   "silence": 94.0,
+   "complaints_12m": 5,
+   "reasons": [
+    "trash_bins_required",
+    "pre_1940_buildings",
+    "building_height"
+   ],
+   "top_building": "2918 FREDRICK DOUGLASS BL"
+  },
+  {
+   "rank": 2,
+   "h3": "892a100a887ffff",
+   "neighborhood": "Mount Eden-Claremont (West)",
+   "borough": "Bronx",
+   "cd": "204",
+   "lat": 40.839352,
+   "lon": -73.905613,
+   "rat_risk": 0.0883,
+   "silence": 92.8,
+   "complaints_12m": 2,
+   "reasons": [
+    "trash_bins_required",
+    "pre_1940_buildings",
+    "building_height"
+   ],
+   "top_building": "1570 WEBSTER AVENUE"
+  },
+  {
+   "rank": 3,
+   "h3": "892a100aaa7ffff",
+   "neighborhood": "Highbridge",
+   "borough": "Bronx",
+   "cd": "204",
+   "lat": 40.830685,
+   "lon": -73.933157,
+   "rat_risk": 0.0662,
+   "silence": 89.8,
+   "complaints_12m": 0,
+   "reasons": [
+    "trash_bins_required",
+    "pre_1940_buildings",
+    "building_height"
+   ],
+   "top_building": "903 SUMMIT AVENUE"
+  },
+  {
+   "rank": 4,
+   "h3": "892a100de33ffff",
+   "neighborhood": "South Williamsburg",
+   "borough": "Brooklyn",
+   "cd": "301",
+   "lat": 40.700622,
+   "lon": -73.951728,
+   "rat_risk": 0.0723,
+   "silence": 87.5,
+   "complaints_12m": 1,
+   "reasons": [
+    "pre_1940_buildings",
+    "trash_bins_required",
+    "population_density"
+   ],
+   "top_building": "265 LEE AVENUE"
+  },
+  {
+   "rank": 5,
+   "h3": "892a100c437ffff",
+   "neighborhood": "Corona",
+   "borough": "Queens",
+   "cd": "404",
+   "lat": 40.737364,
+   "lon": -73.861144,
+   "rat_risk": 0.0611,
+   "silence": 87.4,
+   "complaints_12m": 3,
+   "reasons": [
+    "pre_1940_buildings",
+    "trash_bins_required",
+    "population_density"
+   ],
+   "top_building": "55-25 98 PLACE"
+  },
+  {
+   "rank": 6,
+   "h3": "892a100c507ffff",
+   "neighborhood": "Forest Hills",
+   "borough": "Queens",
+   "cd": "406",
+   "lat": 40.724439,
+   "lon": -73.849979,
+   "rat_risk": 0.0693,
+   "silence": 85.7,
+   "complaints_12m": 2,
+   "reasons": [
+    "pre_1940_buildings",
+    "trash_bins_required",
+    "building_height"
+   ],
+   "top_building": "104-15 QUEENS BOULEVARD"
+  },
+  {
+   "rank": 7,
+   "h3": "892a100e397ffff",
+   "neighborhood": "Flushing-Willets Point",
+   "borough": "Queens",
+   "cd": "407",
+   "lat": 40.751506,
+   "lon": -73.825282,
+   "rat_risk": 0.0622,
+   "silence": 84.8,
+   "complaints_12m": 2,
+   "reasons": [
+    "trash_bins_required",
+    "pre_1940_buildings",
+    "building_age"
+   ],
+   "top_building": "43-23 COLDEN STREET"
+  },
+  {
+   "rank": 8,
+   "h3": "892a100105bffff",
+   "neighborhood": "Norwood",
+   "borough": "Bronx",
+   "cd": "207",
+   "lat": 40.879973,
+   "lon": -73.870657,
+   "rat_risk": 0.1256,
+   "silence": 81.6,
+   "complaints_12m": 9,
+   "reasons": [
+    "trash_bins_required",
+    "storm_drains",
+    "building_height"
+   ],
+   "top_building": "3525 DECATUR AVENUE"
+  },
+  {
+   "rank": 9,
+   "h3": "892a100a1bbffff",
+   "neighborhood": "Kingsbridge-Marble Hill",
+   "borough": "Manhattan",
+   "cd": "207",
+   "lat": 40.873674,
+   "lon": -73.909047,
+   "rat_risk": 0.0847,
+   "silence": 80.3,
+   "complaints_12m": 9,
+   "reasons": [
+    "trash_bins_required",
+    "many_properties",
+    "street_trees"
+   ],
+   "top_building": "5210 BROADWAY"
+  },
+  {
+   "rank": 10,
+   "h3": "892a1008d97ffff",
+   "neighborhood": "East Harlem (North)",
+   "borough": "Manhattan",
+   "cd": "111",
+   "lat": 40.804252,
+   "lon": -73.93215,
+   "rat_risk": 0.0819,
+   "silence": 79.9,
+   "complaints_12m": 0,
+   "reasons": [
+    "trash_bins_required",
+    "pre_1940_buildings",
+    "building_height"
+   ],
+   "top_building": "322 EAST 126 STREET"
+  }
+ ],
+ "tiers": {
+  "top_1pct_risk_cells": 52,
+  "top_1pct_risk_by_borough": {
+   "Bronx": 24,
+   "Manhattan": 27,
+   "Brooklyn": 1
+  },
+  "top_1pct_silent_by_borough": {
+   "Manhattan": 16,
+   "Bronx": 16,
+   "Brooklyn": 7,
+   "Queens": 13
+  }
+ }
+}

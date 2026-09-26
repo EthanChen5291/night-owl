@@ -2,7 +2,8 @@
 
 model/out/cells.json  {month, generated_at, cells: [{h3, score_a, score_b, pct_a, pct_b, silence,
                        ci_b, posterior, reasons[{feature, shap}], cd, rmz, n_inspections,
-                       last_event_at}]}  + extras (is_silent, data_gap, n_complaints_12m)
+                       last_event_at}]}  + extras (is_silent, data_gap, n_complaints_12m,
+                       neighborhood, borough, rank_risk, tier_risk, rank_silent, tier_silent)
 model/out/plan.json   {month, k, nodes: [{rank, h3, lat, lon, tree_id, expected_gain, silence, reason}]}
 
 api/store.py recomputes pct_b (from score_b) and silence = pct_b - pct_a over the whole file, so:
@@ -19,11 +20,12 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 from scipy.stats import beta as beta_dist
 
-from config import PROCESSED
+from config import PROCESSED, RAW
 
 models = importlib.import_module("03_models")
 optimizer = importlib.import_module("04_optimizer")
@@ -41,7 +43,7 @@ NAMES = {
     "n_subway_entrances": "subway_entrances", "share_park": "park_land",
     "dob_permits_3m": "construction_3mo", "temp_c": "temperature", "month_of_year": "season",
     "refuse_tons_cd": "district_trash_tons", "median_income": "median_income",
-    "pop_density": "population_density",
+    "pop_density": "population_density", "share_binned": "trash_bins_required",
 }
 
 
@@ -52,6 +54,22 @@ def pct100(x) -> np.ndarray:
 
 
 NOT_A_PLACE = {"temp_c", "month_of_year", "refuse_tons_cd"}  # seasonal/citywide: not "why this block"
+
+
+def tier(rank, n):
+    """'top 1%' / 'top 5%' / 'top 10%' / None for a 1-based rank out of n."""
+    if rank is None or pd.isna(rank):
+        return None
+    q = rank / n
+    return "top 1%" if q <= 0.01 else "top 5%" if q <= 0.05 else "top 10%" if q <= 0.10 else None
+
+
+def neighbourhoods(cells: pd.DataFrame) -> pd.DataFrame:
+    """NTA neighbourhood + borough name of each cell centroid (2020 census tracts)."""
+    tr = gpd.read_file(RAW / "census_tracts_2020.geojson")[["ntaname", "boroname", "geometry"]]
+    pts = gpd.GeoDataFrame(cells[["h3"]], geometry=gpd.points_from_xy(cells.lng, cells.lat), crs=4326)
+    j = gpd.sjoin(pts, tr.to_crs(4326), how="left", predicate="within").drop_duplicates("h3")
+    return j.set_index("h3")[["ntaname", "boroname"]]
 
 
 def shap_reasons(df: pd.DataFrame, month: str, rows: pd.DataFrame) -> list[list[dict]]:
@@ -83,10 +101,24 @@ def main(k: int) -> None:
     s["pct_a"] = pct100(s.complaints_per_capita)
     s["pct_b"] = pct100(s.risk_b)
     s["silence100"] = (s.pct_b - s.pct_a).round(1)
-    # Posterior as of the scoring month: B is the prior worth PRIOR_LOTS lots, sweeps update it.
-    n0 = models.PRIOR_LOTS + s.sweeps_24m
-    a, b = s.risk_post * n0, (1 - s.risk_post) * n0
-    lo, hi = beta_dist.ppf(0.025, a, b), beta_dist.ppf(0.975, a, b)
+    # ci_b and posterior describe score_b itself (Model B's belief): a Beta prior worth PRIOR_LOTS
+    # inspected lots, centred on score_b, widened to cover the spread of the 5 bootstrap copies.
+    # (Before, they came from the sweep-updated posterior, so score_b could sit outside its own
+    # interval, e.g. Bed-Stuy score_b 0.035 with ci_b [0.072, 0.106].) n_events starts at 0; the
+    # API adds sensor detections on top.
+    n0 = float(models.PRIOR_LOTS)
+    a, b = s.risk_b.clip(1e-3, 1 - 1e-3) * n0, (1 - s.risk_b.clip(1e-3, 1 - 1e-3)) * n0
+    spread = 1.96 * s.risk_b_model_sd
+    lo = np.minimum(beta_dist.ppf(0.025, a, b), (s.risk_b - spread).clip(lower=0))
+    hi = np.maximum(beta_dist.ppf(0.975, a, b), (s.risk_b + spread).clip(upper=1))
+    # Rankings among eligible cells: 1 = highest rat risk (Model B); silent rank only among
+    # flagged silent cells, 1 = biggest gap between rats likely and complaints.
+    n = len(s)
+    s["rank_risk"] = s.risk_b.rank(ascending=False, method="first").astype(int)
+    s["rank_silent"] = s.silence100.where(s.is_silent).rank(ascending=False, method="first")
+    names = neighbourhoods(s)
+    s["neighborhood"] = s.h3.map(names.ntaname)
+    s["borough"] = s.h3.map(names.boroname)
     target = df[df.month == month].set_index("h3").loc[s.h3].reset_index()
     reasons = shap_reasons(df, month, target)
 
@@ -105,6 +137,11 @@ def main(k: int) -> None:
         # extras (not in types.ts; safe to ignore)
         "is_silent": bool(r.is_silent), "data_gap": round(float(r.data_gap), 3),
         "n_complaints_12m": int(r.n_complaints_12m),
+        "neighborhood": r.neighborhood if isinstance(r.neighborhood, str) else None,
+        "borough": r.borough if isinstance(r.borough, str) else None,
+        "rank_risk": int(r.rank_risk), "tier_risk": tier(r.rank_risk, n),
+        "rank_silent": None if pd.isna(r.rank_silent) else int(r.rank_silent),
+        "tier_silent": tier(r.rank_silent, n),
     } for i, r in enumerate(s.itertuples())]
     (OUT / "cells.json").write_text(json.dumps({"month": month, "generated_at": now, "cells": cells}))
 

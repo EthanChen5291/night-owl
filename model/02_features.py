@@ -37,7 +37,7 @@ def count_per_cell(sql: str, name: str) -> pd.Series:
 # ---------------------------------------------------------------- static features
 pluto = points(f"""
     select latitude, longitude, landuse, yearbuilt, numfloors, unitsres,
-           bldgarea, resarea, comarea, retailarea
+           bldgarea, resarea, comarea, retailarea, BBL as bbl, "community board" as cb
     from read_csv_auto('{RAW / "pluto.csv"}', sample_size = 50000)
 """)
 pluto["yearbuilt"] = pluto.yearbuilt.where(pluto.yearbuilt > 1800)  # 0 = unknown
@@ -104,6 +104,16 @@ static = (cells.set_index("h3")[["lat", "lng", "boro_cd", "real_cd"]]
 count_cols = ["n_lots", "units_res", "bldg_area", "retail_area", "com_area", "n_restaurants",
               "n_litter_baskets", "n_catch_basins", "n_trees", "n_subway_entrances", "share_park"]
 static[count_cols] = static[count_cols].fillna(0)
+
+# Neighbourhood context: rats don't stop at hexagon edges. Mean of the 6 ring-1 neighbours
+# (missing neighbours = water/outside NYC are skipped).
+NBR_COLS = ["floors_mean", "year_built_median", "share_pre1940", "share_vacant", "share_residential",
+            "share_commercial", "n_restaurants", "n_litter_baskets", "n_catch_basins", "n_trees",
+            "units_res", "share_park"]
+ring = {c: [n for n in h3.grid_ring(c, 1) if n in static.index] for c in static.index}
+for col in NBR_COLS:
+    v = static[col]
+    static[f"nbr_{col}"] = [v.loc[ns].mean() if ns else np.nan for ns in ring.values()]
 static.reset_index().to_parquet(PROCESSED / "features_static.parquet", index=False)
 
 # ---------------------------------------------------------------- time-varying features
@@ -161,6 +171,31 @@ panel["hpd_rodent_12m"] = lagged_sum("hpd_rodent", 12)          # Model A only (
 panel["complaints_1m"] = lagged_sum("n_complaints", 1)          # Model A only
 panel["complaints_12m"] = lagged_sum("n_complaints", 12)        # Model A only
 panel = panel.drop(columns=raw_monthly)
+
+# Binning (DSNY containerization): share of a cell's lots that must put trash in lidded
+# bins by that month. Each lot's start date comes from its type; a lot counts from the
+# earliest rule that covers it. Sources: DSNY "Trash Revolution" announcements.
+#   2023-08  food businesses (lots with a DOHMH-inspected restaurant)
+#   2024-03  all businesses (mixed-use / commercial land use, or commercial floor area)
+#   2024-11  homes with 1-9 units (rule effective 2024-11-12)
+#   2025-06  10+ unit buildings in Manhattan CD 9 (West Harlem Empire Bins, 100% by June 2025)
+# (2026-06 / 2026-09-08: official NYC Bin required / enforced for 1-9 units: same lots, no new coverage.)
+BIN_RULES = ["2023-08", "2024-03", "2024-11", "2025-06"]
+food_bbls = set(con.sql(f"""select distinct BBL from read_csv_auto('{RAW / "restaurant_inspections.csv"}',
+    sample_size = 50000) where BBL is not null""").df().BBL.astype("int64"))
+rules = pd.DataFrame({
+    "2023-08": pluto.bbl.isin(food_bbls),
+    "2024-03": pluto.landuse.isin([4, 5]) | (pluto.comarea > 0),
+    "2024-11": pluto.unitsres.between(1, 9),
+    "2025-06": (pluto.cb == 109) & (pluto.unitsres >= 10),
+})
+first = rules.idxmax(axis=1).where(rules.any(axis=1))      # earliest rule covering the lot
+starts = pd.crosstab(pluto.h3, first).reindex(columns=BIN_RULES, fill_value=0)
+starts = starts.div(pluto.groupby("h3").size(), axis=0)    # share of the cell's lots per start date
+panel = panel.merge(starts.add_prefix("bin_").reset_index(), on="h3", how="left")
+panel["share_binned"] = sum(np.where(panel.month >= d, panel[f"bin_{d}"].fillna(0), 0.0) for d in BIN_RULES)
+panel["share_small_homes"] = panel["bin_2024-11"].fillna(0)  # for the before/after test
+panel = panel.drop(columns=[f"bin_{d}" for d in BIN_RULES])
 
 # Weather (citywide) and trash tonnage (community district)
 noaa = pd.read_csv(RAW / "noaa_central_park_monthly.csv").rename(columns={"DATE": "month", "TAVG": "temp_c"})

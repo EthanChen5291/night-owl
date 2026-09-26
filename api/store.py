@@ -115,6 +115,13 @@ class Store:
             data["month"] = month
         return data, path
 
+    def placements(self) -> tuple[dict, Path]:
+        """Node spot options inside ranked hexagons (model/09_placements.py). No fixture."""
+        path = self.data_dir / "model" / "out" / "placements.json"
+        if not path.exists():
+            raise FileNotFoundError(path)
+        return self.load_json(path), path
+
     def backtest(self) -> tuple[dict, Path]:
         path = self.backtest_path()
         return self.load_json(path), path
