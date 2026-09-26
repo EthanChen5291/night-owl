@@ -1,6 +1,6 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 16:50** (node spots inside each hexagon).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 16:53** (node spots layer; ready for Ethan to try).
 
 ## For teammates: start here
 
@@ -225,6 +225,12 @@ top-3 spots by our score 18.7% rats found vs sightings only 16.8% vs random
 
 On the map: click a hotspot → its options appear under the row and as green pins A/B/C; click an option to fly in.
 `api/` has a new `GET /placements?h3=` (reads `model/out/placements.json`, 503 if missing).
+
+**Ethan, to try it:** run the server + map (see "How to use this branch"), click a row in "NYC hotspots"; the camera
+flies in, options A/B/C show under the row and as green pins; click an option to zoom to that tree. Typecheck and
+`npm run build` pass, and `/placements` was tested with curl, but the pins have **not been checked visually yet**:
+tell Sanjavan if anything looks off (pin size/height is `setSpots` in `web/src/city/scene.ts`).
+Known limits: 1.4× random is a modest lift; the weights are hand-set (next step: learn them from the sweeps).
 
 ## Honest limits (say these before a judge does)
 
