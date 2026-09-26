@@ -31,7 +31,7 @@ Reset between rehearsals: `curl -X DELETE -H 'X-Demo-Reset: yes' localhost:8000/
 | GET | `/cells?month=YYYY-MM` | Exact-month model file or fixture first; otherwise current model output with its actual month. Live posterior overlay applies only to matching-month events. |
 | GET | `/plan?month&k` | Same month selection; accepted detections re-rank existing tree locations when their H3 is a candidate. `replanned` reports whether the plan changed. |
 | GET | `/queue?limit=50` | live events, newest first, `received_at` added. Starts empty (the queue fixture is for the frontend only) |
-| POST | `/event` | the 9-key body; 400 on malformed shape or JSON (bbox must be 0–1, class `rat`/`person`, conf 0–1) |
+| POST | `/event` | The 9-key body; 400 on malformed shape or JSON. Response `accepted` is true only when this delivery updates the posterior. |
 | GET | `/backtest` | `model/out/backtest.json` → `api/fixtures/backtest.json` (synthetic, flagged `"synthetic": true`) |
 | GET | `/stream` | Server-Sent Events: `hello` on connect, `event` per POST, `reset` on DELETE; keepalive every 15 s |
 | GET | `/health` | `{"ok":true,"events":n,"cells_source":path}` |
