@@ -8,6 +8,7 @@ Gate:    events with conf < MIN_CONF or n_hits < MIN_HITS are logged and queued 
 from __future__ import annotations
 
 import os
+import math
 from dataclasses import dataclass
 
 N0 = float(os.environ.get("BARN_OWL_N0", "10"))
@@ -26,6 +27,11 @@ class Posterior:
     alpha: float
     beta: float
     n_events: int = 0
+    prior_strength: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.prior_strength is None:
+            self.prior_strength = self.alpha + self.beta
 
     @classmethod
     def from_score_b(cls, score_b: float, n0: float = N0) -> "Posterior":
@@ -40,6 +46,20 @@ class Posterior:
     @property
     def mean(self) -> float:
         return self.alpha / (self.alpha + self.beta)
+
+    def interval(self) -> list[float]:
+        """Approximate central 95% Beta interval for the current sensor posterior.
+
+        The Wilson form stays within [0, 1] for small probabilities and narrows
+        as accepted observations add evidence. It is an approximation, unlike
+        the model's exported interval which also includes ensemble spread.
+        """
+        total = self.alpha + self.beta
+        mean = self.mean
+        z = 1.959963984540054
+        centre = (mean + z * z / (2 * total)) / (1 + z * z / total)
+        half = z * math.sqrt(mean * (1 - mean) / total + z * z / (4 * total * total)) / (1 + z * z / total)
+        return [round(max(0.0, centre - half), 4), round(min(1.0, centre + half), 4)]
 
     def to_dict(self) -> dict:
         return {"alpha": round(self.alpha, 4), "beta": round(self.beta, 4), "n_events": self.n_events}
