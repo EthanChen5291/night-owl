@@ -138,7 +138,8 @@ def create_app(data_dir: Path | None = None, events_file: Path | None = None) ->
         print(f"EVENT node={stored['node_id']} h3={stored['h3']} class={stored['class']} conf={stored['conf']:.2f} "
               f"n_hits={stored['n_hits']} -> posterior mean {post.mean:.3f} "
               f"(a={post.alpha:.2f} b={post.beta:.2f} n={post.n_events}) [{tag}]", flush=True)
-        return {"ok": True, "h3": stored["h3"], "posterior": post.to_dict(), "score_b_updated": round(post.mean, 4)}
+        return {"ok": True, "accepted": accepted, "h3": stored["h3"],
+                "posterior": post.to_dict(), "score_b_updated": round(post.mean, 4)}
 
     @app.delete("/events")
     async def reset(x_demo_reset: str | None = Header(default=None), s: Store = Depends(get_store)):

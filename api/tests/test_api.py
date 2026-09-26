@@ -43,7 +43,7 @@ def test_three_events_queue_order_and_posterior(client):
         r = client.post("/event", json=event(conf=cf, ts=f"2026-09-26T14:0{i}:00.000Z"))
         assert r.status_code == 200, r.text
         j = r.json()
-        assert j["ok"] is True and j["h3"] == DEMO_H3
+        assert j["ok"] is True and j["accepted"] is True and j["h3"] == DEMO_H3
         assert j["posterior"]["n_events"] == i + 1
         expected_alpha = prior_alpha + sum(confs[: i + 1])
         assert j["posterior"]["alpha"] == pytest.approx(expected_alpha, abs=1e-3)
@@ -79,7 +79,7 @@ def test_three_events_queue_order_and_posterior(client):
 def test_low_conf_is_queued_but_does_not_move_posterior(client):
     before = client.get("/cells?month=2026-09").json()
     r = client.post("/event", json=event(conf=0.3))
-    assert r.status_code == 200 and r.json()["posterior"]["n_events"] == 0
+    assert r.status_code == 200 and r.json()["accepted"] is False and r.json()["posterior"]["n_events"] == 0
     assert len(client.get("/queue").json()["events"]) == 1
     after = client.get("/cells?month=2026-09").json()
     assert next(c for c in after["cells"] if c["h3"] == DEMO_H3) == next(c for c in before["cells"] if c["h3"] == DEMO_H3)
@@ -87,7 +87,8 @@ def test_low_conf_is_queued_but_does_not_move_posterior(client):
 
 def test_person_event_is_queued_without_update(client):
     before = client.get("/plan?month=2026-09&k=10").json()["nodes"]
-    assert client.post("/event", json=event(**{"class": "person"})).json()["posterior"]["n_events"] == 0
+    person = client.post("/event", json=event(**{"class": "person"})).json()
+    assert person["accepted"] is False and person["posterior"]["n_events"] == 0
     assert len(client.get("/queue").json()["events"]) == 1
     assert client.get("/plan?month=2026-09&k=10").json()["nodes"] == before
 
@@ -147,6 +148,7 @@ def test_duplicate_delivery_and_restart_are_idempotent(tmp_path):
     with TestClient(create_app(data_dir=REPO, events_file=f)) as c:
         first = c.post("/event", json=body).json()
         second = c.post("/event", json=body).json()
+        assert first["accepted"] is True and second["accepted"] is False
         assert second["posterior"] == first["posterior"]
         assert len(c.get("/queue").json()["events"]) == 1
     assert len(f.read_text().splitlines()) == 1
