@@ -38,13 +38,25 @@ Work starts from current `origin/main` in managed worktrees. The original checko
 
 - The integrated frontend branch includes the API and detector code from `utsav/model`.
 - API tests: 25 passed in the integrated frontend checkout.
+- Detector pipeline tests: 8 passed in the integrated frontend checkout.
 - Frontend: `pnpm build` passed; `pnpm lint` passed with two existing warnings.
 - Browser: 5,170 cells, direct map-cell selection, all three display modes, five-site budget, model plan, four-series backtest, and demo-cell popup verified.
 - A clearly identified local test event changed the demo cell from P(active) 0.04 to 0.08, showed one sighting, and updated its timestamp and posterior without reloading. Reset restored its prior and zero sightings.
 - A test event on a real plan candidate (`892a100d467ffff`) moved it from rank 11 to rank 2 in both the API and frontend. The standard demo H3 is outside the model's candidate pool, so it updates the cell without claiming a pin moved.
 - Test events were cleared from the isolated local API event file after verification.
-- Detector baseline: 54 reviewed training frames, 22 held-out frames; rat AP50 0.00755 in PyTorch and 0.01176 in ONNX. Export parity passed. The failed candidate was preserved and was not promoted. A larger lit-room training set and revised training settings are in progress.
+- Offline recovery: three fixture sightings produced zero saved owls. Starting the API with one real test event replaced all three fixture sightings with that one event and one owl, restored all 5,170 model cells, and loaded the backtest. A second restart verified the event stream reconnects after a terminal HTTP error.
+- Detector baseline: 54 reviewed training frames, 22 held-out frames; rat AP50 0.00755 in PyTorch and 0.01176 in ONNX. The failed candidate was preserved and was not promoted.
+- Revised detector: 252 training frames, 49 validation frames from two whole clips. On identical square 416-pixel inputs, PyTorch and ONNX both have rat AP50 0.79031. Tabletop AP50 is 0.93674 on 22 frames; floor AP50 is 0.65108 on 27 frames. Raw outputs also match. This is a tabletop demo candidate; the combined 0.9 requirement and formal event gate are not passed. See `vision/TRAINING_RESULTS.md` for provenance and limits.
+- Original recorded footage was replayed through the Pi detector rules on the Mac, using the 59–63 second segment of `zoom15_b`. One plush crop at confidence 0.860 passed the three-hit gate and received `accepted=true` from the API. The candidate cell score changed from 0.0923 to 0.1297 and its plan rank moved from 11 to 2. The frontend showed the crop and sighting. This recorded event remains in the isolated local demo state; canned test events were cleared.
 - Physical Pi timing, camera exposure, and live prop success still require a test on the actual hardware.
+
+## Handoff artifacts
+
+- Editable five-slide deck: `pitch/out/barn-owl-three-minute-pitch-v8.pptx`; three-minute script: `pitch/script.md`.
+- Local model bundle in the model worktree: `vision/runs/rat-litroom-candidate-20260926.zip` (25,624,553 bytes). SHA256: `63404725f343d020485c0ec8a8b3faca19d62cfbb5cb825eb28914cf3eeb89e0`. Includes the reviewed dataset, ONNX and PyTorch candidate, metrics, Pi runtime, checksums, and recorded replay evidence. Large training artifacts are ignored by Git.
+- Recorded replay evidence in the model worktree: `vision/events/v2_live_demo/`, including `before.json`, `after.json`, `replay_report.json`, the plush crop, and `frontend.png`.
+- Physical handoff: extract the bundle and follow its README for a room-lit, no-POST Pi check. Then measure the 20 timed pushes and three-minute negative reel described in `vision/RUNBOOK.md`. The overall box gate currently fails, so the candidate must not be represented as formally promoted or validated on live rats.
+- Ethan's conversation is monitored every five minutes with a read-only background reader. No messages are sent.
 
 ## Run the integrated demo
 
