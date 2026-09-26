@@ -16,11 +16,11 @@ We replayed 119 months. For each month, Model B trained on earlier data. Then we
 
 ## 4. Node and live trigger, 1:40–2:30
 
-A ranking is a place to start, so the planner proposes tree-pit sites where modeled risk and the data gap are high. Our Pi 5 node looks down through a NoIR camera. PIR wakes it; the camera detector makes the call. [Move the toy rat under the node. Wait for the event.] The event sends the cell, confidence, and a crop. The API updates that cell's chosen prior and re-ranks candidates. We are updating the displayed score, not retraining the model on stage. [Point to the feed and changed value only if they appear.]
+A ranking is a place to start, so the planner proposes tree-pit sites where modeled risk and the data gap are high. The Pi 5 camera points down at our room-lit toy rat. PIR wakes capture; the detector still needs to confirm the object. [Move the toy rat. Wait for the event.] If it fires, the event sends the cell, confidence, and a crop. The API updates that cell's chosen prior and re-ranks candidates. The displayed score changes; the city model does not retrain on stage. [Point to a changed value only if it appears.]
 
 ## 5. What is real, 2:30–3:00
 
-The city data, cell models, backtest, and Pi camera and IR capture are real. Today's detector is for this toy rat, and its held-out rig tests are still pending. We have not deployed a field network or counted rat populations. Our next step is a supervised 50-node pilot and a comparison with later sweeps. Barn Owl gives inspectors a better question to ask: where should we look next?
+The city data, cell models, and backtest are real. Teammates report the Pi camera, PIR, and IR capture work. The first prop detector failed its event test; a revision is underway, with held-out tests pending. We have not deployed a field network or counted rat populations. Our next step is a supervised 50-node pilot checked against later sweeps. Barn Owl helps inspectors ask where to look next.
 
 ## Presenter guardrails
 
@@ -30,6 +30,7 @@ The city data, cell models, backtest, and Pi camera and IR capture are real. Tod
 - The Pi PIR wakes capture. It does not recognize rats. A successful live event needs the detector, the API, and the map.
 - An accepted event updates a chosen Beta prior and may re-rank candidate sites. It does not refit Model B. Model exports also contain historical sweep-informed posteriors; use the API's live event value when speaking about the stage update.
 - The toy-rat detector is a prop demo. Replace “held-out rig tests pending” with a measured result only after the clip and event evaluation is complete.
+- The stage prop is lit by room lights. Hardware IR capture and new rig footage do not establish detector performance under IR.
 - If the live event is a canned POST or the feed fails, tell the audience exactly which part ran.
 
 ## Source snapshot
