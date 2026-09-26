@@ -1,0 +1,16 @@
+# vision workstream: data, weights and wheels never go in git (README §8)
+clips/
+frames/
+frames_pruned/
+frames_aug/
+labels/
+labels_aug/
+dataset/
+runs/
+events/
+*.pt
+*.onnx
+!pi/world_rat_person.onnx
+pi/wheels/
+__pycache__/
+*.pyc

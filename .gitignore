@@ -1,0 +1,41 @@
+# Barn Owl — snapshot repo
+
+# secrets
+.env
+CREDENTIALS.txt
+
+# large data (never commit)
+data/raw/
+data/parquet/
+*.parquet
+*.csv
+*.MOV
+*.mov
+*.mp4
+
+# vision artefacts
+vision/frames/
+vision/frames_pruned/
+vision/labels/
+vision/dataset/
+vision/runs/
+vision/clips/
+vision/pi/wheels/
+*.pt
+*.onnx
+!vision/pi/world_rat_person.onnx
+runs/
+weights/
+
+# renders (PNG output of the Gemini tool; keep the deck set under renders/ tracked explicitly)
+renders/node/
+
+# python / node
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dist/
+
+# OS
+.DS_Store
