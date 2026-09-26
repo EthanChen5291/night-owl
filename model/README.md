@@ -1,6 +1,6 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 14:50** (building-level list added).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 15:30** (building-level backtest added).
 
 ## Headline results
 
@@ -17,6 +17,7 @@ Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day
 | Sensor picks | 20 sites on real tree pits, 95% never swept, median income $61k | `out/plan.json` |
 | Model B accuracy | AUC **0.633** on held-out community districts (logistic baseline 0.567) | `out/metrics.json` |
 | **Which buildings first** | building-level model ranks swept buildings at AUC **0.692** (vs 0.630 for the cell model); top 5 buildings for each of 519 silent blocks / node sites | `out/buildings.json` |
+| **Buildings with no inspection history** (silent-block case) | building model's top picks had rats **18.5%** vs complaints 9.9% vs random 8.5% (**2.2×**), won **105 of 121 months** vs random | `out/building_backtest.json` |
 
 Backtests are scored **only on cells DOHMH actually swept that month**. Silent blocks are rarely
 inspected, so scoring on "any inspection found rats" grades the model on where DOHMH goes, not where rats are.
@@ -60,7 +61,29 @@ In the backtest (ranking cells) it's a tie: 19.7% vs 19.5% of swept lots with ra
 (107 vs 108 against complaints, 91 vs 96 against prior positives). So the **cell model stays the main Model B**
 (map, backtest, silence, planner), and the building model powers the per-block list in `out/buildings.json`.
 Bigger buildings score higher (more units, more chances for signs), which is right for "where will an inspector
-find rats". Neighbour (ring-1) features were also tested: no gain (0.633 → 0.632), not used.
+find rats". ### Building-level backtest (`07_building_backtest.py`, 121 months, top 500 swept buildings/month)
+
+Rats range 30–150 m (NYC: Combs/Fordham 2017; Vancouver: 99% of relatives trapped in the same block), so signs
+often turn up next door. Two ways to count a hit: **exact** (rats at that building) and **block** (rats anywhere on
+its tax block that day).
+
+| Method | exact | block |
+|---|---|---|
+| rats found at this building in the prior 24 months | **41.4%** | 89.3% |
+| **building model** | **32.0%** | 89.2% |
+| complaints about the building, prior 12 months | 26.2% | 82.7% |
+| hexagon model | 22.5% | **90.1%** |
+| random | 11.5% | 74.4% |
+
+- Exact building: the building model beats the hexagon model in 121/121 months and complaints in 111/121, but
+  **"rats found here before" wins** (rats come back to the same building). Honest: for buildings DOHMH already
+  knows, re-checking past positives is the best rule.
+- Block: hexagon ≈ building ≈ past positives (~89–90%); all beat complaints. If rats roam the block, the area view is enough.
+- **No history (the silent-block case, ~1,000 swept buildings/month with no Initial inspection in 24 months):**
+  building 18.5%, hexagon 13.0%, complaints 9.9%, random 8.5%. Complaints barely beat random here; the building
+  model finds 2.2× random (beats random 105/121, complaints 86/121, hexagon 81/121 months).
+
+Neighbour (ring-1) features were also tested: no gain (0.633 → 0.632), not used.
 
 ## Honest limits (say these before a judge does)
 
