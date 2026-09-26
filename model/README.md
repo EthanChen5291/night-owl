@@ -1,6 +1,6 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 13:30**.
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 13:45**.
 
 ## Headline results
 
@@ -18,6 +18,29 @@ Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day
 
 Backtests are scored **only on cells DOHMH actually swept that month**. Silent blocks are rarely
 inspected, so scoring on "any inspection found rats" grades the model on where DOHMH goes, not where rats are.
+
+## Why our picks find more rats
+
+The complaints baseline ranks blocks by **who calls**: some loud blocks aren't ratty (one East Harlem user
+alone filed 5,339 complaints), and quiet ratty blocks get missed. Model B ranks blocks by **physical
+conditions** and never sees complaints. The "rats found last year" baseline only works where inspectors
+already went; Model B can rank any block.
+
+What Model B relies on most (LightGBM gain, share of total, model trained to 2026-08):
+
+| Feature | Share | Likely reason (interpretation; the model shows *what* predicts rats, not *why*) |
+|---|---|---|
+| building height (`floors_mean`) | 17.2% | low-rise walk-ups / rowhouses: bags on the curb, backyards, basements; high-rises often have indoor trash rooms |
+| temperature (`temp_c`) | 14.2% | **seasonal, citywide:** same value for every block in a month, so it sets *when*, not *which block* |
+| district trash tonnage | 9.4% | more trash, more food |
+| building area | 6.2% | bigger buildings, more waste |
+| median income | 5.7% | **control only**, not a cause; don't present it as "poor areas have rats" |
+| median building age / pre-1940 share | 4.9% / 4.1% | old buildings: cracks, gaps, old sewer connections |
+| properties, street trees, population density | 3.2% / 3.2% / 3.1% | more places to nest, soil to burrow in, people making trash |
+
+Pitch version (place features only): *"The city ranks blocks by who calls. We rank them by what attracts
+rats: low-rise old buildings and heavy trash."* Per-cell `reasons[]` in `cells.json` already exclude the
+seasonal features (temperature, month, district tonnage).
 
 ## Honest limits (say these before a judge does)
 
