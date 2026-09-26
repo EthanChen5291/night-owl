@@ -1,10 +1,12 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 17:12** (models list + architecture diagram).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 17:15** (Q&A, research, data sources, glossary, ethics, future work).
 
 **Contents:** [In one minute](#in-one-minute) · [The models](#the-models) · [Architecture](#architecture) ·
 [For teammates](#for-teammates-start-here) · [Headline results](#headline-results) · [Honest limits](#honest-limits-say-these-before-a-judge-does) ·
-[Pipeline](#pipeline) · [Key decisions](#key-decisions)
+[Q&A for judges](#qa-for-judges) · [Pipeline](#pipeline) · [Key decisions](#key-decisions) ·
+[Research](#research-and-sources-we-relied-on) · [Data sources](#data-sources) · [Glossary](#glossary) ·
+[Ethics](#ethics-and-privacy) · [Future work](#future-work)
 
 ## In one minute
 
@@ -335,6 +337,44 @@ Known limits: 1.4× random is a modest lift; the weights are hand-set (next step
 - Model B's accuracy is modest (0.633). It ranks risk; it does not predict rat populations.
 - "Silent" means fewer complaints than expected for the risk and population, not zero complaints.
 
+## Q&A for judges
+
+**"Maybe quiet blocks are quiet because they have no rats?"** We checked with proactive sweeps, which happen whether
+or not anyone called. Between the loudest and quietest quarters of NYC, complaints differ **17.8×** but rats found
+differ only **2.3×**. Quiet blocks still had rats in 6.5% of swept lots, and on quiet blocks our picks found **1.8×**
+more rats than chance in 117 of 119 months.
+
+**"Why not just rank by complaints?"** On 10 years of real sweeps, our picks found **28% more** rats (19.5% vs 15.2%),
+winning 108 of 119 months. Complaints track who calls, not where rats are; one East Harlem app user alone filed 5,339.
+
+**"How do you know it works where nobody ever inspected?"** We don't, and no city dataset can tell us: 97% of the
+quietest cells had no proactive sweep in two years. We tried restaurant rat violations as an outside check there and
+found no clear signal, so we don't claim it. That gap is exactly what the sensor nodes are for.
+
+**"Doesn't Model B just learn where inspectors go?"** It never sees complaint counts, inspection counts, or
+tenant-triggered HPD violations, and it learns only from proactive sweeps (5% had a prior complaint on the lot,
+vs 48% of single-lot visits). It's tested on whole community districts it never saw.
+
+**"Isn't an accuracy of 0.63 low?"** It's a ranking task tested on unseen districts, the hardest honest test. It beats
+the baselines, and what matters is the backtest: more rats found with the same inspections. Per building it's 0.69.
+
+**"Why compare complaints per resident?"** Complaints come from people. Raw counts make empty or low-density areas look
+silent. We publish the other normalisations too (`out/validation.json` test 4).
+
+**"Why hexagons that big?"** Rats rarely range beyond 30–150 m, about one block (Fordham NYC; Vancouver Rat Project).
+An r9 hexagon (~350 m) keeps enough data per cell to be reliable; inside it, the building list and the node spots
+(~50 m) go finer.
+
+**"Why those weights for node spots?"** Hand-set, then tested: our top spots had 1.4× more rats than random spots the
+next year. Learning the weights from data is the next step.
+
+**"Did the bin rules cut rats?"** After the Nov 2024 rule, complaints fell 12% in small-home areas while inspectors
+found rats at almost the same rate (−2%). That suggests complaints fall faster than rats, but it's too small a sample
+to prove anything.
+
+**"Isn't this stigmatizing poor neighborhoods?"** The point is the opposite: these are neighborhoods the city under-serves
+because they call less. See Ethics below.
+
 ## Pipeline
 
 | Step | File | What it does | Runtime |
@@ -409,3 +449,81 @@ Before/after (`binning_effect.py`, Dec–Oct 2023-24 vs 2024-25, Nov 2024 skippe
 Complaints fell everywhere, so this can't show that bins cut rats (the groups differ: rarely swept Queens/SI
 vs dense mitigation-zone areas). Suggestive only: where the rule applied, complaints fell 12% while inspectors
 found rats at almost the same rate. Complaints may be falling faster than rats.
+
+## Research and sources we relied on
+
+- **Rat movement.** NYC rats rarely go more than 30–150 m from their colony; Manhattan has genetically distinct uptown and
+  downtown populations (Combs, Fordham, 2017: [NPR](https://www.npr.org/2017/11/30/567572989/the-genetic-divide-between-nycs-uptown-and-downtown-rats),
+  [Fordham Magazine](https://now.fordham.edu/fordham-magazine/consider-the-rats/),
+  [Proc. R. Soc. B](https://royalsocietypublishing.org/rspb/article/285/1880/20180245/102240/Urban-rat-races-spatial-population-genomics-of)).
+  In Vancouver, 99% of rats were trapped in the same block as a close relative
+  ([Byers et al. 2021](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7819557/)).
+  Review: [Rats About Town (2019)](https://doaj.org/article/cd3f6d92a2484e6b859a162c67a2e859). → block-scale cells, building/spot layers.
+- **Bin rules (containerization).** Food businesses 2023-08-01, all businesses 2024-03-01, homes with 1–9 units
+  2024-11-12, official NYC Bin required 2026-06-01 and enforced 2026-09-08
+  ([DSNY: Trash Revolution year one](https://www.nyc.gov/site/dsny/news/24-013/the-trash-revolution-year-one-new-data-shows-sustained-decrease-rat-sightings),
+  [DSNY: NYC Bins](https://www.nyc.gov/site/dsny/collection/containerization/nyc-bins.page),
+  [Mayor's Office: Brooklyn CD 2 next](https://www.nyc.gov/mayors-office/news/2025/09/return-of-the-trash-revolution--following-major-success-in-manha)).
+
+## Data sources
+
+All from [NYC Open Data](https://opendata.cityofnewyork.us/) unless noted; pulled on 2026-09-25/26. Full field notes:
+[`DATA_DICTIONARY.md`](DATA_DICTIONARY.md).
+
+| Dataset | ID | Used for |
+|---|---|---|
+| [Rodent Inspection](https://data.cityofnewyork.us/d/p937-wjvj) | `p937-wjvj` | Model B label (sweeps), backtests, rats-found signals |
+| [311 Service Requests 2020–](https://data.cityofnewyork.us/d/erm2-nwe9) / [2010–2019](https://data.cityofnewyork.us/d/76ig-c548) | `erm2-nwe9`, `76ig-c548` | Model A label (rat complaints, deduped), sightings for node spots |
+| [PLUTO](https://data.cityofnewyork.us/d/64uk-42ks) | `64uk-42ks` | building age/height/type/units, vacant lots, building model, bin-rule coverage |
+| [Restaurant Inspections](https://data.cityofnewyork.us/d/43nn-pn8j) | `43nn-pn8j` | restaurant density; 04K (rats) held out as a check |
+| [DOB Permit Issuance](https://data.cityofnewyork.us/d/ipu4-2q9a) | `ipu4-2q9a` | new building / demolition / major alteration, prior 3 months |
+| [HPD Housing Violations](https://data.cityofnewyork.us/d/wvxf-dwi5) | `wvxf-dwi5` | rodent violations (Model A only) |
+| [DSNY Litter Baskets](https://data.cityofnewyork.us/d/8znf-7b2c), [Monthly Tonnage](https://data.cityofnewyork.us/d/ebb7-mvp5) | `8znf-7b2c`, `ebb7-mvp5` | food/trash signals |
+| [Street Tree Census 2015](https://data.cityofnewyork.us/d/uvpi-gqnh) | `uvpi-gqnh` | node mount points (tree guards) |
+| [DEP Catch Basins](https://data.cityofnewyork.us/d/2w2g-fk3i) | `2w2g-fk3i` | storm drains (harborage) |
+| [Parks Properties](https://data.cityofnewyork.us/d/enfh-gkve) | `enfh-gkve` | park share |
+| [Community Districts](https://data.cityofnewyork.us/d/5crt-au7u), [2020 Census Tracts](https://data.cityofnewyork.us/d/63ge-mke6) | `5crt-au7u`, `63ge-mke6` | spatial CV folds, neighborhood names |
+| [MTA Subway Entrances](https://data.ny.gov/d/i9wp-a4ja) (data.ny.gov) | `i9wp-a4ja` | subway entrances |
+| [ACS 5-year 2024](https://data.census.gov) (Census API) | `B01003`, `B19013`, `C16002` | population, income (controls), limited-English (bias measure only) |
+| [NOAA Central Park monthly](https://www.ncei.noaa.gov/cdo-web/datasets) | `USW00094728` | temperature |
+
+## Glossary
+
+| Term | Plain meaning |
+|---|---|
+| **H3 cell / hexagon (r9)** | NYC cut into ~350 m hexagons, about 2–3 blocks each. **r11** = ~50 m spots inside them |
+| **cell-month** | one hexagon in one month: the row the models learn from |
+| **Initial inspection** | a first DOHMH rat inspection at a property (not a follow-up) |
+| **sweep** | proactive inspection: ≥10 properties on one block in one day, whether or not anyone called |
+| **Model A / Model B** | complaints model ("what the city sees") / rats model ("what's actually there") |
+| **percentile** | rank from 0–100 against all of NYC; 90 = higher than 90% of cells |
+| **Silence Score / silent block** | B's rank minus A's rank; a silent block has rats likely, far fewer complaints than expected, and ≥100 homes |
+| **AUC** | how well a model ranks: 0.5 = coin flip, 1.0 = perfect |
+| **backtest** | replaying the past as if it were the future: train on earlier months only, check what inspectors found next |
+| **precision@50 / lift** | share of rats found in each method's top 50 picks / ours divided by the complaints baseline |
+| **bootstrap copies** | the same model trained 5 times on resampled districts; disagreement = uncertainty |
+| **Beta-Binomial update** | start from the model's guess, move it with each inspection or sensor detection |
+| **data gap** | how much of a cell's estimate is still a guess (1 = never swept) |
+| **leakage** | a model secretly seeing the answer; Model B never sees complaints or inspection counts |
+| **SHAP reasons** | which features pushed a cell's score up or down |
+
+## Ethics and privacy
+
+- Silent blocks mean **"who isn't being served"**, not "dirty neighborhoods": they are poorer ($62k vs $92k median income)
+  and more limited-English (17% vs 9%) because those residents call 311 less, not because they're at fault.
+- The action the model recommends is **service** (inspection, sanitation, bins), not fines.
+- Block- and building-level detail is for agencies; a public view should show the gap at community-district level so
+  it can't become a stigma map.
+- Limited-English share is used only to **measure** the bias, never as a model input.
+- The node sends only a small event (cell, class, confidence, and a crop of the rat), never video.
+
+## Future work
+
+- Learn the node-spot weights from the sweeps instead of hand-setting them.
+- Test r10 hexagons (~130 m, closer to a rat's range) against r9 on the same backtest.
+- Add the Rat Mitigation Zone boundaries (`rmz` is null for now) and an indexed-zone holdout.
+- Feed real node detections back into Model B's training once nodes are deployed (the feedback loop is built; the data isn't
+  there yet).
+- Measure the Sept 2026 official-bin enforcement once a few months of data exist.
+- Revisit the building model as the main ranking if a future version wins the cell-level backtest.
+
