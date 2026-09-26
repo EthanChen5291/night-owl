@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import sys
 import time
@@ -45,6 +46,14 @@ def read_pushes(path: Path) -> list[float]:
                     out.append(float(row[key]))
                     break
     return sorted(out)
+
+
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for block in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
 
 
 def iter_source(src: str, fps: float, gray: bool):
@@ -95,13 +104,17 @@ def run_detector(det, src: str, fps: float, gray: bool, max_side: int):
     return rows
 
 
-def replay(rows, conf: float, floor_y: float, hits: int, window: float, cooldown: float):
+def replay(rows, conf: float, floor_y: float, hits: int, window: float, cooldown: float,
+           min_width: float = None, max_width: float = None):
     from detect import EventGate, apply_rules
+    import detect as D
 
     gate = EventGate(hits, window, cooldown)
     events = []
     for t, dets in rows:
-        rats, _ = apply_rules([d for d in dets if d.conf >= conf], floor_y)
+        rats, _ = apply_rules([d for d in dets if d.conf >= conf], floor_y,
+                              min_width=D.MIN_RAT_WIDTH if min_width is None else min_width,
+                              max_width=D.MAX_RAT_WIDTH if max_width is None else max_width)
         fired = gate.update(t, rats[0] if rats else None)
         if fired:
             events.append((t, fired[0].conf))
@@ -109,15 +122,22 @@ def replay(rows, conf: float, floor_y: float, hits: int, window: float, cooldown
 
 
 def score_pushes(events, pushes, pre: float, post: float):
-    hit = 0
-    matched = set()
-    for tp in pushes:
-        for k, (te, _) in enumerate(events):
-            if tp - pre <= te <= tp + post:
-                hit += 1
-                matched.add(k)
-                break
-    false = [e for k, e in enumerate(events) if k not in matched and not any(tp - pre <= e[0] <= tp + post for tp in pushes)]
+    """Maximum one-to-one matching; every extra event counts as a false event."""
+    matched_event = {}
+
+    def match(push_index, seen):
+        tp = pushes[push_index]
+        for event_index, (te, _) in enumerate(events):
+            if event_index in seen or not tp - pre <= te <= tp + post:
+                continue
+            seen.add(event_index)
+            if event_index not in matched_event or match(matched_event[event_index], seen):
+                matched_event[event_index] = push_index
+                return True
+        return False
+
+    hit = sum(bool(match(i, set())) for i in range(len(pushes)))
+    false = [e for i, e in enumerate(events) if i not in matched_event]
     return hit, false
 
 
@@ -131,6 +151,8 @@ def main(argv=None) -> int:
     ap.add_argument("--fps", type=float, default=15.0, help="fps to assume for frame directories")
     ap.add_argument("--conf", default=None, help="one value or a comma list to sweep (default: detect.py CONF)")
     ap.add_argument("--floor-y", type=float, default=None)
+    ap.add_argument("--min-rat-width", type=float, default=None)
+    ap.add_argument("--max-rat-width", type=float, default=None)
     ap.add_argument("--hits", type=int, default=None)
     ap.add_argument("--window", type=float, default=None)
     ap.add_argument("--cooldown", type=float, default=None)
@@ -140,10 +162,14 @@ def main(argv=None) -> int:
     ap.add_argument("--color", dest="gray", action="store_false", default=None, help="feed colour (World fallback)")
     ap.add_argument("--names", help="comma-separated class names if not one of the two known models")
     ap.add_argument("--json", metavar="PATH", help="write results as JSON")
+    ap.add_argument("--min-pushes", type=int, default=20, help="minimum annotated pushes for the demo gate")
+    ap.add_argument("--min-neg-minutes", type=float, default=3.0, help="minimum negatives duration for the demo gate")
     args = ap.parse_args(argv)
 
     if not (args.clip or args.frames or args.negatives):
         ap.error("give --clip/--frames (with --pushes) and/or --negatives")
+    if (args.clip or args.frames) and not args.pushes:
+        ap.error("positive footage requires --pushes; unannotated events cannot pass the gate")
     try:
         import detect as D
     except ImportError as e:
@@ -162,6 +188,8 @@ def main(argv=None) -> int:
     hits = D.HITS_NEEDED if args.hits is None else args.hits
     window = D.HIT_WINDOW_S if args.window is None else args.window
     cooldown = D.EVENT_COOLDOWN_S if args.cooldown is None else args.cooldown
+    min_width = D.MIN_RAT_WIDTH if args.min_rat_width is None else args.min_rat_width
+    max_width = D.MAX_RAT_WIDTH if args.max_rat_width is None else args.max_rat_width
     names = [s.strip() for s in args.names.split(",")] if args.names else None
 
     det = D.Detector(args.model, D.IMGSZ, gray, min(confs), D.IOU, names=names)
@@ -184,31 +212,41 @@ def main(argv=None) -> int:
     for c in confs:
         r = {"conf": c}
         if pos_rows is not None:
-            ev = replay(pos_rows, c, floor_y, hits, window, cooldown)
+            ev = replay(pos_rows, c, floor_y, hits, window, cooldown, min_width, max_width)
             hit, false = score_pushes(ev, pushes, args.pre, args.post) if pushes else (0, ev)
             r.update(events=len(ev), pushes=len(pushes), hit=hit,
                      recall=(hit / len(pushes)) if pushes else None, false_events=len(false),
                      event_times=[round(t, 2) for t, _ in ev])
         if neg_rows is not None:
-            nev = replay(neg_rows, c, floor_y, hits, window, cooldown)
-            dur = max(neg_rows[-1][0], 1e-6) if neg_rows else 1e-6
-            r.update(neg_events=len(nev), neg_per_min=60.0 * len(nev) / dur, neg_minutes=dur / 60)
+            nev = replay(neg_rows, c, floor_y, hits, window, cooldown, min_width, max_width)
+            dur = (neg_rows[-1][0] - neg_rows[0][0] + 1 / args.fps) if neg_rows else 0
+            r.update(neg_events=len(nev), neg_per_min=60.0 * len(nev) / dur if dur > 0 else None,
+                     neg_minutes=dur / 60, neg_event_times=[round(t, 2) for t, _ in nev])
         results.append(r)
         recall_s = f"{r['recall']:.0%}" if r.get("recall") is not None else "-"
-        npm_s = f"{r['neg_per_min']:.2f}" if "neg_per_min" in r else "-"
+        npm_s = f"{r['neg_per_min']:.2f}" if r.get("neg_per_min") is not None else "-"
         print(f"{c:>5.2f} {r.get('events', '-'):>7} {r.get('pushes', '-'):>7} {r.get('hit', '-'):>5} "
               f"{recall_s:>7} {r.get('false_events', '-'):>6} | {r.get('neg_events', '-'):>6} {npm_s:>8}")
 
-    gate = [r for r in results if pushes and r.get("recall") is not None]
-    if gate:
-        best = max(gate, key=lambda r: (r["recall"], -r["false_events"], -r.get("neg_per_min", 0)))
-        ok = best["recall"] >= 0.9 and best.get("neg_per_min", 0) < 0.5
-        print(f"\nGATE (>=90% of pushes, <0.5 false/min on negatives) at conf {best['conf']}: {'PASS' if ok else 'FAIL'}")
+    eligible = [r for r in results if len(pushes) >= args.min_pushes and
+                r.get("neg_minutes", 0) >= args.min_neg_minutes and r.get("neg_per_min") is not None]
+    passing = [r for r in eligible if r["recall"] >= 0.9 and r["neg_per_min"] < 0.5]
+    best = min(passing, key=lambda r: (-r["recall"], r["false_events"], r["neg_per_min"], r["conf"])) if passing else None
+    status = "PASS" if best else "FAIL" if eligible else "NOT_EVALUATED"
+    print(f"\nGATE {status}" + (f" at conf {best['conf']}" if best else
+          f" (need {args.min_pushes} annotated pushes and {args.min_neg_minutes:g} min negatives)" if not eligible else ""))
     if args.json:
-        Path(args.json).write_text(json.dumps({"model": args.model, "gray": gray, "floor_y": floor_y, "hits": hits,
-                                               "window": window, "cooldown": cooldown, "results": results}, indent=1))
+        out = Path(args.json)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps({"model": str(Path(args.model).resolve()),
+                                   "model_sha256": sha256(Path(args.model)),
+                                   "gray": gray, "floor_y": floor_y,
+                                   "min_rat_width": min_width, "max_rat_width": max_width,
+                                   "hits": hits, "window": window, "cooldown": cooldown,
+                                   "gate_status": status, "selected_conf": best["conf"] if best else None,
+                                   "results": results}, indent=2) + "\n")
         print(f"wrote {args.json}")
-    return 0
+    return 0 if status == "PASS" else 1
 
 
 if __name__ == "__main__":

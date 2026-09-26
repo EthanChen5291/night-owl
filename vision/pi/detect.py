@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import sys
@@ -59,6 +60,8 @@ GRAY = True
 CONF = 0.5
 IOU = 0.45
 FLOOR_Y = 0.40
+MIN_RAT_WIDTH = 0.01
+MAX_RAT_WIDTH = 0.65
 PERSON_IOU = 0.3        # drop a rat box whose IoU with a person box exceeds this ...
 PERSON_CONTAIN = 0.7    # ... or whose own area is mostly inside a person box (feet standing over it)
 HITS_NEEDED = 3
@@ -267,10 +270,12 @@ def contained_frac(a, b) -> float:
     return (iw * ih) / (a[2] * a[3]) if a[2] * a[3] > 0 else 0.0
 
 
-def apply_rules(dets: list, floor_y: float = FLOOR_Y, person_iou: float = PERSON_IOU, person_contain: float = PERSON_CONTAIN):
+def apply_rules(dets: list, floor_y: float = FLOOR_Y, person_iou: float = PERSON_IOU,
+                person_contain: float = PERSON_CONTAIN, min_width: float = MIN_RAT_WIDTH,
+                max_width: float = MAX_RAT_WIDTH):
     """Floor rule + person suppression. Returns (rats_kept, persons)."""
     persons = [d for d in dets if d.cls == "person"]
-    rats = [d for d in dets if d.cls == "rat" and d.cy > floor_y]
+    rats = [d for d in dets if d.cls == "rat" and d.cy > floor_y and min_width <= d.w <= max_width]
     if persons:
         def clear(r):
             rb = [r.x, r.y, r.w, r.h]
@@ -284,29 +289,29 @@ def apply_rules(dets: list, floor_y: float = FLOOR_Y, person_iou: float = PERSON
 
 
 class EventGate:
-    """HITS_NEEDED hits within HIT_WINDOW_S -> event; then nothing for EVENT_COOLDOWN_S."""
+    """Consecutive frame hits within HIT_WINDOW_S -> event, followed by cooldown."""
 
     def __init__(self, hits_needed: int = HITS_NEEDED, window_s: float = HIT_WINDOW_S, cooldown_s: float = EVENT_COOLDOWN_S):
         self.hits_needed, self.window_s, self.cooldown_s = hits_needed, window_s, cooldown_s
-        self.hits = deque()  # (ts, det)
+        self.hits = deque()  # timestamps of consecutive detected frames
         self.last_event_ts = -1e9
         self.n_events = 0
 
     def update(self, ts: float, best):
         """best: the best rat Det this frame or None. Returns (det, n_hits) when an event fires."""
-        while self.hits and ts - self.hits[0][0] > self.window_s:
-            self.hits.popleft()
-        if best is None:
+        if best is None or ts - self.last_event_ts < self.cooldown_s:
+            self.hits.clear()
             return None
-        self.hits.append((ts, best))
-        if len(self.hits) < self.hits_needed or ts - self.last_event_ts < self.cooldown_s:
+        if self.hits and ts - self.hits[0] > self.window_s:
+            self.hits.clear()
+        self.hits.append(ts)
+        if len(self.hits) < self.hits_needed:
             return None
         n = len(self.hits)
-        top = max((d for _, d in self.hits), key=lambda d: d.conf)
         self.hits.clear()
         self.last_event_ts = ts
         self.n_events += 1
-        return top, n
+        return best, n
 
 
 # ---------------------------------------------------------------- event output
@@ -382,6 +387,28 @@ def save_event(out_dir: Path, body: dict, index: int) -> None:
         (out_dir / f"{stem}.jpg").write_bytes(base64.b64decode(body["crop_b64"]))
 
 
+def apply_deployed_config(args, model: Path, argv=None) -> None:
+    """Use thresholds that passed the event gate for the exact deployed model."""
+    if model.name != MODEL:
+        return
+    config_path = model.with_name("rat_config.json")
+    if not config_path.is_file():
+        return
+    config = json.loads(config_path.read_text())
+    digest = hashlib.sha256(model.read_bytes()).hexdigest()
+    if config.get("model_sha256") != digest:
+        raise ValueError(f"{config_path} does not match {model}")
+    raw = list(sys.argv[1:] if argv is None else argv)
+    flags = {"conf": "--conf", "floor_y": "--floor-y", "min_rat_width": "--min-rat-width",
+             "max_rat_width": "--max-rat-width", "hits": "--hits", "window": "--window",
+             "cooldown": "--cooldown"}
+    for key, flag in flags.items():
+        if not any(value == flag or value.startswith(flag + "=") for value in raw):
+            setattr(args, key, config[key])
+    if "--gray" not in raw and "--color" not in raw:
+        args.gray = config["gray"]
+
+
 # ---------------------------------------------------------------- main loop
 def draw(frame_bgr, rats, persons, dropped, gate: EventGate, fps: float):
     import cv2
@@ -407,6 +434,8 @@ def main(argv=None) -> int:
     ap.add_argument("--conf", type=float, default=CONF)
     ap.add_argument("--iou", type=float, default=IOU)
     ap.add_argument("--floor-y", type=float, default=FLOOR_Y)
+    ap.add_argument("--min-rat-width", type=float, default=MIN_RAT_WIDTH)
+    ap.add_argument("--max-rat-width", type=float, default=MAX_RAT_WIDTH)
     ap.add_argument("--person-iou", type=float, default=PERSON_IOU)
     ap.add_argument("--person-contain", type=float, default=PERSON_CONTAIN)
     ap.add_argument("--hits", type=int, default=HITS_NEEDED)
@@ -438,6 +467,11 @@ def main(argv=None) -> int:
             print(f"no model: {args.model} (train.sh makes pi/rat.onnx; the World fallback is {FALLBACK_MODEL})", file=sys.stderr)
             return 2
     try:
+        apply_deployed_config(args, model, argv)
+    except (ValueError, KeyError) as exc:
+        print(f"invalid deployed model config: {exc}", file=sys.stderr)
+        return 2
+    try:
         import cv2  # noqa: F401
         import numpy  # noqa: F401
         import onnxruntime  # noqa: F401
@@ -465,7 +499,8 @@ def main(argv=None) -> int:
             img = fr.gray if args.gray else fr.bgr
             t0 = time.monotonic()
             dets = det.infer(img)
-            rats, persons = apply_rules(dets, args.floor_y, args.person_iou, args.person_contain)
+            rats, persons = apply_rules(dets, args.floor_y, args.person_iou, args.person_contain,
+                                        args.min_rat_width, args.max_rat_width)
             dropped = [d for d in dets if d.cls == "rat" and d not in rats]
             best = rats[0] if rats else None
             fired = gate.update(fr.ts, best)
