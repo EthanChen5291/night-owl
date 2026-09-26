@@ -345,9 +345,9 @@ def main(dataset: str = "vision/dataset", out: str = "vision/runs/modal-rat", ep
         }
         training_report = {
             "dataset_manifest_sha256": sha256(source / "manifest.json"),
-            "candidate": str((destination / "rat.onnx").resolve()),
+            "candidate": "rat.onnx",
             "candidate_sha256": report["artifacts_sha256"]["rat.onnx"],
-            "best_pt": str((destination / "best.pt").resolve()),
+            "best_pt": "best.pt",
             "reviewed_only": True,
             "rat_ap50": report["matched_shape"]["onnx_ap50"]["rat"],
             "ap50_by_class": report["matched_shape"]["onnx_ap50"],
