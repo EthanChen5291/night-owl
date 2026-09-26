@@ -1,105 +1,128 @@
-"""Write the map's JSON (contract section 6) from step 3/4 outputs.
+"""Write the map/API JSON (the contract in web/src/types.ts) from step 3/4 outputs.
 
-cells.json  [{h3, risk_a, risk_b, silence, ci_lo, ci_hi, n_complaints, n_inspections,
-              n_fail, income_q, reasons[]}]  + extras: is_silent, data_gap, risk_b_prob
-plan.json   written by 04_optimizer.py (re-run here so both come from the same scores)
+model/out/cells.json  {month, generated_at, cells: [{h3, score_a, score_b, pct_a, pct_b, silence,
+                       ci_b, posterior, reasons[{feature, shap}], cd, rmz, n_inspections,
+                       last_event_at}]}  + extras (is_silent, data_gap, n_complaints_12m)
+model/out/plan.json   {month, k, nodes: [{rank, h3, lat, lon, tree_id, expected_gain, silence, reason}]}
 
-risk_a / risk_b are percentiles (0-1) among eligible cells so the "city sees /
-actually there" toggle uses one colour scale. reasons[] = top-3 Model B feature
-contributions (LightGBM SHAP) in plain words.
+api/store.py recomputes pct_b (from score_b) and silence = pct_b - pct_a over the whole file, so:
+  - only eligible cells are written (real building stock + residents), otherwise parks and rail
+    yards distort the ranks;
+  - pct_a is the percentile of predicted complaints PER RESIDENT (A-variant), the fair comparison;
+  - score_b is Model B's belief, so the server's recomputed silence matches ours.
 
-Run: python3 model/export.py [--out DIR]
+Run: python3 model/export.py [--k 20]
 """
 import argparse
 import importlib
 import json
-import math
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy.stats import beta as beta_dist
 
 from config import PROCESSED
 
 models = importlib.import_module("03_models")
 optimizer = importlib.import_module("04_optimizer")
+OUT = Path(__file__).resolve().parent / "out"
 
-PHRASES = {
-    "n_lots": "many properties", "year_built_median": "old building stock",
-    "share_pre1940": "mostly pre-1940 buildings", "share_vacant": "vacant lots",
-    "share_residential": "mostly residential", "share_mixed_use": "mixed-use buildings",
-    "share_commercial": "commercial buildings", "share_industrial": "industrial land",
-    "floors_mean": "building height", "units_res": "dense housing",
-    "bldg_area": "large building footprint", "retail_area": "retail frontage",
-    "com_area": "commercial space", "n_restaurants": "many restaurants",
-    "n_litter_baskets": "street litter baskets", "n_catch_basins": "storm drains",
-    "n_trees": "street trees", "n_subway_entrances": "subway entrances",
-    "share_park": "park land", "dob_permits_3m": "recent construction",
-    "rest_04k_12m": "restaurant rat violations", "rest_08a_12m": "restaurant pest-harbourage violations",
-    "temp_c": "warm season", "month_of_year": "time of year", "refuse_tons_cd": "high trash volume",
-    "median_income": "local income level", "pop_density": "population density",
+# Wire names for reasons[] (the popup shows them with "_" -> " ")
+NAMES = {
+    "n_lots": "many_properties", "year_built_median": "building_age",
+    "share_pre1940": "pre_1940_buildings", "share_vacant": "vacant_lots",
+    "share_residential": "residential_share", "share_mixed_use": "mixed_use_buildings",
+    "share_commercial": "commercial_share", "share_industrial": "industrial_land",
+    "floors_mean": "building_height", "units_res": "housing_units", "bldg_area": "building_area",
+    "retail_area": "retail_space", "com_area": "commercial_space", "n_restaurants": "restaurants",
+    "n_litter_baskets": "litter_baskets", "n_catch_basins": "storm_drains", "n_trees": "street_trees",
+    "n_subway_entrances": "subway_entrances", "share_park": "park_land",
+    "dob_permits_3m": "construction_3mo", "temp_c": "temperature", "month_of_year": "season",
+    "refuse_tons_cd": "district_trash_tons", "median_income": "median_income",
+    "pop_density": "population_density",
 }
 
 
-def clean(v):
-    if isinstance(v, (float, np.floating)) and (math.isnan(v) or math.isinf(v)):
-        return None
-    return v.item() if isinstance(v, np.generic) else v
+def pct100(x) -> np.ndarray:
+    """0..100 average-rank percentile, same rule as api/posterior.percentile_rank."""
+    r = pd.Series(x).rank(method="average").to_numpy() - 1
+    return np.round(100 * r / max(len(r) - 1, 1), 1)
 
 
-def top_reasons(df: pd.DataFrame, score_month: str, rows: pd.DataFrame) -> list[list[str]]:
-    hist = df[(df.month < score_month) & (df.n_sweep > 0)]
-    model = models.fit_b(hist)
-    contrib = model.predict(rows[models.B_FEATS], pred_contrib=True)[:, :-1]  # drop bias
-    names = np.array(models.B_FEATS)
+NOT_A_PLACE = {"temp_c", "month_of_year", "refuse_tons_cd"}  # seasonal/citywide: not "why this block"
+
+
+def shap_reasons(df: pd.DataFrame, month: str, rows: pd.DataFrame) -> list[list[dict]]:
+    model = models.fit_b(df[(df.month < month) & (df.n_sweep > 0)])
+    contrib = model.predict(rows[models.B_FEATS], pred_contrib=True)[:, :-1]  # drop bias column
+    place = np.array([f not in NOT_A_PLACE for f in models.B_FEATS])
     out = []
     for c in contrib:
-        idx = [i for i in np.argsort(-c)[:3] if c[i] > 0]
-        out.append([PHRASES.get(n, n) for n in names[idx]])
+        c = np.where(place, c, 0.0)
+        top = np.argsort(-np.abs(c))[:3]
+        out.append([{"feature": NAMES.get(models.B_FEATS[i], models.B_FEATS[i]),
+                     "shap": round(float(c[i]), 4)} for i in top])
     return out
+
+
+def main(k: int) -> None:
+    OUT.mkdir(exist_ok=True)
+    df = models.load()
+    scores = pd.read_parquet(PROCESSED / "scores.parquet")
+    month = scores.month.iloc[0]
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    last12 = df[(df.month < month) & (df.month >= str(pd.Period(month, "M") - 12))]
+    recent = last12.groupby("h3").agg(n_inspections=("n_initial", "sum"),
+                                      n_complaints_12m=("n_complaints", "sum"))
+    s = scores[scores.eligible].merge(recent, on="h3", how="left").reset_index(drop=True)
+    s[["n_inspections", "n_complaints_12m"]] = s[["n_inspections", "n_complaints_12m"]].fillna(0)
+
+    s["pct_a"] = pct100(s.complaints_per_capita)
+    s["pct_b"] = pct100(s.risk_b)
+    s["silence100"] = (s.pct_b - s.pct_a).round(1)
+    # Posterior as of the scoring month: B is the prior worth PRIOR_LOTS lots, sweeps update it.
+    n0 = models.PRIOR_LOTS + s.sweeps_24m
+    a, b = s.risk_post * n0, (1 - s.risk_post) * n0
+    lo, hi = beta_dist.ppf(0.025, a, b), beta_dist.ppf(0.975, a, b)
+    target = df[df.month == month].set_index("h3").loc[s.h3].reset_index()
+    reasons = shap_reasons(df, month, target)
+
+    cells = [{
+        "h3": r.h3,
+        "score_a": round(float(r.risk_a), 3),              # expected rat complaints this month
+        "score_b": round(float(r.risk_b), 4),              # P(active rat signs | inspected)
+        "pct_a": float(r.pct_a), "pct_b": float(r.pct_b), "silence": float(r.silence100),
+        "ci_b": [round(float(lo[i]), 4), round(float(hi[i]), 4)],
+        "posterior": {"alpha": round(float(a[i]), 4), "beta": round(float(b[i]), 4), "n_events": 0},
+        "reasons": reasons[i],
+        "cd": str(int(r.boro_cd)),
+        "rmz": None,                                       # TODO: Ethan's RMZ polygons
+        "n_inspections": int(r.n_inspections),
+        "last_event_at": None,
+        # extras (not in types.ts; safe to ignore)
+        "is_silent": bool(r.is_silent), "data_gap": round(float(r.data_gap), 3),
+        "n_complaints_12m": int(r.n_complaints_12m),
+    } for i, r in enumerate(s.itertuples())]
+    (OUT / "cells.json").write_text(json.dumps({"month": month, "generated_at": now, "cells": cells}))
+
+    sil = s.set_index("h3").silence100
+    picks = optimizer.plan(scores, k)
+    nodes = [{"rank": p["rank"], "h3": p["h3"], "lat": p["lat"], "lon": p["lng"],
+              "tree_id": p["asset_id"], "expected_gain": p["score"],
+              "silence": float(sil.get(p["h3"], 0.0)),
+              "reason": f"{p['reason']}; mount: {p['address'] or p['asset_type']}"} for p in picks]
+    (OUT / "plan.json").write_text(json.dumps({"month": month, "k": len(nodes), "nodes": nodes}, indent=1))
+
+    print(f"model/out/cells.json: {len(cells):,} cells for {month} "
+          f"({(OUT / 'cells.json').stat().st_size / 1e6:.1f} MB), silent: {int(s.is_silent.sum())}")
+    print(f"model/out/plan.json: {len(nodes)} nodes")
+    print("example:", json.dumps(next(c for c in cells if c["is_silent"]))[:600])
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default=str(PROCESSED), help="output folder")
-    args = ap.parse_args()
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-
-    df = models.load()
-    scores = pd.read_parquet(PROCESSED / "scores.parquet")
-    month = scores.month.iloc[0]
-
-    last12 = df[(df.month < month) & (df.month >= str(pd.Period(month, "M") - 12))]
-    recent = last12.groupby("h3").agg(n_complaints=("n_complaints", "sum"),
-                                      n_inspections=("n_initial", "sum"), n_fail=("n_rat", "sum"))
-    s = scores.drop(columns=["n_complaints"]).merge(recent, on="h3", how="left")
-    s[["n_complaints", "n_inspections", "n_fail"]] = s[["n_complaints", "n_inspections", "n_fail"]].fillna(0)
-
-    e = s.eligible
-    s["risk_a_pct"] = np.nan
-    s["risk_b_pct"] = np.nan
-    s.loc[e, "risk_a_pct"] = s.loc[e, "complaints_per_capita"].rank(pct=True)
-    s.loc[e, "risk_b_pct"] = s.loc[e, "risk_b"].rank(pct=True)
-    s["income_q"] = pd.qcut(s.median_income, 5, labels=[1, 2, 3, 4, 5]).astype("float")
-
-    target = df[df.month == month].set_index("h3").loc[s.h3].reset_index()
-    s["reasons"] = top_reasons(df, month, target)
-
-    cells = [{k: clean(v) for k, v in {
-        "h3": r.h3, "risk_a": r.risk_a_pct, "risk_b": r.risk_b_pct, "silence": r.silence,
-        "ci_lo": r.silence_lo, "ci_hi": r.silence_hi, "n_complaints": int(r.n_complaints),
-        "n_inspections": int(r.n_inspections), "n_fail": int(r.n_fail), "income_q": r.income_q,
-        "reasons": r.reasons,
-        # extras beyond the contract (safe to ignore)
-        "is_silent": bool(r.is_silent), "data_gap": r.data_gap, "risk_b_prob": r.risk_b,
-        "eligible": bool(r.eligible),
-    }.items()} for r in s.itertuples()]
-    (out / "cells.json").write_text(json.dumps(cells))
-    picks = optimizer.plan(scores, 20)
-    (out / "plan.json").write_text(json.dumps(picks, indent=2))
-
-    print(f"cells.json: {len(cells):,} cells for {month} ({(out / 'cells.json').stat().st_size / 1e6:.1f} MB)")
-    print(f"plan.json: {len(picks)} sites")
-    ex = next(c for c in cells if c["is_silent"])
-    print("example silent cell:", json.dumps(ex))
+    ap.add_argument("--k", type=int, default=20)
+    main(ap.parse_args().k)

@@ -1,0 +1,206 @@
+{
+ "month": "2026-09",
+ "k": 20,
+ "nodes": [
+  {
+   "rank": 1,
+   "h3": "892a100a94fffff",
+   "lat": 40.8177579,
+   "lon": -73.91322648,
+   "tree_id": "402988",
+   "expected_gain": 0.07549,
+   "silence": 14.0,
+   "reason": "model rat risk 8% (top 1%), no proactive sweep in 24 months, 3 complaints last year; mount: 661 BERGEN AVENUE"
+  },
+  {
+   "rank": 2,
+   "h3": "892a100ded7ffff",
+   "lat": 40.71378597,
+   "lon": -73.95440514,
+   "tree_id": "3708",
+   "expected_gain": 0.07519,
+   "silence": 5.4,
+   "reason": "model rat risk 8% (top 1%), no proactive sweep in 24 months, 14 complaints last year; mount: 423 METROPOLITAN AVENUE"
+  },
+  {
+   "rank": 3,
+   "h3": "892a100f6c7ffff",
+   "lat": 40.80471066,
+   "lon": -73.91500169,
+   "tree_id": "340510",
+   "expected_gain": 0.07465,
+   "silence": 41.6,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 1 complaints last year; mount: 673 EAST 137 STREET"
+  },
+  {
+   "rank": 4,
+   "h3": "892a100ab33ffff",
+   "lat": 40.81244667,
+   "lon": -73.92602111,
+   "tree_id": "249191",
+   "expected_gain": 0.0734,
+   "silence": 8.5,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 5 complaints last year; mount: 301 MORRIS AVENUE"
+  },
+  {
+   "rank": 5,
+   "h3": "892a100abbbffff",
+   "lat": 40.8178352,
+   "lon": -73.92185276,
+   "tree_id": "458480",
+   "expected_gain": 0.07312,
+   "silence": 6.4,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 8 complaints last year; mount: 284 EAST 150 STREET"
+  },
+  {
+   "rank": 6,
+   "h3": "892a100de53ffff",
+   "lat": 40.71084819,
+   "lon": -73.96508661,
+   "tree_id": "4619",
+   "expected_gain": 0.07174,
+   "silence": 12.6,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 10 complaints last year; mount: 86 SOUTH 6 STREET"
+  },
+  {
+   "rank": 7,
+   "h3": "892a100ab2fffff",
+   "lat": 40.80710976,
+   "lon": -73.92984603,
+   "tree_id": "86288",
+   "expected_gain": 0.07056,
+   "silence": 29.0,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 3 complaints last year; mount: 271 EAST 132 STREET"
+  },
+  {
+   "rank": 8,
+   "h3": "892a100a187ffff",
+   "lat": 40.87637991,
+   "lon": -73.90633317,
+   "tree_id": "40079",
+   "expected_gain": 0.07007,
+   "silence": 70.2,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 6 complaints last year; mount: 5496 BROADWAY"
+  },
+  {
+   "rank": 9,
+   "h3": "892a100da77ffff",
+   "lat": 40.68149898,
+   "lon": -73.9745052,
+   "tree_id": "218164",
+   "expected_gain": 0.06904,
+   "silence": 11.2,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 2 complaints last year; mount: 484 DEAN STREET"
+  },
+  {
+   "rank": 10,
+   "h3": "892a100da0bffff",
+   "lat": 40.6868281,
+   "lon": -73.97461191,
+   "tree_id": "263239",
+   "expected_gain": 0.06886,
+   "silence": 0.5,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 25 complaints last year; mount: 88 SOUTH PORTLAND AVENUE"
+  },
+  {
+   "rank": 11,
+   "h3": "892a100dc7bffff",
+   "lat": 40.70358324,
+   "lon": -73.93631483,
+   "tree_id": "552601",
+   "expected_gain": 0.06757,
+   "silence": 17.8,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 1 complaints last year; mount: 188 VARET STREET"
+  },
+  {
+   "rank": 12,
+   "h3": "892a100d5bbffff",
+   "lat": 40.74380304,
+   "lon": -73.91945452,
+   "tree_id": "34878",
+   "expected_gain": 0.06664,
+   "silence": 10.0,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 6 complaints last year; mount: 43-041 45 STREET"
+  },
+  {
+   "rank": 13,
+   "h3": "892a100a13bffff",
+   "lat": 40.86805829,
+   "lon": -73.9174877,
+   "tree_id": "45679",
+   "expected_gain": 0.06597,
+   "silence": 18.8,
+   "reason": "model rat risk 7% (top 1%), 2 lots swept in 24 months, 7 complaints last year; mount: 517 WEST 212 STREET"
+  },
+  {
+   "rank": 14,
+   "h3": "892a1001333ffff",
+   "lat": 40.8511148,
+   "lon": -73.86727171,
+   "tree_id": "244496",
+   "expected_gain": 0.06566,
+   "silence": 10.3,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 7 complaints last year; mount: 2050 BRONXDALE AVENUE"
+  },
+  {
+   "rank": 15,
+   "h3": "892a100d503ffff",
+   "lat": 40.74375339,
+   "lon": -73.92799973,
+   "tree_id": "194358",
+   "expected_gain": 0.06532,
+   "silence": -1.8,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 1 complaints last year; mount: 45-015 37 STREET"
+  },
+  {
+   "rank": 16,
+   "h3": "892a100d3a3ffff",
+   "lat": 40.72122893,
+   "lon": -73.96062915,
+   "tree_id": "41821",
+   "expected_gain": 0.06524,
+   "silence": 3.5,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 0 complaints last year; mount: 83 KENT AVENUE"
+  },
+  {
+   "rank": 17,
+   "h3": "892a100de17ffff",
+   "lat": 40.70541953,
+   "lon": -73.95173492,
+   "tree_id": "291262",
+   "expected_gain": 0.06505,
+   "silence": 25.4,
+   "reason": "model rat risk 7% (top 1%), no proactive sweep in 24 months, 2 complaints last year; mount: 318 RUTLEDGE STREET"
+  },
+  {
+   "rank": 18,
+   "h3": "892a100deb3ffff",
+   "lat": 40.70589133,
+   "lon": -73.94336548,
+   "tree_id": "267348",
+   "expected_gain": 0.06436,
+   "silence": 7.3,
+   "reason": "model rat risk 6% (top 1%), no proactive sweep in 24 months, 7 complaints last year; mount: 137 BOERUM STREET"
+  },
+  {
+   "rank": 19,
+   "h3": "892a100a913ffff",
+   "lat": 40.82091327,
+   "lon": -73.89852078,
+   "tree_id": "479525",
+   "expected_gain": 0.06417,
+   "silence": 15.4,
+   "reason": "model rat risk 6% (top 1%), no proactive sweep in 24 months, 8 complaints last year; mount: 880 EAST 163 STREET"
+  },
+  {
+   "rank": 20,
+   "h3": "892a100e3d7ffff",
+   "lat": 40.75395021,
+   "lon": -73.83485946,
+   "tree_id": "200604",
+   "expected_gain": 0.06407,
+   "silence": 97.0,
+   "reason": "model rat risk 6% (top 1%), no proactive sweep in 24 months, 0 complaints last year; mount: 131-010 MAPLE AVENUE"
+  }
+ ]
+}
