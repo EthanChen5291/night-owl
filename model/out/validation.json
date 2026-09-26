@@ -1,0 +1,145 @@
+{
+  "test1": {
+    "table": [
+      {
+        "level": "quietest",
+        "cells": 1206,
+        "lots_swept": 235837,
+        "rats": 15385,
+        "complaints_per_1k": 0.1374,
+        "rat_rate": 0.0652
+      },
+      {
+        "level": "quiet",
+        "cells": 1043,
+        "lots_swept": 275817,
+        "rats": 26082,
+        "complaints_per_1k": 0.3603,
+        "rat_rate": 0.0946
+      },
+      {
+        "level": "loud",
+        "cells": 936,
+        "lots_swept": 305291,
+        "rats": 34891,
+        "complaints_per_1k": 0.66,
+        "rat_rate": 0.1143
+      },
+      {
+        "level": "loudest",
+        "cells": 672,
+        "lots_swept": 333109,
+        "rats": 50952,
+        "complaints_per_1k": 2.4524,
+        "rat_rate": 0.153
+      }
+    ],
+    "complaint_ratio_loudest_vs_quietest": 17.8,
+    "rat_rate_ratio_loudest_vs_quietest": 2.3,
+    "rat_rate_zero_complaint_cells": 0.0277
+  },
+  "test2": {
+    "by_risk_tier": [
+      {
+        "tier": "low",
+        "cells": 128.0,
+        "lots": 10939.0,
+        "rat_rate": 0.078
+      },
+      {
+        "tier": "mid",
+        "cells": 128.0,
+        "lots": 15389.0,
+        "rat_rate": 0.1339
+      },
+      {
+        "tier": "high",
+        "cells": 128.0,
+        "lots": 14454.0,
+        "rat_rate": 0.2013
+      }
+    ],
+    "by_silent_flag": [
+      {
+        "is_silent": false,
+        "cells": 286.0,
+        "lots": 35073.0,
+        "rat_rate": 0.1373
+      },
+      {
+        "is_silent": true,
+        "cells": 98.0,
+        "lots": 5709.0,
+        "rat_rate": 0.1764
+      }
+    ]
+  },
+  "test3": {
+    "by_risk_tier": [
+      {
+        "tier": "low",
+        "cells": 516.0,
+        "restaurant_inspections": 1780.0,
+        "rat_violation_rate": 0.023
+      },
+      {
+        "tier": "mid",
+        "cells": 515.0,
+        "restaurant_inspections": 3133.0,
+        "rat_violation_rate": 0.029
+      },
+      {
+        "tier": "high",
+        "cells": 516.0,
+        "restaurant_inspections": 4449.0,
+        "rat_violation_rate": 0.0283
+      }
+    ],
+    "by_silent_flag": [
+      {
+        "is_silent": false,
+        "cells": 1375.0,
+        "restaurant_inspections": 8131.0,
+        "rat_violation_rate": 0.0284
+      },
+      {
+        "is_silent": true,
+        "cells": 172.0,
+        "restaurant_inspections": 1231.0,
+        "rat_violation_rate": 0.0219
+      }
+    ]
+  },
+  "test4": [
+    {
+      "normalisation": "raw count",
+      "silent_cells": 364,
+      "median_income": 91986.0,
+      "limited_english": 0.076
+    },
+    {
+      "normalisation": "per property",
+      "silent_cells": 137,
+      "median_income": 103992.0,
+      "limited_english": 0.042
+    },
+    {
+      "normalisation": "per home",
+      "silent_cells": 600,
+      "median_income": 87277.5,
+      "limited_english": 0.091
+    },
+    {
+      "normalisation": "per resident (used)",
+      "silent_cells": 504,
+      "median_income": 73718.5,
+      "limited_english": 0.127
+    },
+    {
+      "normalisation": "ALL eligible",
+      "silent_cells": 5170,
+      "median_income": 91902.0,
+      "limited_english": 0.092
+    }
+  ]
+}

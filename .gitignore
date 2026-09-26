@@ -39,3 +39,11 @@ dist/
 
 # OS
 .DS_Store
+
+# model pipeline (Sanjavan): raw data lives outside the repo, intermediates never committed
+data/processed/
+*.geojson
+*.duckdb
+*.pkl
+__pycache__/
+.ipynb_checkpoints/

@@ -1,82 +1,80 @@
-# Barn Owl model pipeline (`model/`)
+# model/ — where are the rats nobody reports?
 
-Two LightGBM models per H3 r9 cell x month, the Silence Score, a rolling-origin backtest on real
-proactive inspections, and the scored files the API serves. Everything here was written and run on
-2026-09-26 (event day) against the Parquet bake in `~/divMap/data/parquet/`; nothing is copied from
-the working repos.
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 13:30**.
 
-## Run
+## Headline results
 
-```
-./model/run.sh                      # features -> train -> backtest -> score, all NYC, ~11 min on the M-series Mac
-./model/run.sh --scope manhattan    # Manhattan cells only (features.py flag; the other steps follow the table)
-BARNOWL_PARQUET=/path/to/parquet ./model/run.sh
-```
-
-Each script also runs on its own (`./model/features.py`, `./model/train.py`, ...); the shebang is
-`uv run --with duckdb --with lightgbm --with h3 --with shap --with scikit-learn --with pandas --with pyarrow --with numpy --with matplotlib python`.
-LightGBM needs `libomp` (`brew install libomp`). Optional env: `BARNOWL_RAW` (raw dir with `rmz.geojson`),
-`BARNOWL_TREES` (renderer `trees.json`), `BARNOWL_THREADS` (default 10), `BARNOWL_REFIT` (backtest refit
-cadence in months, default 6).
-
-## Outputs (`model/out/`)
-
-| File | Committed | What |
+| Claim | Number | Where |
 |---|---|---|
-| `features.parquet` | no | 916,720 rows = 6,548 cells x 140 months (2015-01 .. 2026-08), 60 columns |
-| `cells_static.parquet` | no | cell -> lat/lon, cd, rmz, borough, tract |
-| `model_a.txt`, `model_b.txt`, `propensity.txt`, `model_b_boot_{0..4}.txt` | no | LightGBM boosters |
-| `model_b_calibration.json` | no | isotonic calibration breakpoints for Model B (from the CV out-of-fold predictions) |
-| `metrics.json` | yes | CV / holdout / ablation metrics, feature lists, params, backtest extra series means |
-| `backtest.json`, `backtest.png` | yes | rolling-origin backtest in the frozen shape, and the one chart |
-| `backtest_detail.json` | no | the same series plus B-alone, 311 trailing-3-month, hit-rate-given-inspected variants |
-| `cells_2026-08.json`, `cells.json` | yes | `GET /cells?month=2026-08` in the frozen contract shape (`city/cells.fixture.json`) |
-| `plan.json` | yes | `GET /plan?month=2026-08&k=8` |
+| **Backtest: our picks beat "go where people complain"** | **21.9% vs 17.2%** of swept lots had rats (+27%), won **76 of 83 months** (2019-01 → 2026-08) | `out/backtest.json` |
+| Backtest: beats "go where rats were found before" | 21.9% vs 19.4%, won 68 of 83 months, without using inspection history | `out/backtest.json` |
+| **Backtest: quiet blocks only** | **17.9% vs 10.3% random (1.7×), won 81 of 83 months** | `out/backtest.json` |
+| Quiet ≠ rat-free | loudest vs quietest areas: complaints differ **17.8×**, rats found in sweeps only **2.3×** | `out/validation.json` test 1 |
+| Out-of-time check | trained to 2023-12; quiet cells swept in 2024: high-risk third 20.1% vs low-risk third 7.8% | test 2 |
+| No ground truth where nobody complains | **97%** of the quietest-quartile cells had no proactive sweep in 24 months, vs 55% of the loudest | `03_models.py` data_gap |
+| Silent blocks (high B, low A) | **501 cells**, median income **$75k vs $92k**, limited-English households 12.7% vs 9.2% | `out/cells.json` (`is_silent`) |
+| Sensor picks | 20 sites on real tree pits, 95% never swept, median income $61k | `out/plan.json` |
+| Model B accuracy | AUC **0.626** on held-out community districts (logistic baseline 0.561) | `out/metrics.json` |
 
-## What each step does
+Backtests are scored **only on cells DOHMH actually swept that month**. Silent blocks are rarely
+inspected, so scoring on "any inspection found rats" grades the model on where DOHMH goes, not where rats are.
 
-**`features.py`** (22 s). Cell universe = every r9 cell containing a PLUTO lot with building area or
-residential units, all five boroughs (6,548 cells). Point tables are hashed to cells from lat/lon with
-the `h3` package; RMZ (`raw/open/rmz.geojson`), census tracts and parks are rasterised with
-`h3.geo_to_cells` (parks at r11, so `park_share` is the share of a cell's 49 r11 children inside a
-park). `cd` is the modal PLUTO community district of the cell's lots. Every trailing-window feature
-(`*_3m`, `*_6m`, `*_12m`, `*_lag*`) covers the months strictly before the row's month.
-Targets: `complaints` (311 rodent complaints in the cell that month), `n_initial_l60_0` and
-`n_active_l60_0` (Initial inspections with no complaint on the lot in the prior 60 days, and how many
-found active rat signs). Model B features (40): PLUTO (lots, units, areas, FAR, median building age,
-pre-1940 / vacant / 1-2 family / mixed-use shares, floors), restaurant count and vermin-code visits
-(04K/04L/08A) in the prior 3 and 12 months, DOB NB/DM permits in the prior 6 and 12 months, litter
-baskets (cell and ring-1), catch basins, park share/adjacency, ACS 2023 tract income, population and
-poverty with the CDBG `lomod_pct` fallback (`low_income_share`), NOAA monthly temperature (current,
-3-month lag, same month last year), month-of-year, year, COVID dummy (2020-03..2021-06), RMZ flag and
-zone id. Model A additionally gets complaints in the prior 1/3/12 months, ring-1 complaints (prior 3
-months), the CB-month all-complaint count (2020 on), Initial inspections and active rate in the prior
-12 months, months since the last inspection. `common.check_leakage` greps the B list for
-`complaint|insp|cb_all|active|l60|silence|score` before every train.
+## Honest limits (say these before a judge does)
 
-**`train.py`** (~5 min). Model A: LightGBM Poisson on `complaints` with offset `log1p(res_units)`,
-rows from 2016-01 (full lag history). Propensity: LightGBM binary P(cell-month gets an l60=0 Initial
-inspection) on the B features + community district, out-of-fold by CD; weight = marginal rate / clip(p, 0.02, 1),
-then clipped at its 1st/99th percentile. Model B: LightGBM binary on `active` for the 1.36 M l60=0
-Initial inspections (each joined to its cell-month feature row), IPW weights, B features only.
-Spatial CV = GroupKFold(5) by community district for everything. Holdout = every l60=0 Initial
-inspection inside an RMZ in the last 12 months (2025-09..2026-08), trained on the complement.
-Ablations: B without RMZ, B without ACS, B unweighted, and the leakage row (A's features on B's target).
-Calibration: isotonic on the B out-of-fold predictions. CI: 5 bootstrap-resampled B models.
+- **Never-swept areas can't be validated with existing data.** We tried restaurant rat violations (04K) as an
+  independent check there: no clear signal (2.3% / 2.9% / 2.8% by risk tier, z≈1.2). Not claimed. That gap is
+  what the nodes are for.
+- **The equity result depends on how Model A is normalised.** Per resident (used, because complaints come from
+  people): silent blocks $74k / 12.7% limited-English. Raw counts: ~average. Per property: richer. Table in
+  `out/validation.json` test 4.
+- Model B's accuracy is modest (0.63). It ranks risk; it does not predict rat populations.
+- "Silent" means fewer complaints than expected for the risk and population, not zero complaints.
 
-**`backtest.py`** (~3.5 min). Origins = every month 2016-01..2026-07. Expanding window, models refit
-every 6 months (23 refits; between refits the last models are reused but the features at the origin
-month are always the true lagged features). At each origin, cells are ranked by Silence Score
-(`pct_b - pct_a`) and by the 311 baseline (`pct_a`, Model A's predicted-complaint percentile);
-precision@50 = share of the top 50 that have at least one active l60=0 Initial inspection in that
-month. `backtest.json` has exactly `{window, k, series[{month, precision_silent, precision_311,
-n_positives}], summary{mean_precision_silent, mean_precision_311, lift}, synthetic: false}`.
+## Pipeline
 
-**`score.py`** (~10 s). Scores 2026-08: `score_a`, calibrated `score_b`, percentiles across all
-6,548 cells, `silence`, `ci_b` = min/max of the 5 bootstrap models (widened to include the point
-estimate), Beta-Binomial prior `alpha = 10 * score_b`, `beta = 10 * (1 - score_b)`, `n_events = 0`,
-SHAP TreeExplainer top-3 features on Model B, `n_inspections` = l60=0 Initial inspections in the cell
-over 2015-01..2026-08, `last_event_at = null`. Planner: Manhattan cells with `silence > 0`, greedy on
-`expected_gain = 100 * Var[Beta(alpha, beta)] * score_b` (posterior variance x P(active)), each pick
-snapped to the nearest tree pit in the cell with a 100 m exclusion around previous picks; cells with
-no pit are skipped.
+| Step | File | What it does | Runtime |
+|---|---|---|---|
+| 1 | `01_build_cells.py` | inspections + 311 → every H3 r9 cell in NYC (7,633) × month; sweep flag; complaint dedupe | 7 s |
+| 2 | `02_features.py` | 25 physical features per cell / cell-month, all lagged (no future data) | 10 s |
+| 3 | `03_models.py` | Model A, A-variant, Model B ×5, Silence Score, uncertainty, spatial CV; `train_until(T)` hook | ~70 s |
+| 4 | `04_optimizer.py` | N node sites: risk × data gap, ring-1 spacing, snapped to live street trees | 2 s |
+| 5 | `05_backtest.py` | rolling backtest on sweeps, refit every 6 months | ~40 s |
+| – | `validate_silence.py` | tests 1–4 above | ~60 s |
+| – | `export.py` | `out/cells.json`, `out/plan.json` in the `web/src/types.ts` / `api/` contract | ~10 s |
+
+```
+cd Github/poc
+python3 model/01_build_cells.py && python3 model/02_features.py && python3 model/03_models.py \
+  && python3 model/04_optimizer.py && python3 model/05_backtest.py && python3 model/export.py
+```
+
+Raw data lives outside the repo in `../../data/raw/` (override with `DATA_DIR=...`); intermediates go to
+`../../data/processed/`. Neither is committed. Sources and quirks: `data/DATA_DICTIONARY.md` in the project folder.
+
+## Key decisions
+
+- **Sweep = ≥10 Initial inspections on one tax block on one day** (73% of Initial inspections). Only 5.3% had a
+  rat complaint on the lot in the prior year, vs 47.6% of single-lot visits. Agrees with the "no prior complaint
+  on the lot" rule 72% of the time.
+- **Model B** (LightGBM, cross-entropy): label = share of swept lots with rat activity per cell-month, weighted
+  by lots swept. 25 physical features only: no complaint counts, no inspection counts, no HPD (tenant-triggered),
+  no restaurant 04K/08A (held out as an independent check). `limited_english_share` is in neither model: it's the
+  bias being measured. No IPW: training on sweeps already removes most complaint selection.
+- **Model A** (LightGBM, Poisson): rat complaints per cell-month, all features + past complaints + HPD. The
+  **A-variant** uses B's features only, so the Silence Score compares labels, not model capacity.
+- **Silence** = pct(B) − pct(A-variant complaints **per resident**), per bootstrap copy. Silent = B in the top 40%,
+  every copy agrees (interval excludes 0), gap > 25 points.
+- **Uncertainty**: tree copies agree on unseen areas (false confidence), so a Beta-Binomial posterior (B = prior
+  worth 20 lots, sweeps update it) plus `data_gap` = share of the estimate still a guess (1 = never swept).
+- **Optimizer**: score = B × data_gap; cells where recent sweeps already found rats are skipped (known problems
+  go to the DOHMH queue, not a sensor).
+- **Complaint dedupe**: one East Harlem app user filed 5,339 complaints at one GPS point (up to 36/day, 1,306
+  days). At most one complaint per exact spot per day counts (removes 5.9% of rows).
+
+## Open items
+
+- `rmz` is null in `cells.json` until the Rat Mitigation Zone polygons are added.
+- Stage demo cell `892a100d2c3ffff` (27th & 6th) is not silent in real data (silence −1.2). Pick a real one:
+  in Manhattan, silent cells cluster in CD 106, 104 and 101; the LES (CD 103) is a known hotspot (high B *and* high A).
+- Binning (containerization) feature: small homes have used lidded bins since 2024-11-12; the official NYC Bin has been
+  enforced since 2026-09-08. Planned as a time-varying feature.
