@@ -89,6 +89,7 @@ button { font: inherit; color: inherit; }
 .pill { padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid transparent; }
 .pill.live { background: var(--ok-bg); color: var(--ok); }
 .pill.fixture { background: var(--warn-bg); color: var(--warn); }
+.pill.stale { background: var(--warn-bg); color: var(--warn); }
 .pill.loading { color: var(--muted); border-color: var(--line); }
 .count { margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: var(--row-hot); font-size: 11px; font-weight: 600; }
 
@@ -96,6 +97,11 @@ button { font: inherit; color: inherit; }
 .header { position: absolute; top: 12px; right: 12px; z-index: 6; }
 .status { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: 999px; height: 40px; }
 .month input { background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font: inherit; }
+.budget { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.budget select { background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 3px 5px; font: inherit; }
+.month-note { margin-top: 5px; padding: 6px 10px; border-radius: 8px; color: var(--warn); font-size: 11px; text-align: right; }
+.demo-link, .plan-place { border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); cursor: pointer; padding: 3px 7px; font-size: 11px; white-space: nowrap; }
+.demo-link:hover, .plan-place:hover { background: var(--row-hot); }
 
 /* ---------- toolbar (top left): icon buttons ---------- */
 .toolbar { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; gap: 8px; }
@@ -166,6 +172,8 @@ button { font: inherit; color: inherit; }
 .stat-fill.silence.neg { background: var(--neg); }
 .stat-val { text-align: right; }
 .cellcard-row { display: flex; justify-content: space-between; margin-top: 6px; }
+.cellcard-detail { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; color: var(--muted); }
+.cellcard-detail b { color: var(--ink); text-align: right; }
 .popup-reasons { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
 .reason { display: grid; grid-template-columns: 120px 1fr 52px; gap: 6px; align-items: center; font-size: 11px; margin: 2px 0; }
 .reason-bar { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
@@ -215,6 +223,7 @@ button { font: inherit; color: inherit; }
 .suggested-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .owl.compact { padding: 6px 8px; }
 .owl.compact.open { background: var(--row-hot); border-color: var(--glass-line); }
+.plan-place { margin-top: 6px; }
 .spots { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
 .spot { display: flex; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 8px; background: var(--glass); cursor: pointer; }
 .spot:hover { background: var(--row); }
@@ -246,12 +255,24 @@ button { font: inherit; color: inherit; }
 .kpi-sub { font-size: 11px; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 .chart { position: relative; }
-.chart-labels { position: absolute; right: 0; top: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; text-align: left; width: 88px; }
+.chart-labels { position: absolute; right: 0; top: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; text-align: left; width: 110px; }
 .badge { margin-left: 8px; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
 .badge.synthetic { background: var(--warn-bg); color: var(--warn); }
+.backtest-note { margin-left: 8px; }
 
 @media (max-width: 1100px) {
   .modebar { top: 64px; }
   .nodes { top: 116px; }
   .backtest { right: 12px; }
+}
+@media (max-width: 800px) {
+  .header { top: 62px; left: 12px; right: auto; }
+  .status { height: auto; flex-wrap: wrap; border-radius: 14px; gap: 5px 8px; max-width: min(340px, calc(100vw - 24px)); }
+  .modebar { top: 12px; left: auto; right: 12px; transform: none; align-items: flex-end; }
+  .nodes { top: 140px; bottom: 12px; width: min(280px, calc(100vw - 55px)); }
+  .cellcard, .picker, .logs { top: 140px; width: min(320px, calc(100vw - 24px)); max-height: calc(100vh - 190px); overflow-y: auto; }
+  .backtest { left: 12px; right: 12px; max-height: 44vh; overflow-y: auto; }
+  .kpis { flex-wrap: wrap; }
+  .kpi { min-width: 100px; }
+  .legend.lifted { bottom: min(48vh, 380px); }
 }

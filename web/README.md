@@ -1,17 +1,17 @@
 # web - Barn Owl map (deliverable 1 + backtest chart + live feed)
 
-Vite + React + TypeScript + three.js. One page: a 3D H3 map of lower Manhattan with the
-city-sees / actually-there / silence toggle, a hover popup with the contract fields, the k=8
+Vite + React + TypeScript + three.js. One page: a citywide H3 map with optional 3D city tiles, the
+city-sees / actually-there / silence toggle, a popup with the contract fields, a selectable 5/10/20-site
 node plan as pins, a live event feed, and the backtest chart.
 
 ## Run
 
 ```
 cd web
-npm install
-npm run dev          # http://localhost:5173
-npm run build        # tsc -b && vite build -> dist/
-npx tsc --noEmit -p tsconfig.app.json
+pnpm install
+pnpm dev             # http://localhost:5173
+pnpm build           # tsc -b && vite build -> dist/
+pnpm lint
 ```
 
 ## API and the dev proxy
@@ -21,8 +21,8 @@ strips the prefix, so the server keeps the contract's bare paths:
 
 | frontend | server |
 |---|---|
-| `GET /api/cells?month=2026-08` | `GET /cells?month=2026-08` |
-| `GET /api/plan?k=8` | `GET /plan?k=8` |
+| `GET /api/cells?month=2026-09` | `GET /cells?month=2026-09` |
+| `GET /api/plan?month=2026-09&k=20` | `GET /plan?month=2026-09&k=20` |
 | `GET /api/queue?limit=20` (polled every 2 s) | `GET /queue?limit=20` |
 | `GET /api/stream` (optional SSE, one event JSON per message) | `GET /stream` |
 | `GET /api/backtest` | `GET /backtest` |
@@ -35,9 +35,9 @@ Change the target in `vite.config.ts` if the model server runs elsewhere.
 
 ## Fixture fallback
 
-If a request fails or times out (3 s) the app imports the repo fixtures directly from
+If a request fails or times out (8 s) the app imports the repo fixtures directly from
 `../city/*.fixture.json` (single source, nothing is copied): `cells.fixture.json`, `plan.fixture.json`,
-`queue.fixture.json`. The header pill says `API: live` or `API: fixture`. There is no backtest fixture;
+`queue.fixture.json`. The header marks model, fixture, or stale data and shows the served month if it differs from the requested month. The H3 map, planned sites, and cell popup work without generated city tiles. There is no backtest fixture;
 without the API the panel says "backtest not available". Polling keeps trying `/api/queue` every 2 s,
 so starting the server later flips the feed to live without a reload.
 
@@ -133,7 +133,7 @@ The interface is icons first; every control names itself on hover.
   sightings, the top-3 reasons. Click again or Esc to close.
 - Owls panel (right): one card per owl with its gauge, address, last sighting; suggested sites under it.
   The arrow on its left border slides it away; the backtest strip has the same arrow on its top border.
-- A new event flashes its cell for ~1.5 s, bumps that cell's posterior locally, then refetches `/cells`.
+- A new event flashes its cell, then refetches `/cells` and `/plan`; the API owns the posterior and ranking.
   Events arrive over SSE (`event:` messages) with the 2 s poll as the fallback.
 - Backtest strip (bottom): KPI tiles (lift, mean precision of both rankings, months ahead) and the two
   precision lines with the COVID months shaded; direct labels at the line ends, a glass tooltip.

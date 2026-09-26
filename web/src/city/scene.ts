@@ -197,6 +197,7 @@ export class CityScene {
   private hexes = new Map<string, HexEntry>()
   private hexGroup = new THREE.Group()
   private field: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null // the citywide 2D colour map
+  private fieldCellByFace: string[] = []
   private planGroup = new THREE.Group()
   private cityLayerGroup = new THREE.Group() // citywide land / parks / water: the map under the colour field
   private areaLayerGroup = new THREE.Group() // the active area's own ground: the only land drawn inside an area
@@ -799,6 +800,7 @@ export class CityScene {
    * that share it, so the field reads as a smooth gradient rather than a honeycomb; colours are muted towards the look's neutral.
    */
   private rebuildField() {
+    this.fieldCellByFace = []
     if (this.field) {
       this.scene.remove(this.field)
       this.field.geometry.dispose()
@@ -848,6 +850,7 @@ export class CityScene {
         idx[k++] = centre
         idx[k++] = centre + 1 + i
         idx[k++] = centre + 1 + ((i + 1) % ring.length)
+        this.fieldCellByFace.push(cell.h3)
         v++
       })
     }
@@ -1143,7 +1146,11 @@ export class CityScene {
         const hits = this.raycaster.intersectObjects(this.hexGroup.children, false)
         if (hits.length) hexHit = hits[0].object.userData.h3 as string
       }
-      if (!info && !this.activeArea && base?.h3 && this.cells.has(base.h3)) hexHit = base.h3
+      if (!info && !this.activeArea && this.field) {
+        const fieldHit = this.raycaster.intersectObject(this.field, false)[0]
+        if (typeof fieldHit?.faceIndex === 'number') hexHit = this.fieldCellByFace[fieldHit.faceIndex] ?? null
+      }
+      if (!info && !hexHit && !this.activeArea && base?.h3 && this.cells.has(base.h3)) hexHit = base.h3
       // 3. the boroughs: name tags always (except the one you are in), their shapes in the citywide view
       if (!info) {
         const targets: THREE.Object3D[] = []

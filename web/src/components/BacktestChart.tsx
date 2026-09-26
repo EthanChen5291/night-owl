@@ -10,9 +10,11 @@ interface Props {
   wide: boolean // the owls panel is collapsed, so the strip can use the full width
 }
 
-// Two series, fixed order, validated on both surfaces (dataviz palette check): orange = silent blocks, blue = 311.
-const SILENT = '#c8731e'
+// The historical JSON calls the Model B risk line `precision_silent`.
+const MODEL_B = '#c8731e'
 const BASELINE = '#3a7dbd'
+const PRIOR_SIGNS = '#2a9180'
+const RANDOM = '#8f95a6'
 const COVID: [string, string] = ['2020-03', '2021-06']
 
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`
@@ -28,6 +30,8 @@ export default function BacktestChart({ data, open, onToggle, wide }: Props) {
   const months = num(summary.n_months) ?? data?.series.length ?? null
   const ticks = useMemo(() => (data ? data.series.filter((p) => p.month.endsWith('-01')).map((p) => p.month) : []), [data])
   const last = data?.series[data.series.length - 1]
+  const hasPriorSigns = data?.series.some((point) => typeof point.precision_positives === 'number') ?? false
+  const hasRandom = data?.series.some((point) => typeof point.precision_random === 'number') ?? false
   return (
     <section className={`backtest panel ${open ? '' : 'collapsed'} ${wide ? 'wide' : ''}`}>
       <button className="tab tab-top" onClick={onToggle} title={open ? 'Hide backtest' : 'Show backtest'} aria-expanded={open}>
@@ -42,7 +46,7 @@ export default function BacktestChart({ data, open, onToggle, wide }: Props) {
           </div>
           <div className="kpi">
             <span className="kpi-label">
-              <i className="dot" style={{ background: SILENT }} /> silent blocks
+              <i className="dot" style={{ background: MODEL_B }} /> Model B risk
             </span>
             <span className="kpi-value">{meanSilent !== null ? fmtPct(meanSilent) : '—'}</span>
           </div>
@@ -61,6 +65,7 @@ export default function BacktestChart({ data, open, onToggle, wide }: Props) {
             <span className="kpi-sub muted">
               {data?.window.length === 2 ? `${data.window[0]} → ${data.window[1]}` : ''}
               {data?.synthetic && <span className="badge synthetic">synthetic</span>}
+              {data && <span className="backtest-note">Only k={data.k} is available in this result.</span>}
             </span>
           </div>
         </div>
@@ -69,7 +74,7 @@ export default function BacktestChart({ data, open, onToggle, wide }: Props) {
         {data && (
           <div className="chart">
             <ResponsiveContainer width="100%" height={150}>
-              <LineChart data={data.series} margin={{ top: 10, right: 92, bottom: 0, left: 0 }}>
+              <LineChart data={data.series} margin={{ top: 10, right: 115, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke="rgba(128, 140, 155, 0.22)" vertical={false} />
                 <ReferenceArea x1={COVID[0]} x2={COVID[1]} fill="rgba(128, 140, 155, 0.12)" strokeOpacity={0} label={{ value: 'COVID', position: 'insideTop', fontSize: 11, fill: '#7c8794' }} />
                 <XAxis dataKey="month" ticks={ticks} tickFormatter={(m: string) => m.slice(0, 4)} tick={{ fontSize: 12, fill: '#7c8794' }} axisLine={false} tickLine={false} />
@@ -80,14 +85,18 @@ export default function BacktestChart({ data, open, onToggle, wide }: Props) {
                   labelStyle={{ fontWeight: 600, marginBottom: 4 }}
                   formatter={(v: unknown, name: unknown) => [typeof v === 'number' ? fmtPct(v) : String(v), String(name)]}
                 />
-                <Line type="monotone" dataKey="precision_silent" name="silent blocks" stroke={SILENT} dot={false} strokeWidth={2.2} isAnimationActive={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--glass-strong)' }} />
+                <Line type="monotone" dataKey="precision_silent" name="Model B risk" stroke={MODEL_B} dot={false} strokeWidth={2.2} isAnimationActive={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--glass-strong)' }} />
                 <Line type="monotone" dataKey="precision_311" name="311 baseline" stroke={BASELINE} dot={false} strokeWidth={2.2} isAnimationActive={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--glass-strong)' }} />
+                {hasPriorSigns && <Line type="monotone" dataKey="precision_positives" name="Prior rat signs" stroke={PRIOR_SIGNS} dot={false} strokeWidth={1.6} isAnimationActive={false} />}
+                {hasRandom && <Line type="monotone" dataKey="precision_random" name="Random" stroke={RANDOM} dot={false} strokeWidth={1.4} strokeDasharray="4 3" isAnimationActive={false} />}
               </LineChart>
             </ResponsiveContainer>
             {last && (
               <div className="chart-labels" aria-hidden>
-                <span style={{ color: SILENT }}>silent blocks {fmtPct(last.precision_silent)}</span>
+                <span style={{ color: MODEL_B }}>Model B risk {fmtPct(last.precision_silent)}</span>
                 <span style={{ color: BASELINE }}>311 baseline {fmtPct(last.precision_311)}</span>
+                {hasPriorSigns && typeof last.precision_positives === 'number' && <span style={{ color: PRIOR_SIGNS }}>prior signs {fmtPct(last.precision_positives)}</span>}
+                {hasRandom && typeof last.precision_random === 'number' && <span style={{ color: RANDOM }}>random {fmtPct(last.precision_random)}</span>}
               </div>
             )}
           </div>

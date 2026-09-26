@@ -39,6 +39,8 @@ import type {
 const DEFAULT_MONTH = '2026-09'
 const POLL_MS = 2000
 const QUEUE_LIMIT = 50
+const DEFAULT_PLAN_BUDGET = 20
+const DEMO_H3 = '892a100d2c3ffff'
 
 function hashParams(): URLSearchParams {
   return new URLSearchParams(window.location.hash.replace(/^#/, ''))
@@ -67,7 +69,10 @@ export default function App() {
   const [month, setMonth] = useState(DEFAULT_MONTH)
   const [cells, setCells] = useState<Cell[]>([])
   const [cellsSource, setCellsSource] = useState<Source | null>(null)
+  const [servedMonth, setServedMonth] = useState<string | null>(null)
   const [plan, setPlan] = useState<PlanNode[]>([])
+  const [planMonth, setPlanMonth] = useState<string | null>(null)
+  const [planBudget, setPlanBudget] = useState(DEFAULT_PLAN_BUDGET)
   const [showPlan, setShowPlan] = useState(true)
   const [events, setEvents] = useState<RatEvent[]>([])
   const [queueSource, setQueueSource] = useState<Source>('fixture')
@@ -98,9 +103,12 @@ export default function App() {
   const seenRef = useRef<Set<string>>(new Set())
   const primedRef = useRef(false) // first queue load does not flash
   const seqRef = useRef(0)
-  const liveRef = useRef({ cells: false, queue: false }) // once live, a failed refresh keeps the live data
+  const liveRef = useRef({ cells: false, queue: false })
+  const monthRef = useRef(month)
+  const planBudgetRef = useRef(planBudget)
+  const cellsRequestRef = useRef(0)
+  const planRequestRef = useRef(0)
   const owlsRef = useRef(owls)
-  owlsRef.current = owls
   const cacheRef = useRef(new TileCache())
 
   // ---- mode and area in the URL hash so a reload keeps them
@@ -134,7 +142,10 @@ export default function App() {
   }, [preset])
 
   // ---- owls persist
-  useEffect(() => saveOwls(owls), [owls])
+  useEffect(() => {
+    owlsRef.current = owls
+    saveOwls(owls)
+  }, [owls])
 
   // ---- keyboard: Esc cancels placing / selection / pinned card, Delete removes the selected owl
   useEffect(() => {
@@ -155,17 +166,44 @@ export default function App() {
 
   // ---- cells, plan, backtest, citywide layers, manifests
   const loadCells = useCallback(async (m: string) => {
+    const request = ++cellsRequestRef.current
     const { data, source } = await fetchCells(m)
-    if (source === 'fixture' && liveRef.current.cells) return // transient failure: keep what the API gave us
+    if (request !== cellsRequestRef.current || monthRef.current !== m) return
+    if (source === 'fixture' && liveRef.current.cells) {
+      setCellsSource('stale')
+      return
+    }
     liveRef.current.cells = source === 'live'
     setCells(data.cells)
-    setCellsSource(source)
+    setCellsSource(data.synthetic || data.source === 'fixture' ? 'fixture' : source)
+    setServedMonth(data.month)
   }, [])
   useEffect(() => {
     void loadCells(month)
   }, [month, loadCells])
+  const selectMonth = useCallback((m: string) => {
+    monthRef.current = m
+    liveRef.current.cells = false
+    setCells([])
+    setCellsSource(null)
+    setServedMonth(null)
+    setPlan([])
+    setPlanMonth(null)
+    setMonth(m)
+  }, [])
+  const loadPlan = useCallback(async (m: string, k: number) => {
+    const request = ++planRequestRef.current
+    const { data } = await fetchPlan(m, k)
+    if (request !== planRequestRef.current || monthRef.current !== m) return
+    setPlan(data.nodes.slice(0, k))
+    setPlanMonth(data.month)
+    setOpenRank(null)
+    setSpotsByCell(new Map())
+  }, [])
   useEffect(() => {
-    void fetchPlan(20).then(({ data }) => setPlan(data.nodes))
+    void loadPlan(month, planBudget)
+  }, [month, planBudget, loadPlan])
+  useEffect(() => {
     void fetchBacktest().then(setBacktest)
     void fetchPublic<CityMeta>('/city/meta.json').then((m) => setMeta(m))
     void fetchPublic<AreasManifest>('/city/areas.json').then((m) => setAreasManifest(m))
@@ -240,9 +278,9 @@ export default function App() {
     }
   }, [openRank, plan, spotsByCell])
 
-  // ---- one event in: flash, bump the posterior locally, then refetch /cells
+  // ---- events are evidence; the server owns posterior and ranking updates
   const ingest = useCallback(
-    (incoming: RatEvent[], source: Source) => {
+    (incoming: RatEvent[], source: Source, flashNew = true) => {
       const fresh = incoming.filter((e) => !seenRef.current.has(eventKey(e)))
       for (const e of fresh) seenRef.current.add(eventKey(e))
       if (fresh.length === 0) return
@@ -265,33 +303,19 @@ export default function App() {
           return next
         })
       }
-      if (!primedRef.current) {
-        primedRef.current = true
-        return
+      if (flashNew) {
+        const newest = fresh.reduce((a, b) => (a.ts >= b.ts ? a : b))
+        setFlash({ h3: newest.h3, seq: ++seqRef.current })
       }
-      const newest = fresh.reduce((a, b) => (a.ts >= b.ts ? a : b))
-      setFlash({ h3: newest.h3, seq: ++seqRef.current })
-      setCells((prev) =>
-        prev.map((c) =>
-          fresh.some((e) => e.h3 === c.h3)
-            ? {
-                ...c,
-                posterior: {
-                  ...c.posterior,
-                  alpha: c.posterior.alpha + fresh.filter((e) => e.h3 === c.h3).length,
-                  n_events: c.posterior.n_events + fresh.filter((e) => e.h3 === c.h3).length,
-                },
-                last_event_at: newest.ts,
-              }
-            : c,
-        ),
-      )
-      if (source === 'live') setTimeout(() => void loadCells(month), 1000)
+      if (source === 'live') {
+        void loadCells(month)
+        void loadPlan(month, planBudget)
+      }
     },
-    [loadCells, month],
+    [loadCells, loadPlan, month, planBudget],
   )
   const ingestRef = useRef(ingest)
-  ingestRef.current = ingest
+  useEffect(() => { ingestRef.current = ingest }, [ingest])
 
   // ---- /queue polling every 2 s (keeps trying the API so it goes live when the server appears)
   useEffect(() => {
@@ -299,10 +323,27 @@ export default function App() {
     const tick = async () => {
       const { data, source } = await fetchQueue(QUEUE_LIMIT)
       if (!alive) return
-      if (source === 'fixture' && liveRef.current.queue) return // one missed poll must not inject fixture events
+      if (source === 'fixture' && liveRef.current.queue) {
+        setQueueSource('stale')
+        return
+      }
+      const becameLive = source === 'live' && !liveRef.current.queue
       liveRef.current.queue = source === 'live'
       setQueueSource(source)
-      ingestRef.current(data.events, source)
+      if (becameLive) {
+        void loadCells(monthRef.current)
+        void loadPlan(monthRef.current, planBudgetRef.current)
+        void fetchBacktest().then(setBacktest)
+      }
+      if (source === 'live' && data.events.length === 0 && seenRef.current.size > 0) {
+        seenRef.current.clear()
+        setEvents([])
+        setFlash(null)
+        void loadCells(monthRef.current)
+        void loadPlan(monthRef.current, planBudgetRef.current)
+      }
+      ingestRef.current(data.events, source, primedRef.current)
+      primedRef.current = true
     }
     void tick()
     const id = setInterval(() => void tick(), POLL_MS)
@@ -310,7 +351,7 @@ export default function App() {
       alive = false
       clearInterval(id)
     }
-  }, [])
+  }, [loadCells, loadPlan])
 
   // ---- SSE at /api/stream: the server names its messages, so listen for `event`, not the default channel
   useEffect(() => {
@@ -327,12 +368,17 @@ export default function App() {
     }
     es.addEventListener('event', onEvent)
     es.onmessage = onEvent
-    es.onerror = () => {
-      setStreaming(false)
-      es.close()
-    }
+    es.addEventListener('reset', () => {
+      seenRef.current.clear()
+      setEvents([])
+      setFlash(null)
+      void loadCells(monthRef.current)
+      void loadPlan(monthRef.current, planBudgetRef.current)
+    })
+    // EventSource reconnects by itself; polling continues while it is disconnected.
+    es.onerror = () => setStreaming(false)
     return () => es.close()
-  }, [])
+  }, [loadCells, loadPlan])
 
   // ---- derived
   const centre = useMemo(() => {
@@ -356,7 +402,9 @@ export default function App() {
   }, [tiles])
   const cellByH3 = useMemo(() => new Map(cells.map((c) => [c.h3, c])), [cells])
   // suggested sites of the borough you are in (by their r7 tile's area); nothing citywide
-  const planHere = useMemo(() => (area ? plan.filter((p) => tileAreas[cellToParent(p.h3, 7)] === area) : []), [plan, area, tileAreas])
+  const visiblePlan = useMemo(() => (planMonth && planMonth === servedMonth ? plan : []), [planMonth, servedMonth, plan])
+  const noBake = areas.length === 0
+  const planHere = useMemo(() => (noBake ? visiblePlan : area ? visiblePlan.filter((p) => tileAreas[cellToParent(p.h3, 7)] === area) : []), [visiblePlan, area, noBake, tileAreas])
   const openNode = openRank !== null ? planHere.find((p) => p.rank === openRank) : undefined
   // which borough an owl is in: its point against the borough outlines, else its r7 tile's area
   const areaOfOwl = useCallback(
@@ -367,7 +415,7 @@ export default function App() {
     [areas, projector, tileAreas],
   )
   // inside a borough only its owls exist, on the map and in the list; citywide, all of them
-  const owlsHere = useMemo(() => (area ? owls.filter((o) => areaOfOwl(o) === area) : owls), [owls, area, areaOfOwl])
+  const owlsHere = useMemo(() => (noBake ? owls : area ? owls.filter((o) => areaOfOwl(o) === area) : owls), [owls, area, noBake, areaOfOwl])
   const openSpots = useMemo(() => (openNode ? spotsByCell.get(openNode.h3) : undefined), [openNode, spotsByCell])
 
   // ---- an owl spawned by an event before any tile was loaded has a placeholder address: fill it in once we can
@@ -437,6 +485,14 @@ export default function App() {
     setOpenRank(null)
     setFocus({ lat: spot.lat, lon: spot.lon, distance: 300, seq: ++seqRef.current })
   }, [])
+  const placePlan = useCallback((site: PlanNode) => {
+    const owl = newOwl(owlsRef.current, site.lat, site.lon, null, undefined, site.tree_id)
+    owlsRef.current = [...owlsRef.current, owl]
+    setOwls((prev) => [...prev, owl])
+    setSelected(owl.id)
+    setOwlsOpen(true)
+    setFocus({ lat: site.lat, lon: site.lon, distance: 300, seq: ++seqRef.current })
+  }, [])
   const placeOwl = useCallback(
     (lat: number, lon: number) => {
       const spot = addressAt(lat, lon)
@@ -475,7 +531,7 @@ export default function App() {
         if (spot) placeSpot(spot)
         return
       }
-      if (info.cellHit && info.h3 && cellByH3.has(info.h3) && area) {
+      if (info.cellHit && info.h3 && cellByH3.has(info.h3) && (area || noBake)) {
         const h3 = info.h3
         setPinned((p) => (p?.h3 === h3 ? null : { h3, addr: info.addr }))
         setSelected(null)
@@ -484,7 +540,7 @@ export default function App() {
       setPinned(null)
       setSelected(null)
     },
-    [area, placing, placeOwl, cellByH3, setArea, selectOwl, openSpots, placeSpot],
+    [area, noBake, placing, placeOwl, cellByH3, setArea, selectOwl, openSpots, placeSpot],
   )
   const onHover = useCallback((info: HoverInfo | null) => setHover(info), [])
   const onView = useCallback((v: ViewInfo) => setView(v), [])
@@ -510,7 +566,7 @@ export default function App() {
             tiles={tiles}
             areas={areas}
             tileAreas={tileAreas}
-            activeArea={area}
+            activeArea={noBake ? null : area}
             nodes={owlsHere}
             selectedNode={selected}
             index={index}
@@ -533,12 +589,18 @@ export default function App() {
           onPlace={() => setPlacing((p) => !p)}
           onShowPlan={() => setShowPlan((s) => !s)}
           onLogs={() => setLogsOpen((o) => !o)}
+          noBake={noBake}
         />
         <ModeBar mode={mode} onMode={setMode} preset={preset} onPreset={setPreset} />
-        <Header month={month} cellCount={cells.length} source={cellsSource} onMonth={setMonth} />
+        <Header month={month} servedMonth={servedMonth} cellCount={cells.length} source={cellsSource} planBudget={planBudget} onMonth={selectMonth} onPlanBudget={(k) => { planBudgetRef.current = k; setPlan([]); setPlanMonth(null); setPlanBudget(k) }} onDemo={() => {
+          if (!cellByH3.has(DEMO_H3)) return
+          const [lat, lon] = cellToLatLng(DEMO_H3)
+          setFocus({ lat, lon, distance: 800, seq: ++seqRef.current })
+          setPinned({ h3: DEMO_H3, addr: null })
+        }} />
         <Legend mode={mode} lifted={chartOpen} />
 
-        {!area && areas.length > 0 && <AreaPicker areas={areas} hovered={hover?.areaId ?? null} onPick={setArea} />}
+        {!activeArea && areas.length > 0 && <AreaPicker areas={areas} hovered={hover?.areaId ?? null} onPick={setArea} />}
 
         {hover && hover.kind !== 'ground' && <HoverTip info={hover} mode={mode} cell={hoveredCell} node={hoveredOwl} area={hoveredArea} placing={placing} />}
         {pinnedCell && <CellPopup cell={pinnedCell} mode={mode} addr={pinned?.addr ?? null} onClose={() => setPinned(null)} />}
@@ -558,7 +620,8 @@ export default function App() {
           }}
           onFlySpot={(s) => setFocus({ lat: s.lat, lon: s.lon, distance: 320, seq: ++seqRef.current })}
           onPlaceSpot={placeSpot}
-          inArea={!!area}
+          onPlacePlan={placePlan}
+          inArea={!!area || noBake}
           source={queueSource}
           streaming={streaming}
           open={owlsOpen}

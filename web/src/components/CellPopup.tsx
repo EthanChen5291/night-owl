@@ -36,8 +36,9 @@ export default function CellPopup({ cell, mode, addr, onClose }: Props) {
           <b>{addr ?? `Block ${cell.h3.slice(-5)}`}</b>
           <span className="muted small">
             district {cell.cd}
-            {cell.rmz ? ` · ${cell.rmz}` : ''} · {cell.n_inspections} inspections
+            {cell.rmz ? ` · ${cell.rmz}` : ' · RMZ unavailable'} · {cell.n_inspections} inspections
           </span>
+          <code className="muted small">{cell.h3}</code>
         </div>
         <button className="icon-btn" onClick={onClose} aria-label="Close">
           <CloseIcon size={15} />
@@ -46,6 +47,9 @@ export default function CellPopup({ cell, mode, addr, onClose }: Props) {
       <Bar label="city sees" value={cell.pct_a} tone="a" />
       <Bar label="what's there" value={cell.pct_b} tone="b" />
       <Bar label="silence" value={cell.silence} tone="silence" />
+      <div className="cellcard-detail small"><span>Complaints / month</span><b>{fmt(cell.score_a, 3)}</b></div>
+      <div className="cellcard-detail small"><span>City percentile</span><b>{fmt(cell.pct_a, 1)}</b></div>
+      <div className="cellcard-detail small"><span>Rat-sign percentile</span><b>{fmt(cell.pct_b, 1)}</b></div>
       <div className="cellcard-row muted small">
         <span>
           P(active) <b>{fmt(cell.score_b, 2)}</b> [{fmt(cell.ci_b[0], 2)}–{fmt(cell.ci_b[1], 2)}]
@@ -54,6 +58,8 @@ export default function CellPopup({ cell, mode, addr, onClose }: Props) {
           <b>{cell.posterior.n_events}</b> sightings
         </span>
       </div>
+      <div className="cellcard-detail small"><span>Posterior α / β</span><b>{fmt(cell.posterior.alpha)} / {fmt(cell.posterior.beta)}</b></div>
+      <div className="cellcard-detail small"><span>Last event</span><b>{cell.last_event_at ? new Date(cell.last_event_at).toLocaleString() : 'none'}</b></div>
       <div className="popup-reasons">
         {cell.reasons.slice(0, 3).map((r) => (
           <div key={r.feature} className="reason">

@@ -33,7 +33,8 @@ async function withFallback<T>(path: string, fixture: T): Promise<Loaded<T>> {
 export const fetchCells = (month: string) =>
   withFallback<CellsResponse>(`/cells?month=${encodeURIComponent(month)}`, cellsFixture as CellsResponse)
 
-export const fetchPlan = (k = 8) => withFallback<PlanResponse>(`/plan?k=${k}`, planFixture as PlanResponse)
+export const fetchPlan = (month: string, k = 8) =>
+  withFallback<PlanResponse>(`/plan?month=${encodeURIComponent(month)}&k=${k}`, planFixture as PlanResponse)
 
 export const fetchQueue = (limit = 20) =>
   withFallback<QueueResponse>(`/queue?limit=${limit}`, queueFixture as QueueResponse)

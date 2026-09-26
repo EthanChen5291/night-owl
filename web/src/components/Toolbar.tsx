@@ -3,6 +3,7 @@ import { BackIcon, ListIcon, PinPlusIcon, SparkIcon } from './Icons'
 
 interface Props {
   area: Area | null
+  noBake: boolean
   placing: boolean
   showPlan: boolean
   logsOpen: boolean
@@ -13,7 +14,7 @@ interface Props {
 }
 
 /** Top left: back to the city, place an owl, suggested sites, sightings log. Icons only, names on hover. */
-export default function Toolbar({ area, placing, showPlan, logsOpen, onBack, onPlace, onShowPlan, onLogs }: Props) {
+export default function Toolbar({ area, noBake, placing, showPlan, logsOpen, onBack, onPlace, onShowPlan, onLogs }: Props) {
   return (
     <div className="toolbar">
       {area && (
@@ -22,12 +23,12 @@ export default function Toolbar({ area, placing, showPlan, logsOpen, onBack, onP
           <span>{area.name}</span>
         </button>
       )}
-      {area && (
+      {(area || noBake) && (
         <button className={`tool panel ${placing ? 'active' : ''}`} aria-pressed={placing} title={placing ? 'Placing an owl: click the map (Esc to cancel)' : 'Place an owl'} onClick={onPlace}>
           <PinPlusIcon size={20} />
         </button>
       )}
-      {area && (
+      {(area || noBake) && (
         <button className={`tool panel ${showPlan ? 'active' : ''}`} aria-pressed={showPlan} title="Suggested sites from the model (click a pin to place an owl there)" onClick={onShowPlan}>
           <SparkIcon size={20} />
         </button>
