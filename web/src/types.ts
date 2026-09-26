@@ -25,6 +25,15 @@ export interface Cell {
   rmz: string | null
   n_inspections: number
   last_event_at: string | null
+  // ranking extras from model/export.py (optional: fixtures don't have them)
+  neighborhood?: string | null
+  borough?: string | null
+  rank_risk?: number
+  tier_risk?: string | null
+  rank_silent?: number | null
+  tier_silent?: string | null
+  is_silent?: boolean
+  n_complaints_12m?: number
 }
 
 export interface CellsResponse {

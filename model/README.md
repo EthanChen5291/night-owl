@@ -1,6 +1,6 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 15:55** (hotspot rankings added; silent needs ≥100 homes).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 16:20** (hotspots panel on the map; ci_b fix).
 
 ## Headline results
 
@@ -122,6 +122,10 @@ Every eligible cell in `cells.json` now carries `rank_risk` / `tier_risk` (1 = h
 | 9 | Kingsbridge-Marble Hill | Manhattan | 8.5% | +80 | 9 | 5210 BROADWAY |
 | 10 | East Harlem (North) | Manhattan | 8.2% | +80 | 0 | 322 EAST 126 STREET |
 
+**On the map:** a "NYC hotspots" panel (`web/src/components/Hotspots.tsx`, tabs Silent / Rat risk, click = fly
+to the cell) reads these rank fields straight from `/cells`; the cell popup shows neighborhood and tier. Both hide
+themselves on fixture data, which has no ranks.
+
 Scope: models train and rank on all five boroughs (the silent blocks are mostly in the Bronx and Queens; dropping
 them would lose data and the equity story). The 3D demo map only draws Lower Manhattan.
 
@@ -183,6 +187,10 @@ Raw data lives outside the repo in `../../data/raw/` (override with `DATA_DIR=..
   days). At most one complaint per exact spot per day counts (removes 5.9% of rows).
 
 ## Open items
+
+- Fixed 16:20: `ci_b` came from the sweep-updated posterior, so `score_b` could sit outside its own interval
+  (Bed-Stuy 0.035 vs [0.072, 0.106]). `ci_b` and `posterior` now describe `score_b` itself (Beta prior worth 20
+  lots, widened to the bootstrap spread); 0 of 5,170 cells outside.
 
 - `rmz` is null in `cells.json` until the Rat Mitigation Zone polygons are added.
 - Stage demo cell `892a100d2c3ffff` (27th & 6th) is not silent in real data (silence −7.0). Pick a real one:

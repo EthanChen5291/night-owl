@@ -6,6 +6,7 @@ import BacktestChart from './components/BacktestChart'
 import CellPopup from './components/CellPopup'
 import EventFeed, { eventKey } from './components/EventFeed'
 import Header from './components/Header'
+import Hotspots from './components/Hotspots'
 import Legend from './components/Legend'
 import Scene from './components/Scene'
 import Toggle from './components/Toggle'
@@ -181,6 +182,7 @@ export default function App() {
         {!ready && <div className="loading">loading cells...</div>}
         <Toggle mode={mode} onMode={setMode} preset={preset} onPreset={setPreset} />
         <Legend mode={mode} showPlan={showPlan} onShowPlan={setShowPlan} planCount={plan.length} />
+        <Hotspots cells={cells} onSelect={(h3) => setFocus({ h3, seq: ++seqRef.current })} />
         {hoveredCell && hover && <CellPopup cell={hoveredCell} mode={mode} x={hover.x} y={hover.y} />}
         <EventFeed
           events={events}

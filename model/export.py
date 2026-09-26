@@ -101,10 +101,16 @@ def main(k: int) -> None:
     s["pct_a"] = pct100(s.complaints_per_capita)
     s["pct_b"] = pct100(s.risk_b)
     s["silence100"] = (s.pct_b - s.pct_a).round(1)
-    # Posterior as of the scoring month: B is the prior worth PRIOR_LOTS lots, sweeps update it.
-    n0 = models.PRIOR_LOTS + s.sweeps_24m
-    a, b = s.risk_post * n0, (1 - s.risk_post) * n0
-    lo, hi = beta_dist.ppf(0.025, a, b), beta_dist.ppf(0.975, a, b)
+    # ci_b and posterior describe score_b itself (Model B's belief): a Beta prior worth PRIOR_LOTS
+    # inspected lots, centred on score_b, widened to cover the spread of the 5 bootstrap copies.
+    # (Before, they came from the sweep-updated posterior, so score_b could sit outside its own
+    # interval, e.g. Bed-Stuy score_b 0.035 with ci_b [0.072, 0.106].) n_events starts at 0; the
+    # API adds sensor detections on top.
+    n0 = float(models.PRIOR_LOTS)
+    a, b = s.risk_b.clip(1e-3, 1 - 1e-3) * n0, (1 - s.risk_b.clip(1e-3, 1 - 1e-3)) * n0
+    spread = 1.96 * s.risk_b_model_sd
+    lo = np.minimum(beta_dist.ppf(0.025, a, b), (s.risk_b - spread).clip(lower=0))
+    hi = np.maximum(beta_dist.ppf(0.975, a, b), (s.risk_b + spread).clip(upper=1))
     # Rankings among eligible cells: 1 = highest rat risk (Model B); silent rank only among
     # flagged silent cells, 1 = biggest gap between rats likely and complaints.
     n = len(s)

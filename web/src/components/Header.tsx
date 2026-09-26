@@ -11,7 +11,7 @@ export default function Header({ month, cellCount, source, onMonth }: Props) {
   return (
     <header className="header">
       <span className="brand">Barn Owl</span>
-      <span className="muted">silent blocks, lower Manhattan</span>
+      <span className="muted">silent blocks, all five boroughs (3D view: lower Manhattan)</span>
       <label className="month">
         month
         <input type="month" value={month} onChange={(e) => e.target.value && onMonth(e.target.value)} />

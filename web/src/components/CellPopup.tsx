@@ -16,7 +16,7 @@ export default function CellPopup({ cell, mode, x, y }: Props) {
   const maxShap = Math.max(1e-6, ...cell.reasons.map((r) => Math.abs(r.shap)))
   // keep the card inside the viewport
   const w = 300
-  const h = 330
+  const h = 370
   const left = Math.min(x + 16, window.innerWidth - w - 8)
   const top = Math.min(y + 16, window.innerHeight - h - 8)
   return (
@@ -26,6 +26,21 @@ export default function CellPopup({ cell, mode, x, y }: Props) {
         <code>{cell.h3}</code>
       </div>
       <div className="popup-grid">
+        {cell.neighborhood && (
+          <>
+            <span>where</span>
+            <b>{cell.neighborhood}, {cell.borough}</b>
+          </>
+        )}
+        {(cell.tier_silent || cell.tier_risk) && (
+          <>
+            <span>hotspot</span>
+            <b className="pos">
+              {[cell.tier_silent && `${cell.tier_silent} silent (#${cell.rank_silent})`,
+                cell.tier_risk && `${cell.tier_risk} risk (#${cell.rank_risk})`].filter(Boolean).join(' · ')}
+            </b>
+          </>
+        )}
         <span>cd</span>
         <b>{cell.cd}</b>
         <span>rmz</span>
