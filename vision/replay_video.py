@@ -55,6 +55,8 @@ def main(argv=None) -> int:
     ap.add_argument("--pushes", help="optional CSV of actual push times; exploratory one-to-one scoring")
     ap.add_argument("--fps", type=float, help="override missing or incorrect video FPS metadata")
     ap.add_argument("--max-frames", type=int, default=0)
+    ap.add_argument("--start-sec", type=float, default=0.0, help="seek to this clip time for a short demo segment")
+    ap.add_argument("--duration-sec", type=float, default=0.0, help="replay this many seconds (0 = to clip end)")
     ap.add_argument("--conf", type=float, default=CONF)
     ap.add_argument("--iou", type=float, default=IOU)
     ap.add_argument("--floor-y", type=float, default=FLOOR_Y,
@@ -80,13 +82,20 @@ def main(argv=None) -> int:
     fps = args.fps or cap.get(cv2.CAP_PROP_FPS)
     if not 0 < fps < 240:
         ap.error("video has no valid FPS; supply --fps")
+    if args.start_sec < 0 or args.duration_sec < 0:
+        ap.error("--start-sec and --duration-sec must be nonnegative")
+    first_frame = round(args.start_sec * fps)
+    if first_frame:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, first_frame)
     detector = Detector(str(model), gray=args.gray, conf=args.conf, iou=args.iou)
     gate = EventGate(args.hits, args.window, args.cooldown)
     save_dir = Path(args.save_events) if args.save_events else None
     events = []
-    index = 0
+    index = first_frame
+    frames_read = 0
     previous_ts = None
-    origin_ms = None
+    origin_ms = 0.0 if first_frame else None
+    segment_start = None
     wall_start = time.monotonic()
     try:
         while True:
@@ -97,9 +106,13 @@ def main(argv=None) -> int:
             if origin_ms is None:
                 origin_ms = pos_ms
             t_sec = clip_time(index, fps, pos_ms, previous_ts, origin_ms)
+            if segment_start is None:
+                segment_start = t_sec
+            if args.duration_sec and t_sec - segment_start >= args.duration_sec:
+                break
             previous_ts = t_sec
             if not args.no_pace:
-                delay = wall_start + t_sec - time.monotonic()
+                delay = wall_start + t_sec - segment_start - time.monotonic()
                 if delay > 0:
                     time.sleep(delay)
             frame = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if args.gray else bgr
@@ -119,14 +132,18 @@ def main(argv=None) -> int:
                 print(f"event {len(events)} at {t_sec:.2f}s frame {index}: conf {selected.conf:.3f} "
                       f"bbox {selected.bbox} POST {response}", flush=True)
             index += 1
-            if args.max_frames and index >= args.max_frames:
+            frames_read += 1
+            if args.max_frames and frames_read >= args.max_frames:
                 break
     finally:
         cap.release()
     report = {"status": "EXPLORATORY_REPLAY", "clip": str(clip.resolve()),
               "clip_sha256": sha256(clip), "model": str(model.resolve()),
-              "model_sha256": sha256(model), "recorded_fps": fps, "frames_read": index,
-              "duration_sec": previous_ts or 0.0, "gray": args.gray, "conf": args.conf,
+              "model_sha256": sha256(model), "recorded_fps": fps, "frames_read": frames_read,
+              "start_sec": segment_start or 0.0,
+              "end_sec": previous_ts or 0.0,
+              "duration_sec": (previous_ts - segment_start) if previous_ts is not None else 0.0,
+              "gray": args.gray, "conf": args.conf,
               "floor_y": args.floor_y, "min_rat_width": args.min_rat_width,
               "max_rat_width": args.max_rat_width, "hits": args.hits, "window": args.window,
               "cooldown": args.cooldown, "events": events}
@@ -141,7 +158,7 @@ def main(argv=None) -> int:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(report, indent=2) + "\n")
         print(f"report {out}")
-    print(f"done: {index} frames, {previous_ts or 0:.2f}s clip time, {len(events)} events")
+    print(f"done: {frames_read} frames, {report['duration_sec']:.2f}s replay, {len(events)} events")
     return 0
 
 
