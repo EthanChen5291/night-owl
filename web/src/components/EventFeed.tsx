@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { RatEvent, Source } from '../types'
 
 interface Props {
@@ -16,14 +17,20 @@ const fmtTs = (iso: string) => {
 }
 
 export default function EventFeed({ events, source, streaming, latestKey, onSelect }: Props) {
+  const [open, setOpen] = useState(true)
   return (
-    <aside className="feed panel">
+    <aside className={`feed panel${open ? '' : ' collapsed'}`}>
       <div className="feed-head">
         <span>Events</span>
         <span className="muted small">
           {source === 'live' ? (streaming ? 'SSE' : 'polling 2 s') : 'fixture'} · {events.length}
+          <button className="min-btn" onClick={() => setOpen(!open)} title={open ? 'minimize' : 'expand'}>
+            {open ? '–' : '+'}
+          </button>
         </span>
       </div>
+      {open && (
+      <>
       {events.length === 0 && <div className="muted small">no events yet</div>}
       <ul>
         {events.map((e) => {
@@ -45,6 +52,8 @@ export default function EventFeed({ events, source, streaming, latestKey, onSele
           )
         })}
       </ul>
+      </>
+      )}
     </aside>
   )
 }
