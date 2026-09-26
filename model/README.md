@@ -1,14 +1,15 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 13:45**.
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 14:05**.
 
 ## Headline results
 
 | Claim | Number | Where |
 |---|---|---|
-| **Backtest: our picks beat "go where people complain"** | **21.9% vs 17.2%** of swept lots had rats (+27%), won **76 of 83 months** (2019-01 → 2026-08) | `out/backtest.json` |
-| Backtest: beats "go where rats were found before" | 21.9% vs 19.4%, won 68 of 83 months, without using inspection history | `out/backtest.json` |
-| **Backtest: quiet blocks only** | **17.9% vs 10.3% random (1.7×), won 81 of 83 months** | `out/backtest.json` |
+| **Backtest: our picks beat "go where people complain"** | **19.2% vs 15.2%** of swept lots had rats (+26%), won **108 of 119 months** (2016-01 → 2026-08) | `out/backtest.json` |
+| Backtest: beats "go where rats were found before" | 19.2% vs 17.1%, won 92 of 119 months, without using inspection history | `out/backtest.json` |
+| **Backtest: quiet blocks only** | **15.6% vs 8.8% random (1.8×), won 117 of 119 months** | `out/backtest.json` |
+| Live loop (hour-6 gate, server side) | `api/` serving our `out/` files; one fake rat event on the demo cell: `score_b` 0.038 → 0.118, silence −1.2 → +14.4 | tested 14:00 |
 | Quiet ≠ rat-free | loudest vs quietest areas: complaints differ **17.8×**, rats found in sweeps only **2.3×** | `out/validation.json` test 1 |
 | Out-of-time check | trained to 2023-12; quiet cells swept in 2024: high-risk third 20.1% vs low-risk third 7.8% | test 2 |
 | No ground truth where nobody complains | **97%** of the quietest-quartile cells had no proactive sweep in 24 months, vs 55% of the loudest | `03_models.py` data_gap |

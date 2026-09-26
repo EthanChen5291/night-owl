@@ -1,6 +1,6 @@
 """Step 5: rolling backtest, scored on proactive sweeps only.
 
-For every month M (2019-01 ..): Model B is trained only on months before M (refit every
+For every month M (2016-01 ..): Model B is trained only on months before M (refit every
 REFIT_EVERY months; features at M are always M's own lagged features, so no leakage).
 Among the cells DOHMH actually swept in M, each method picks its top K:
 
@@ -17,7 +17,7 @@ Output: model/out/backtest.json in the web contract
   {window, k, series[{month, precision_silent, precision_311, n_positives, ...}], summary, synthetic}
 precision_silent = our model, precision_311 = complaints baseline (names fixed by web/src/types.ts).
 
-Run: python3 model/05_backtest.py [--k 50] [--start 2019-01]
+Run: python3 model/05_backtest.py [--k 50] [--start 2016-01]
 """
 import argparse
 import importlib
@@ -86,6 +86,7 @@ def main(k: int, start: str) -> None:
         "mean_precision_311": round(s.precision_311.mean(), 4),
         "mean_precision_positives": round(s.precision_positives.mean(), 4),
         "mean_precision_random": round(s.precision_random.mean(), 4),
+        "lift": round(s.precision_silent.mean() / s.precision_311.mean(), 3),  # read by web BacktestChart
         "lift_vs_311": round(s.precision_silent.mean() / s.precision_311.mean(), 3),
         "lift_vs_positives": round(s.precision_silent.mean() / s.precision_positives.mean(), 3),
         "months_beating_311": int((s.precision_silent > s.precision_311).sum()),
@@ -106,6 +107,6 @@ def main(k: int, start: str) -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--k", type=int, default=50)
-    ap.add_argument("--start", default="2019-01")
+    ap.add_argument("--start", default="2016-01")
     a = ap.parse_args()
     main(a.k, a.start)
