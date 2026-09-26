@@ -276,6 +276,7 @@ data/bake_open_data.py              CSV → Parquet (DuckDB), --download / --acs
 city/README.md, build_city.py       city renderer docs and the buildings/trees bake
 city/make_fixture.py                generates the three synthetic contract fixtures below
 city/cells.fixture.json, plan.fixture.json, queue.fixture.json
+web/                                Vite + React + three.js map (hex overlay, toggle, popup, plan pins, event feed, backtest chart)
 api/                                FastAPI backend serving the contract (main.py, store.py, posterior.py, tests, fake_event.sh)
 node/README-pi.md, HANDOFF-pi5-camera-pir-node.md   Pi setup, login route, gotchas, the four tests
 node/DEBRIEF-utsav.md               the narrative for a newcomer

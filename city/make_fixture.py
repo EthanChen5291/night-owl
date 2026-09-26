@@ -283,7 +283,13 @@ def build_plan(rng: random.Random, rows: list[dict]) -> dict:
 def build_queue() -> dict:
     """Three events from the stage node. ts is when the Pi fired, received_at when the API got it."""
     base = dt.datetime(2026, 9, 26, 14, 2, 11, tzinfo=dt.timezone.utc)
-    specs = [(0, 0.91, [212, 301, 138, 74]), (47, 0.87, [188, 288, 151, 80]), (131, 0.94, [240, 310, 129, 69])]
+    # bbox is [x, y, w, h] normalised to 0-1 per the contract (the detector letterboxes 640x480);
+    # these are the pixel boxes (212,301,138,74) etc. divided by 640/480.
+    specs = [
+        (0, 0.91, [0.331, 0.627, 0.216, 0.154]),
+        (47, 0.87, [0.294, 0.600, 0.236, 0.167]),
+        (131, 0.94, [0.375, 0.646, 0.202, 0.144]),
+    ]
     events = []
     for offset_s, conf, bbox in specs:
         ts = base + dt.timedelta(seconds=offset_s)
@@ -296,7 +302,7 @@ def build_queue() -> dict:
                 "class": "rat",
                 "conf": conf,
                 "n_hits": 3,
-                "bbox": bbox,  # [x, y, w, h] in the 640x480 detector frame
+                "bbox": bbox,  # [x, y, w, h] normalised 0-1
                 "crop_b64": "",  # empty in the fixture; the live node sends a JPEG of the rat crop
                 "fw": FW,
                 "received_at": rx.isoformat(timespec="milliseconds").replace("+00:00", "Z"),

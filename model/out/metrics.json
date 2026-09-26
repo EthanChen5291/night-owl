@@ -1,0 +1,294 @@
+{
+ "n_cells": 6548,
+ "n_cell_months": 916720,
+ "months": [
+  "2015-01",
+  "2026-08"
+ ],
+ "scope": [
+  "BK",
+  "BX",
+  "MN",
+  "QN",
+  "SI"
+ ],
+ "model_a": {
+  "objective": "poisson",
+  "offset": "log1p(pluto_res_units)",
+  "n_rows": 838144,
+  "n_features": 48,
+  "cv": "GroupKFold(5) by community district",
+  "poisson_deviance": 0.8317,
+  "null_deviance": 1.713,
+  "deviance_explained": 0.5144,
+  "spearman_all_rows": 0.5129,
+  "spearman_per_month_mean": 0.5051
+ },
+ "propensity": {
+  "auc": 0.8504,
+  "marginal_rate": 0.1161,
+  "features": "B features + community district code"
+ },
+ "model_b_data": {
+  "n_rows": 1363451,
+  "active_rate": 0.1427,
+  "weight_clip": [
+   0.128,
+   3.319
+  ],
+  "effective_sample_size": 536853,
+  "n_holdout_rmz_last12": 70234,
+  "holdout_active_rate": 0.1452
+ },
+ "model_b": {
+  "B_full": {
+   "n_features": 40,
+   "weighted": true,
+   "cv": {
+    "auc": 0.624,
+    "brier": 0.1218
+   },
+   "holdout_rmz_last12": {
+    "auc": 0.6152,
+    "brier": 0.1214,
+    "precision_at_50_cells": 0.98
+   },
+   "cv_calibrated": {
+    "auc": 0.6243,
+    "brier": 0.1194
+   },
+   "top_gain_features": [
+    "pluto_share_1_2fam",
+    "year",
+    "pluto_far",
+    "acs_median_income",
+    "acs_poverty_rate",
+    "litter_baskets_ring1",
+    "pluto_com_area_share",
+    "pluto_share_pre1940",
+    "tavg_lag3",
+    "pluto_lots"
+   ]
+  },
+  "B_no_rmz": {
+   "n_features": 38,
+   "weighted": true,
+   "cv": {
+    "auc": 0.6235,
+    "brier": 0.1219
+   },
+   "holdout_rmz_last12": {
+    "auc": 0.6148,
+    "brier": 0.1214,
+    "precision_at_50_cells": 0.98
+   }
+  },
+  "B_no_acs": {
+   "n_features": 35,
+   "weighted": true,
+   "cv": {
+    "auc": 0.6219,
+    "brier": 0.1214
+   },
+   "holdout_rmz_last12": {
+    "auc": 0.6128,
+    "brier": 0.1215,
+    "precision_at_50_cells": 0.98
+   }
+  },
+  "B_unweighted": {
+   "n_features": 40,
+   "weighted": false,
+   "cv": {
+    "auc": 0.619,
+    "brier": 0.1229
+   },
+   "holdout_rmz_last12": {
+    "auc": 0.6253,
+    "brier": 0.1208,
+    "precision_at_50_cells": 0.98
+   }
+  },
+  "B_plus_A_features_leakage": {
+   "n_features": 48,
+   "weighted": true,
+   "cv": {
+    "auc": 0.6758,
+    "brier": 0.1174
+   },
+   "holdout_rmz_last12": {
+    "auc": 0.6352,
+    "brier": 0.1203,
+    "precision_at_50_cells": 0.98
+   }
+  }
+ },
+ "features": {
+  "A": [
+   "pluto_lots",
+   "pluto_res_units",
+   "pluto_units_total",
+   "pluto_bldg_area",
+   "pluto_lot_area",
+   "pluto_far",
+   "pluto_bldg_age_median",
+   "pluto_share_pre1940",
+   "pluto_vacant_share",
+   "pluto_com_area_share",
+   "pluto_share_1_2fam",
+   "pluto_mixed_share",
+   "pluto_median_floors",
+   "pluto_numbldgs",
+   "rest_count",
+   "rest_vermin_3m",
+   "rest_vermin_12m",
+   "rest_visits_12m",
+   "dob_nb_6m",
+   "dob_dm_6m",
+   "dob_nb_12m",
+   "dob_dm_12m",
+   "litter_baskets",
+   "litter_baskets_ring1",
+   "catch_basins",
+   "park_share",
+   "park_adjacent",
+   "acs_median_income",
+   "acs_population",
+   "acs_poverty_rate",
+   "cdbg_lomod_pct",
+   "low_income_share",
+   "tavg_f",
+   "tavg_lag3",
+   "tavg_prev_year",
+   "month_of_year",
+   "year",
+   "covid",
+   "rmz_flag",
+   "rmz_id",
+   "complaints_lag1",
+   "complaints_lag3",
+   "complaints_lag12",
+   "complaints_ring1_lag3",
+   "cb_all_complaints_lag1",
+   "insp_lag12",
+   "insp_active_rate_lag12",
+   "months_since_last_insp"
+  ],
+  "B": [
+   "pluto_lots",
+   "pluto_res_units",
+   "pluto_units_total",
+   "pluto_bldg_area",
+   "pluto_lot_area",
+   "pluto_far",
+   "pluto_bldg_age_median",
+   "pluto_share_pre1940",
+   "pluto_vacant_share",
+   "pluto_com_area_share",
+   "pluto_share_1_2fam",
+   "pluto_mixed_share",
+   "pluto_median_floors",
+   "pluto_numbldgs",
+   "rest_count",
+   "rest_vermin_3m",
+   "rest_vermin_12m",
+   "rest_visits_12m",
+   "dob_nb_6m",
+   "dob_dm_6m",
+   "dob_nb_12m",
+   "dob_dm_12m",
+   "litter_baskets",
+   "litter_baskets_ring1",
+   "catch_basins",
+   "park_share",
+   "park_adjacent",
+   "acs_median_income",
+   "acs_population",
+   "acs_poverty_rate",
+   "cdbg_lomod_pct",
+   "low_income_share",
+   "tavg_f",
+   "tavg_lag3",
+   "tavg_prev_year",
+   "month_of_year",
+   "year",
+   "covid",
+   "rmz_flag",
+   "rmz_id"
+  ],
+  "A_only": [
+   "complaints_lag1",
+   "complaints_lag3",
+   "complaints_lag12",
+   "complaints_ring1_lag3",
+   "cb_all_complaints_lag1",
+   "insp_lag12",
+   "insp_active_rate_lag12",
+   "months_since_last_insp"
+  ],
+  "propensity": [
+   "pluto_lots",
+   "pluto_res_units",
+   "pluto_units_total",
+   "pluto_bldg_area",
+   "pluto_lot_area",
+   "pluto_far",
+   "pluto_bldg_age_median",
+   "pluto_share_pre1940",
+   "pluto_vacant_share",
+   "pluto_com_area_share",
+   "pluto_share_1_2fam",
+   "pluto_mixed_share",
+   "pluto_median_floors",
+   "pluto_numbldgs",
+   "rest_count",
+   "rest_vermin_3m",
+   "rest_vermin_12m",
+   "rest_visits_12m",
+   "dob_nb_6m",
+   "dob_dm_6m",
+   "dob_nb_12m",
+   "dob_dm_12m",
+   "litter_baskets",
+   "litter_baskets_ring1",
+   "catch_basins",
+   "park_share",
+   "park_adjacent",
+   "acs_median_income",
+   "acs_population",
+   "acs_poverty_rate",
+   "cdbg_lomod_pct",
+   "low_income_share",
+   "tavg_f",
+   "tavg_lag3",
+   "tavg_prev_year",
+   "month_of_year",
+   "year",
+   "covid",
+   "rmz_flag",
+   "rmz_id",
+   "cd_code"
+  ]
+ },
+ "params": {
+  "rounds_A": 400,
+  "rounds_B": 400,
+  "rounds_propensity": 200,
+  "bootstrap_models": 5,
+  "lgb": {
+   "objective": "binary",
+   "learning_rate": 0.05,
+   "num_leaves": 63,
+   "min_data_in_leaf": 100,
+   "feature_fraction": 0.8,
+   "bagging_fraction": 0.8,
+   "bagging_freq": 1,
+   "lambda_l2": 1.0,
+   "verbose": -1,
+   "num_threads": 10,
+   "seed": 0,
+   "deterministic": false
+  }
+ },
+ "runtime_s": 570.6
+}
