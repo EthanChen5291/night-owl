@@ -41,7 +41,7 @@ NAMES = {
     "n_subway_entrances": "subway_entrances", "share_park": "park_land",
     "dob_permits_3m": "construction_3mo", "temp_c": "temperature", "month_of_year": "season",
     "refuse_tons_cd": "district_trash_tons", "median_income": "median_income",
-    "pop_density": "population_density",
+    "pop_density": "population_density", "share_binned": "trash_bins_required",
 }
 
 

@@ -1,46 +1,46 @@
 {
-  "model_b_auc_heldout_districts": 0.626,
-  "logistic_baseline_auc": 0.561,
+  "model_b_auc_heldout_districts": 0.633,
+  "logistic_baseline_auc": 0.567,
   "model_b_calibration": {
     "0": {
       "predicted": 0.02,
-      "observed": 0.03
+      "observed": 0.029
     },
     "1": {
       "predicted": 0.044,
-      "observed": 0.062
+      "observed": 0.061
     },
     "2": {
-      "predicted": 0.058,
-      "observed": 0.078
+      "predicted": 0.059,
+      "observed": 0.074
     },
     "3": {
-      "predicted": 0.071,
-      "observed": 0.091
+      "predicted": 0.072,
+      "observed": 0.092
     },
     "4": {
-      "predicted": 0.084,
-      "observed": 0.102
+      "predicted": 0.085,
+      "observed": 0.098
     },
     "5": {
-      "predicted": 0.097,
-      "observed": 0.109
+      "predicted": 0.098,
+      "observed": 0.112
     },
     "6": {
-      "predicted": 0.11,
-      "observed": 0.121
+      "predicted": 0.111,
+      "observed": 0.123
     },
     "7": {
-      "predicted": 0.126,
-      "observed": 0.132
+      "predicted": 0.127,
+      "observed": 0.128
     },
     "8": {
-      "predicted": 0.146,
-      "observed": 0.145
+      "predicted": 0.151,
+      "observed": 0.147
     },
     "9": {
-      "predicted": 0.185,
-      "observed": 0.169
+      "predicted": 0.2,
+      "observed": 0.186
     }
   },
   "model_a_spearman_heldout_districts": 0.5,

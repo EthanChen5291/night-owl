@@ -41,6 +41,7 @@ PHYSICAL = [
     "bldg_area", "retail_area", "com_area", "n_restaurants", "n_litter_baskets",
     "n_catch_basins", "n_trees", "n_subway_entrances", "share_park",
     "dob_permits_3m", "temp_c", "month_of_year", "refuse_tons_cd",
+    "share_binned",  # DSNY bin rules: share of lots that must use lidded bins that month
 ]
 CONTROLS = ["median_income", "pop_density"]           # controls only, per the spec
 B_FEATS = PHYSICAL + CONTROLS                          # never complaint/inspection counts, never HPD
