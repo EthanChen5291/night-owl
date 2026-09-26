@@ -1,6 +1,98 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 16:53** (node spots layer; ready for Ethan to try).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 17:12** (models list + architecture diagram).
+
+**Contents:** [In one minute](#in-one-minute) · [The models](#the-models) · [Architecture](#architecture) ·
+[For teammates](#for-teammates-start-here) · [Headline results](#headline-results) · [Honest limits](#honest-limits-say-these-before-a-judge-does) ·
+[Pipeline](#pipeline) · [Key decisions](#key-decisions)
+
+## In one minute
+
+NYC finds rats mostly through 311 calls, so its rat map is really a map of who calls. This branch builds the part
+that finds **where the city isn't looking**: it learns where rats *should* be from physical conditions (old low-rise
+buildings, trash, restaurants, construction, bin rules), compares that with where people *complain*, and flags the
+**silent blocks** (rats likely, few calls). Then it ranks NYC hotspots, picks where to put sensor nodes (down to a
+specific street tree), and lists which buildings to inspect first. On 10 years of real inspections it finds **28%
+more rats** than "go where people complain", and on quiet blocks **1.8× more than chance**.
+
+## The models
+
+| # | Name | Type | What it does, in plain words | File |
+|---|---|---|---|---|
+| 1 | **Model A: "what the city sees"** | LightGBM, Poisson | Predicts how many rat complaints an area gets: the city's current picture | `03_models.py` |
+| 2 | **A-variant** | LightGBM, Poisson | Model A limited to Model B's physical features, so the comparison is fair | `03_models.py` |
+| 3 | **Model B: "what's actually there"** | LightGBM, 5 bootstrap copies | Chance an inspector finds rats in an area, from physical facts only, never complaints. If the 5 copies disagree, we're unsure | `03_models.py` |
+| 4 | **Silence Score** | percentile math | Model B's rank minus the complaints-per-resident rank. High = rats likely, nobody calling | `03_models.py` |
+| 5 | **Beta-Binomial update** | Bayesian statistics | Starts from Model B's guess; inspections and sensor detections move it. Also measures how much is still a guess | `03_models.py`, `api/posterior.py` |
+| 6 | **Building model** | LightGBM | Same idea per building (age, floors, homes, type, restaurant): which door to knock on first | `lots.py`, `06_buildings.py` |
+| 7 | **Node planner** | greedy rule | 20 sensor sites: likely rats × little data, spread out, snapped to a real street tree | `04_optimizer.py` |
+| 8 | **Node spot scorer** | weighted rule (hand-set weights) | Inside a hexagon, ranks ~50 m spots for the node: sightings, rats found, risky buildings, food, drains | `09_placements.py` |
+| – | Logistic regression | baseline | Only a sanity check: Model B has to beat it (0.633 vs 0.567 AUC) | `03_models.py` |
+| 9 | Model C: rat detector (Utsav) | YOLO11n on the Pi | Sees a rat on the night camera, sends `POST /event`, which feeds #5 | `vision/` |
+
+### How they connect
+
+```
+Model A + Model B        →  Silence Score            →  which AREAS are silent            (map colours)
+Model B + "how unsure"   →  Node planner             →  WHERE to put sensors              (pins 1..20)
+Node spot scorer         →  inside each ranked area  →  WHICH street tree to mount on     (green pins A/B/C)
+Building model           →  inside each ranked area  →  WHICH building to inspect first   (building list)
+Model C on the Pi        →  "rat seen!" POST /event  →  Beta-Binomial update → map recolours (live demo)
+```
+
+In one line: A and B find **where the city isn't looking**, the planner and spot scorer decide **where to put
+sensors**, the building model says **which door to knock on**, and the detector **proves it with a real sighting**.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph DATA["NYC open data (outside the repo, ~1 GB)"]
+    D1["Rodent inspections 3.1M"]
+    D2["311 rat complaints 512k"]
+    D3["PLUTO buildings, restaurants, DOB permits,<br/>trees, drains, baskets, parks, subway"]
+    D4["ACS income, NOAA weather, DSNY tonnage, bin rules"]
+  end
+
+  subgraph MODEL["model/ (this branch)"]
+    S1["01 cells: H3 r9 x month,<br/>sweep flag, dedupe"]
+    S2["02 features: 26 physical,<br/>lagged, no leakage"]
+    MA["Model A + A-variant<br/>(complaints)"]
+    MB["Model B x5<br/>(rats, physical only)"]
+    SIL["Silence Score +<br/>Beta-Binomial uncertainty"]
+    LOT["Building model"]
+    PLAN["04 node planner"]
+    SPOT["09 node spots<br/>(street trees)"]
+    HOT["08 hotspot rankings"]
+    BT["05 / 07 backtests,<br/>validation"]
+    OUT[("model/out/*.json<br/>cells, plan, backtest, buildings,<br/>hotspots, placements")]
+  end
+
+  subgraph APP["demo stack"]
+    API["api/ FastAPI server<br/>(Ethan)"]
+    WEB["web/ 3D map<br/>(React + three.js)"]
+    PI["Pi node + Model C YOLO<br/>(Utsav, Bruno)"]
+  end
+
+  D1 & D2 --> S1
+  D3 & D4 --> S2
+  S1 --> S2 --> MA & MB
+  MA & MB --> SIL
+  S2 --> LOT
+  SIL --> PLAN & HOT
+  LOT --> SPOT & HOT
+  PLAN --> SPOT
+  MB --> BT
+  SIL & PLAN & LOT & HOT & SPOT & BT --> OUT
+  OUT --> API
+  PI -- "POST /event (rat seen)" --> API
+  API -- "/cells /plan /backtest /placements" --> WEB
+```
+
+**The loop in words:** open data → cells and features → Model A (complaints) and Model B (rats) → silence and
+uncertainty → rankings, sensor sites, spots, building lists → `model/out/*.json` → Ethan's server → the map. When the
+node on the Pi sees a rat, it posts an event; the server updates that hexagon's Beta-Binomial estimate and the map
+recolours. That's the feedback loop: the sensor turns a ranking into evidence.
 
 ## For teammates: start here
 
