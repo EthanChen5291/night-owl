@@ -143,9 +143,11 @@ def train_until(df: pd.DataFrame, month_T: str, score_month: str | None = None) 
     out["silence"] = silence.mean(0)
     out["silence_lo"] = silence.min(0)
     out["silence_hi"] = silence.max(0)
-    # Silent = every copy agrees B ranks it above A (interval excludes zero), and
-    # meaningfully so (top-quarter gap).
-    out["is_silent"] = ok & (out.silence_lo > 0) & (out.silence > 0.25)
+    # Silent = high B, low A: B ranks it in the top 40%, every copy agrees B ranks
+    # it above A (interval excludes zero), and meaningfully so (top-quarter gap).
+    b_pct = np.full(len(target), np.nan)
+    b_pct[ok] = pct(prior[ok])
+    out["is_silent"] = ok & (b_pct >= 0.6) & (out.silence_lo > 0) & (out.silence > 0.25)
     return out
 
 
