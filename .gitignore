@@ -1,0 +1,23 @@
+# data never goes in the repo (raw pulls are ~1 GB, live outside at ../../data)
+data/
+*.csv
+*.parquet
+*.geojson
+*.duckdb
+
+# secrets
+.env
+*.key
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# model artifacts
+*.onnx
+*.pt
+*.pkl
+
+.DS_Store
