@@ -1,0 +1,50 @@
+{
+  "model_b_auc_heldout_districts": 0.626,
+  "logistic_baseline_auc": 0.561,
+  "model_b_calibration": {
+    "0": {
+      "predicted": 0.02,
+      "observed": 0.03
+    },
+    "1": {
+      "predicted": 0.044,
+      "observed": 0.062
+    },
+    "2": {
+      "predicted": 0.058,
+      "observed": 0.078
+    },
+    "3": {
+      "predicted": 0.071,
+      "observed": 0.091
+    },
+    "4": {
+      "predicted": 0.084,
+      "observed": 0.102
+    },
+    "5": {
+      "predicted": 0.097,
+      "observed": 0.109
+    },
+    "6": {
+      "predicted": 0.11,
+      "observed": 0.121
+    },
+    "7": {
+      "predicted": 0.126,
+      "observed": 0.132
+    },
+    "8": {
+      "predicted": 0.146,
+      "observed": 0.145
+    },
+    "9": {
+      "predicted": 0.185,
+      "observed": 0.169
+    }
+  },
+  "model_a_spearman_heldout_districts": 0.5,
+  "last_12m_complaints_spearman": 0.486,
+  "n_b_rows": 37579,
+  "n_a_rows": 694720
+}
