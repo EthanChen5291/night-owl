@@ -106,3 +106,15 @@ export interface Building {
 export interface CityMeta {
   centre: { lat: number; lon: number }
 }
+
+/** A node spot inside a hexagon (model/09_placements.py, GET /placements?h3=). */
+export interface Spot {
+  rank: number
+  spot_h3: string
+  lat: number
+  lon: number
+  tree_id: string
+  mount_address: string
+  score: number
+  reasons: string[]
+}

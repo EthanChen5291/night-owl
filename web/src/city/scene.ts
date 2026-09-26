@@ -41,6 +41,7 @@ export class CityScene {
   private hexes = new Map<string, HexEntry>()
   private hexGroup = new THREE.Group()
   private planGroup = new THREE.Group()
+  private spotGroup = new THREE.Group()
   private buildingMesh: THREE.Mesh | null = null
   private buildingRanges: BuildingRange[] = []
   private hemi: THREE.HemisphereLight
@@ -92,7 +93,7 @@ export class CityScene {
     this.key = new THREE.DirectionalLight(0xffb070, 1.6)
     this.key.position.set(-2500, 1800, 1200)
     this.scene.add(this.ambient, this.hemi, this.key)
-    this.scene.add(this.hexGroup, this.planGroup)
+    this.scene.add(this.hexGroup, this.planGroup, this.spotGroup)
     this.setPreset('night')
 
     canvas.addEventListener('pointermove', this.handlePointerMove)
@@ -194,6 +195,40 @@ export class CityScene {
       stem.position.set(x, base + 60, -y)
       this.planGroup.add(pin, label, stem)
     }
+  }
+
+  /** Candidate node spots inside the selected hexagon: small green pins labelled A, B, C. */
+  setSpots(spots: { rank: number; lat: number; lon: number; spot_h3: string }[], h3: string | null) {
+    this.spotGroup.clear()
+    const cell = h3 ? this.cells.get(h3) : undefined
+    const base = cell ? heightFor(this.mode, cell) : 6
+    const cone = new THREE.ConeGeometry(10, 36, 10)
+    for (const s of spots) {
+      const [x, y] = this.projector.xy(s.lat, s.lon)
+      const pin = new THREE.Mesh(
+        cone,
+        new THREE.MeshStandardMaterial({ color: 0x7dffa0, emissive: 0x2a9a50, emissiveIntensity: 1.0, roughness: 0.4 }),
+      )
+      pin.rotation.x = Math.PI
+      pin.position.set(x, base + 70 + 18, -y)
+      const label = makeLabel(String.fromCharCode(64 + s.rank))
+      label.position.set(x, base + 70 + 60, -y)
+      label.scale.multiplyScalar(0.7)
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.2, 1.2, 70, 6),
+        new THREE.MeshBasicMaterial({ color: 0x7dffa0, transparent: true, opacity: 0.7 }),
+      )
+      stem.position.set(x, base + 35, -y)
+      this.spotGroup.add(pin, label, stem)
+    }
+  }
+
+  /** Fly to a lat/lon (e.g. one node spot), closer than focusCell. */
+  focusLatLon(lat: number, lon: number, distance = FOCUS_DISTANCE / 2) {
+    const [x, y] = this.projector.xy(lat, lon)
+    this.focusTarget = new THREE.Vector3(x, 0, -y)
+    const dir = this.camera.position.clone().sub(this.controls.target).normalize()
+    this.focusCamera = this.focusTarget.clone().add(dir.multiplyScalar(distance))
   }
 
   setPlanVisible(visible: boolean) {

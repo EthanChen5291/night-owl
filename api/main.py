@@ -101,6 +101,17 @@ def create_app(data_dir: Path | None = None, events_file: Path | None = None) ->
         data.setdefault("source", str(path))
         return data
 
+    @app.get("/placements")
+    async def placements(h3: str | None = None, s: Store = Depends(get_store)):
+        """Top node spots (H3 r11, ~50 m) inside a hexagon, each with a street tree to mount on."""
+        try:
+            data, _ = s.placements()
+        except FileNotFoundError as e:
+            raise HTTPException(503, f"no placements file: {e}")
+        if h3 is None:
+            return {"month": data.get("month"), "n_cells": len(data.get("cells", {}))}
+        return {"month": data.get("month"), "h3": h3, "spots": data.get("cells", {}).get(h3, [])}
+
     @app.post("/event")
     async def post_event(event: Event, s: Store = Depends(get_store)):
         body = event.model_dump(by_alias=True)

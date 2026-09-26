@@ -109,3 +109,6 @@ b { font-weight: 600; }
 .feed.collapsed { bottom: auto; }
 .hotspots.collapsed { max-height: none; }
 .hotspots .toggle-row { margin-bottom: 4px; }
+.spots { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.spot { padding: 4px 6px; margin-top: 4px; border-radius: 4px; background: #0d1a12; border: 1px solid #1f3a28; cursor: pointer; font-size: 12px; }
+.spot:hover { border-color: #7dffa0; }

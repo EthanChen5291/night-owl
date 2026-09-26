@@ -1,6 +1,6 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 16:55** (teammate handoff added).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 16:50** (node spots inside each hexagon).
 
 ## For teammates: start here
 
@@ -15,6 +15,7 @@ Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day
 | Node planner: 20 sites on real tree pits | done | `04_optimizer.py` → `out/plan.json` |
 | Building list: top 5 buildings to inspect per silent block / node site | done | `06_buildings.py` → `out/buildings.json` |
 | Hotspot rankings: top 10 risk / silent, top-1% tiers, neighborhoods | done | `08_hotspots.py` → `out/hotspots.json` |
+| **Node spots inside each hexagon**: 3 mount options (street trees, ~50 m spots) per ranked hexagon | done | `09_placements.py` → `out/placements.json`, `GET /placements?h3=` |
 | Map JSON in the `api/` + `web/` contract | done | `export.py` → `out/cells.json`, `out/plan.json` |
 | Map: "NYC hotspots" panel, click flies in + opens popup, minimize buttons, popup shows neighborhood + tier | done | `web/src/components/Hotspots.tsx` + small edits (below) |
 
@@ -28,7 +29,7 @@ Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day
   makes silent picks look 24× worse than 311, because silent blocks are rarely inspected. This one scores only on
   cells that were swept that month.
 - `web/` edits on this branch (heads-up before merging): new `components/Hotspots.tsx`; small edits to `App.tsx`
-  (hotspots panel, pinned popup), `city/scene.ts` (focus now zooms in, `FOCUS_DISTANCE = 900`),
+  (hotspots panel, pinned popup, node spots), `city/scene.ts` (focus now zooms in, `FOCUS_DISTANCE = 900`),
   `components/CellPopup.tsx` (where / hotspot rows), `components/EventFeed.tsx` (minimize), `components/Header.tsx`
   (subtitle), `index.css`, `types.ts` (optional ranking fields). Typecheck and `npm run build` pass.
 - Asks: the **Rat Mitigation Zone polygons** (`rmz` is null in `cells.json` until then); one owner for `model/out/`
@@ -77,7 +78,7 @@ NYC Open Data + Census/NOAA; list and pull method in `data/DATA_DICTIONARY.md` o
 ```
 python3 model/01_build_cells.py && python3 model/02_features.py && python3 model/03_models.py \
   && python3 model/04_optimizer.py && python3 model/05_backtest.py && python3 model/export.py \
-  && python3 model/06_buildings.py && python3 model/08_hotspots.py
+  && python3 model/06_buildings.py && python3 model/08_hotspots.py && python3 model/09_placements.py
 ```
 About 5 minutes on an M-series Mac (the backtests are the slow part).
 
@@ -207,6 +208,23 @@ themselves on fixture data, which has no ranks.
 
 Scope: models train and rank on all five boroughs (the silent blocks are mostly in the Bronx and Queens; dropping
 them would lose data and the equity story). The 3D demo map only draws Lower Manhattan.
+
+## Node spots: where exactly inside the hexagon (`09_placements.py`)
+
+A layer on top of the hexagon ranking, nothing replaced (Ethan's idea). A node stays for days or weeks, so it should
+sit where rats most likely pass, not where one was seen today. Each ranked r9 hexagon is split into its H3 r11 spots
+(~50 m, about half a block). Each spot is ranked against the other spots in the same hexagon on: rat sightings (30%),
+rats found by inspectors (25%), highest building risk (20%), food: restaurants + litter baskets (15%), harborage:
+storm drains + vacant lots (10%), all over the prior 24 months. A spot needs a live street tree (the node clamps to a
+tree guard); the mount is the tree nearest the spot centre. Top 3 spots for 757 hexagons
+(silent, top-10% risk, plan nodes).
+
+**Check** (features to 2024-08, rats found in sweeps 2024-09..2025-08, 757 hexagons, 14,187 swept spots):
+top-3 spots by our score 18.7% rats found vs sightings only 16.8% vs random
+13.2% (**1.4× random**). The weights are hand-set, not fitted.
+
+On the map: click a hotspot → its options appear under the row and as green pins A/B/C; click an option to fly in.
+`api/` has a new `GET /placements?h3=` (reads `model/out/placements.json`, 503 if missing).
 
 ## Honest limits (say these before a judge does)
 

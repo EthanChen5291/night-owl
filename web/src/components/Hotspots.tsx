@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react'
-import type { Cell } from '../types'
+import type { Cell, Spot } from '../types'
 
 interface Props {
   cells: Cell[]
   onSelect: (h3: string) => void
+  selected?: string | null
+  spots?: Spot[]
+  onSpot?: (s: Spot) => void
 }
 
 type Tab = 'risk' | 'silent'
 const TOP = 10
 
 // Top-10 lists from the rank fields model/export.py writes into cells.json. Click = fly to cell.
-export default function Hotspots({ cells, onSelect }: Props) {
+export default function Hotspots({ cells, onSelect, selected = null, spots = [], onSpot }: Props) {
   const [tab, setTab] = useState<Tab>('silent')
   const [open, setOpen] = useState(true)
   const rows = useMemo(() => {
@@ -59,6 +62,18 @@ export default function Hotspots({ cells, onSelect }: Props) {
               <span className={c.silence > 0 ? 'pos' : 'neg'}>silence {c.silence > 0 ? '+' : ''}{c.silence.toFixed(0)}</span>
               <span className="muted">{c.n_complaints_12m ?? '?'} calls/yr</span>
             </div>
+            {selected === c.h3 && (
+              <div className="spots" onClick={(e) => e.stopPropagation()}>
+                <div className="muted small">where to put the node (green pins):</div>
+                {spots.length === 0 && <div className="muted small">no spot options for this cell</div>}
+                {spots.map((s) => (
+                  <div key={s.spot_h3} className="spot" onClick={() => onSpot?.(s)} title="fly to this spot">
+                    <b>{String.fromCharCode(64 + s.rank)}.</b> tree #{s.tree_id}, {s.mount_address}
+                    <div className="muted small">{s.reasons.join(' · ')}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </li>
         ))}
       </ol>

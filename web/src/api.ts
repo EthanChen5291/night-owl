@@ -1,7 +1,7 @@
 import cellsFixture from '../../city/cells.fixture.json'
 import planFixture from '../../city/plan.fixture.json'
 import queueFixture from '../../city/queue.fixture.json'
-import type { BacktestResponse, CellsResponse, PlanResponse, QueueResponse, Source } from './types'
+import type { Spot, BacktestResponse, CellsResponse, PlanResponse, QueueResponse, Source } from './types'
 
 export const API = '/api'
 
@@ -57,5 +57,14 @@ export async function fetchPublic<T>(path: string): Promise<T | null> {
     return (await res.json()) as T
   } catch {
     return null
+  }
+}
+
+/** Node spot options inside one hexagon; empty when the API or the file is missing. */
+export async function fetchPlacements(h3: string): Promise<Spot[]> {
+  try {
+    return (await getJson<{ spots: Spot[] }>(`/placements?h3=${encodeURIComponent(h3)}`)).spots ?? []
+  } catch {
+    return []
   }
 }

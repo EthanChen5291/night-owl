@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cellToLatLng } from 'h3-js'
-import { fetchBacktest, fetchCells, fetchPlan, fetchPublic, fetchQueue } from './api'
+import { fetchBacktest, fetchCells, fetchPlacements, fetchPlan, fetchPublic, fetchQueue } from './api'
 import { centroid } from './city/projection'
 import BacktestChart from './components/BacktestChart'
 import CellPopup from './components/CellPopup'
@@ -10,7 +10,7 @@ import Hotspots from './components/Hotspots'
 import Legend from './components/Legend'
 import Scene from './components/Scene'
 import Toggle from './components/Toggle'
-import type { BacktestResponse, Building, Cell, CityMeta, Mode, PlanNode, Preset, RatEvent, Source } from './types'
+import type { BacktestResponse, Building, Cell, CityMeta, Mode, PlanNode, Preset, RatEvent, Source, Spot } from './types'
 
 const DEFAULT_MONTH = '2026-08'
 const POLL_MS = 2000
@@ -40,6 +40,9 @@ export default function App() {
   const [meta, setMeta] = useState<CityMeta | null | undefined>(undefined)
   const [hover, setHover] = useState<{ h3: string; x: number; y: number } | null>(null)
   const [pinned, setPinned] = useState<string | null>(null) // popup opened from the hotspots list
+  const [selected, setSelected] = useState<string | null>(null) // hotspot whose node spots are shown
+  const [spots, setSpots] = useState<Spot[]>([])
+  const [spotFocus, setSpotFocus] = useState<{ lat: number; lon: number; seq: number } | null>(null)
 
   const seenRef = useRef<Set<string>>(new Set())
   const primedRef = useRef(false) // first queue load does not flash
@@ -168,6 +171,13 @@ export default function App() {
     setFocus({ h3, seq })
     setFlash({ h3, seq })
     setPinned(h3)
+    setSelected(h3)
+    setSpots([])
+    void fetchPlacements(h3).then(setSpots)
+  }, [])
+  const selectSpot = useCallback((s: Spot) => {
+    setPinned(null)
+    setSpotFocus({ lat: s.lat, lon: s.lon, seq: ++seqRef.current })
   }, [])
   const ready = cells.length > 0 && meta !== undefined
 
@@ -186,13 +196,16 @@ export default function App() {
             buildings={buildings}
             flash={flash}
             focus={focus}
+            spots={spots}
+            spotsFor={selected}
+            spotFocus={spotFocus}
             onHover={onHover}
           />
         )}
         {!ready && <div className="loading">loading cells...</div>}
         <Toggle mode={mode} onMode={setMode} preset={preset} onPreset={setPreset} />
         <Legend mode={mode} showPlan={showPlan} onShowPlan={setShowPlan} planCount={plan.length} />
-        <Hotspots cells={cells} onSelect={selectHotspot} />
+        <Hotspots cells={cells} onSelect={selectHotspot} selected={selected} spots={spots} onSpot={selectSpot} />
         {hoveredCell && hover && <CellPopup cell={hoveredCell} mode={mode} x={hover.x} y={hover.y} />}
         {pinnedCell && (
           <CellPopup cell={pinnedCell} mode={mode} x={window.innerWidth / 2 + 40} y={window.innerHeight / 2 - 200} />
