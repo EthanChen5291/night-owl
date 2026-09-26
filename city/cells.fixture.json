@@ -1,0 +1,4416 @@
+{
+ "month": "2026-08",
+ "generated_at": "2026-09-26T15:46:31Z",
+ "cells": [
+  {
+   "h3": "892a100d223ffff",
+   "score_a": 1.48,
+   "score_b": 0.109,
+   "pct_a": 64.0,
+   "pct_b": 36.0,
+   "silence": -28.0,
+   "ci_b": [
+    0.001,
+    0.337
+   ],
+   "posterior": {
+    "alpha": 0.656,
+    "beta": 7.344,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.062
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": 0.045
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.031
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d227ffff",
+   "score_a": 0.737,
+   "score_b": 0.119,
+   "pct_a": 22.0,
+   "pct_b": 49.6,
+   "silence": 27.6,
+   "ci_b": [
+    0.0,
+    0.259
+   ],
+   "posterior": {
+    "alpha": 0.716,
+    "beta": 10.284,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.064
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.05
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.028
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 5,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d22bffff",
+   "score_a": 1.078,
+   "score_b": 0.11,
+   "pct_a": 42.4,
+   "pct_b": 37.6,
+   "silence": -4.8,
+   "ci_b": [
+    0.001,
+    0.374
+   ],
+   "posterior": {
+    "alpha": 0.66,
+    "beta": 6.34,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.05
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.038
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.033
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d22fffff",
+   "score_a": 0.475,
+   "score_b": 0.133,
+   "pct_a": 4.4,
+   "pct_b": 64.8,
+   "silence": 60.4,
+   "ci_b": [
+    0.017,
+    0.425
+   ],
+   "posterior": {
+    "alpha": 1.799,
+    "beta": 9.201,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.025
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.02
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.02
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 5,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d237ffff",
+   "score_a": 0.64,
+   "score_b": 0.11,
+   "pct_a": 16.0,
+   "pct_b": 36.8,
+   "silence": 20.8,
+   "ci_b": [
+    0.0,
+    0.331
+   ],
+   "posterior": {
+    "alpha": 0.659,
+    "beta": 7.341,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.098
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.041
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.041
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d23bffff",
+   "score_a": 0.627,
+   "score_b": 0.082,
+   "pct_a": 14.4,
+   "pct_b": 7.2,
+   "silence": -7.2,
+   "ci_b": [
+    0.0,
+    0.253
+   ],
+   "posterior": {
+    "alpha": 0.491,
+    "beta": 8.509,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.081
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.059
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.058
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 3,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d263ffff",
+   "score_a": 2.826,
+   "score_b": 0.122,
+   "pct_a": 96.8,
+   "pct_b": 53.6,
+   "silence": -43.2,
+   "ci_b": [
+    0.03,
+    0.602
+   ],
+   "posterior": {
+    "alpha": 1.734,
+    "beta": 5.266,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "tree_pits",
+     "shap": 0.049
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.047
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.043
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d267ffff",
+   "score_a": 0.778,
+   "score_b": 0.106,
+   "pct_a": 25.6,
+   "pct_b": 32.8,
+   "silence": 7.2,
+   "ci_b": [
+    0.114,
+    0.447
+   ],
+   "posterior": {
+    "alpha": 6.638,
+    "beta": 18.362,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.058
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.033
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.024
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 19,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d26bffff",
+   "score_a": 2.007,
+   "score_b": 0.108,
+   "pct_a": 86.4,
+   "pct_b": 35.2,
+   "silence": -51.2,
+   "ci_b": [
+    0.015,
+    0.382
+   ],
+   "posterior": {
+    "alpha": 1.65,
+    "beta": 10.35,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.049
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": -0.032
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.031
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 6,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d26fffff",
+   "score_a": 1.818,
+   "score_b": 0.116,
+   "pct_a": 76.8,
+   "pct_b": 42.4,
+   "silence": -34.4,
+   "ci_b": [
+    0.001,
+    0.348
+   ],
+   "posterior": {
+    "alpha": 0.693,
+    "beta": 7.307,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.041
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.036
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": 0.035
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d277ffff",
+   "score_a": 1.207,
+   "score_b": 0.12,
+   "pct_a": 49.6,
+   "pct_b": 51.2,
+   "silence": 1.6,
+   "ci_b": [
+    0.014,
+    0.369
+   ],
+   "posterior": {
+    "alpha": 1.718,
+    "beta": 10.282,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.111
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.029
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.026
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 6,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d30bffff",
+   "score_a": 1.022,
+   "score_b": 0.153,
+   "pct_a": 40.0,
+   "pct_b": 76.0,
+   "silence": 36.0,
+   "ci_b": [
+    0.003,
+    0.441
+   ],
+   "posterior": {
+    "alpha": 0.919,
+    "beta": 6.081,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "lomod_pct",
+     "shap": -0.048
+    },
+    {
+     "feature": "tree_pits",
+     "shap": 0.028
+    },
+    {
+     "feature": "temp_mean",
+     "shap": -0.015
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d30fffff",
+   "score_a": 0.739,
+   "score_b": 0.125,
+   "pct_a": 23.2,
+   "pct_b": 56.8,
+   "silence": 33.6,
+   "ci_b": [
+    0.027,
+    0.542
+   ],
+   "posterior": {
+    "alpha": 1.749,
+    "beta": 6.251,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.052
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": 0.049
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.042
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d31bffff",
+   "score_a": 0.568,
+   "score_b": 0.116,
+   "pct_a": 11.2,
+   "pct_b": 44.0,
+   "silence": 32.8,
+   "ci_b": [
+    0.022,
+    0.53
+   ],
+   "posterior": {
+    "alpha": 1.697,
+    "beta": 6.303,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.083
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": 0.057
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.048
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d343ffff",
+   "score_a": 0.496,
+   "score_b": 0.306,
+   "pct_a": 6.4,
+   "pct_b": 95.2,
+   "silence": 88.8,
+   "ci_b": [
+    0.105,
+    0.751
+   ],
+   "posterior": {
+    "alpha": 2.834,
+    "beta": 4.166,
+    "n_events": 1
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.233
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.19
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.132
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": "2026-08-29T21:24:00Z"
+  },
+  {
+   "h3": "892a100d347ffff",
+   "score_a": 0.675,
+   "score_b": 0.152,
+   "pct_a": 17.6,
+   "pct_b": 74.4,
+   "silence": 56.8,
+   "ci_b": [
+    0.002,
+    0.35
+   ],
+   "posterior": {
+    "alpha": 0.912,
+    "beta": 8.088,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "tree_pits",
+     "shap": 0.061
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.056
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.051
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 3,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d34bffff",
+   "score_a": 0.682,
+   "score_b": 0.166,
+   "pct_a": 18.4,
+   "pct_b": 83.2,
+   "silence": 64.8,
+   "ci_b": [
+    0.035,
+    0.58
+   ],
+   "posterior": {
+    "alpha": 1.994,
+    "beta": 6.006,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.045
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": 0.043
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.027
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d34fffff",
+   "score_a": 1.743,
+   "score_b": 0.217,
+   "pct_a": 73.6,
+   "pct_b": 90.4,
+   "silence": 16.8,
+   "ci_b": [
+    0.123,
+    0.633
+   ],
+   "posterior": {
+    "alpha": 4.302,
+    "beta": 7.698,
+    "n_events": 1
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.127
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.112
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.093
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 5,
+   "last_event_at": "2026-08-18T23:13:00Z"
+  },
+  {
+   "h3": "892a100d353ffff",
+   "score_a": 0.616,
+   "score_b": 0.226,
+   "pct_a": 13.6,
+   "pct_b": 92.8,
+   "silence": 79.2,
+   "ci_b": [
+    0.022,
+    0.309
+   ],
+   "posterior": {
+    "alpha": 2.355,
+    "beta": 15.645,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.113
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.112
+    },
+    {
+     "feature": "tree_pits",
+     "shap": 0.076
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 12,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d357ffff",
+   "score_a": 0.824,
+   "score_b": 0.21,
+   "pct_a": 29.6,
+   "pct_b": 88.0,
+   "silence": 58.4,
+   "ci_b": [
+    0.01,
+    0.522
+   ],
+   "posterior": {
+    "alpha": 1.258,
+    "beta": 5.742,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.124
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.09
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.077
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d35bffff",
+   "score_a": 0.457,
+   "score_b": 0.211,
+   "pct_a": 1.6,
+   "pct_b": 89.6,
+   "silence": 88.0,
+   "ci_b": [
+    0.05,
+    0.599
+   ],
+   "posterior": {
+    "alpha": 2.264,
+    "beta": 5.736,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.121
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.11
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.1
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d363ffff",
+   "score_a": 0.475,
+   "score_b": 0.08,
+   "pct_a": 4.4,
+   "pct_b": 3.2,
+   "silence": -1.2,
+   "ci_b": [
+    0.0,
+    0.369
+   ],
+   "posterior": {
+    "alpha": 0.479,
+    "beta": 5.521,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.107
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.073
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.06
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d367ffff",
+   "score_a": 0.686,
+   "score_b": 0.1,
+   "pct_a": 19.2,
+   "pct_b": 28.0,
+   "silence": 8.8,
+   "ci_b": [
+    0.0,
+    0.399
+   ],
+   "posterior": {
+    "alpha": 0.6,
+    "beta": 5.4,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.065
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.046
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.037
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d36bffff",
+   "score_a": 0.985,
+   "score_b": 0.165,
+   "pct_a": 38.0,
+   "pct_b": 81.6,
+   "silence": 43.6,
+   "ci_b": [
+    0.002,
+    0.181
+   ],
+   "posterior": {
+    "alpha": 0.989,
+    "beta": 18.011,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.067
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": 0.044
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.043
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 13,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d36fffff",
+   "score_a": 1.287,
+   "score_b": 0.176,
+   "pct_a": 57.6,
+   "pct_b": 86.4,
+   "silence": 28.8,
+   "ci_b": [
+    0.05,
+    0.452
+   ],
+   "posterior": {
+    "alpha": 3.054,
+    "beta": 10.946,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": 0.065
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.059
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.049
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 8,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d373ffff",
+   "score_a": 0.631,
+   "score_b": 0.105,
+   "pct_a": 15.2,
+   "pct_b": 31.2,
+   "silence": 16.0,
+   "ci_b": [
+    0.0,
+    0.346
+   ],
+   "posterior": {
+    "alpha": 0.629,
+    "beta": 7.371,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.07
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.068
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": -0.049
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d377ffff",
+   "score_a": 0.468,
+   "score_b": 0.116,
+   "pct_a": 2.8,
+   "pct_b": 45.6,
+   "silence": 42.8,
+   "ci_b": [
+    0.001,
+    0.436
+   ],
+   "posterior": {
+    "alpha": 0.697,
+    "beta": 5.303,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.039
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.038
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.037
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d37bffff",
+   "score_a": 0.81,
+   "score_b": 0.122,
+   "pct_a": 28.0,
+   "pct_b": 52.8,
+   "silence": 24.8,
+   "ci_b": [
+    0.001,
+    0.452
+   ],
+   "posterior": {
+    "alpha": 0.731,
+    "beta": 5.269,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": -0.048
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": 0.026
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": 0.019
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d3c3ffff",
+   "score_a": 0.907,
+   "score_b": 0.133,
+   "pct_a": 34.4,
+   "pct_b": 64.0,
+   "silence": 29.6,
+   "ci_b": [
+    0.001,
+    0.372
+   ],
+   "posterior": {
+    "alpha": 0.799,
+    "beta": 7.201,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.07
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.039
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.039
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d3cbffff",
+   "score_a": 0.695,
+   "score_b": 0.091,
+   "pct_a": 20.0,
+   "pct_b": 15.2,
+   "silence": -4.8,
+   "ci_b": [
+    0.009,
+    0.327
+   ],
+   "posterior": {
+    "alpha": 1.549,
+    "beta": 11.451,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.091
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.08
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.038
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 7,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d3cfffff",
+   "score_a": 0.579,
+   "score_b": 0.141,
+   "pct_a": 12.8,
+   "pct_b": 69.6,
+   "silence": 56.8,
+   "ci_b": [
+    0.001,
+    0.388
+   ],
+   "posterior": {
+    "alpha": 0.843,
+    "beta": 7.157,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": -0.05
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.046
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": -0.03
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d3d3ffff",
+   "score_a": 0.827,
+   "score_b": 0.081,
+   "pct_a": 30.4,
+   "pct_b": 4.8,
+   "silence": -25.6,
+   "ci_b": [
+    0.008,
+    0.282
+   ],
+   "posterior": {
+    "alpha": 1.485,
+    "beta": 13.515,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.148
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.076
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.067
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 9,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d3dbffff",
+   "score_a": 0.504,
+   "score_b": 0.063,
+   "pct_a": 7.2,
+   "pct_b": 0.8,
+   "silence": -6.4,
+   "ci_b": [
+    0.0,
+    0.324
+   ],
+   "posterior": {
+    "alpha": 0.381,
+    "beta": 5.619,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.081
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.08
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.072
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072127ffff",
+   "score_a": 1.699,
+   "score_b": 0.098,
+   "pct_a": 71.2,
+   "pct_b": 24.0,
+   "silence": -47.2,
+   "ci_b": [
+    0.0,
+    0.418
+   ],
+   "posterior": {
+    "alpha": 0.585,
+    "beta": 5.415,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.088
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.07
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.048
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072137ffff",
+   "score_a": 2.005,
+   "score_b": 0.092,
+   "pct_a": 85.6,
+   "pct_b": 16.0,
+   "silence": -69.6,
+   "ci_b": [
+    0.033,
+    0.396
+   ],
+   "posterior": {
+    "alpha": 2.552,
+    "beta": 12.448,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.067
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.062
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.047
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 9,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10721a3ffff",
+   "score_a": 2.068,
+   "score_b": 0.139,
+   "pct_a": 88.0,
+   "pct_b": 68.8,
+   "silence": -19.2,
+   "ci_b": [
+    0.001,
+    0.329
+   ],
+   "posterior": {
+    "alpha": 0.833,
+    "beta": 8.167,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.051
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.047
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.045
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 3,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10721a7ffff",
+   "score_a": 1.779,
+   "score_b": 0.131,
+   "pct_a": 74.4,
+   "pct_b": 60.8,
+   "silence": -13.6,
+   "ci_b": [
+    0.002,
+    0.466
+   ],
+   "posterior": {
+    "alpha": 0.789,
+    "beta": 5.211,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": 0.048
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.025
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.025
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10721abffff",
+   "score_a": 2.65,
+   "score_b": 0.088,
+   "pct_a": 95.2,
+   "pct_b": 10.4,
+   "silence": -84.8,
+   "ci_b": [
+    0.016,
+    0.503
+   ],
+   "posterior": {
+    "alpha": 1.525,
+    "beta": 6.475,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.091
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.083
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.068
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10721afffff",
+   "score_a": 1.801,
+   "score_b": 0.137,
+   "pct_a": 75.6,
+   "pct_b": 68.0,
+   "silence": -7.6,
+   "ci_b": [
+    0.002,
+    0.412
+   ],
+   "posterior": {
+    "alpha": 0.821,
+    "beta": 6.179,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.077
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": -0.048
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.04
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072803ffff",
+   "score_a": 1.151,
+   "score_b": 0.081,
+   "pct_a": 47.2,
+   "pct_b": 5.6,
+   "silence": -41.6,
+   "ci_b": [
+    0.0,
+    0.306
+   ],
+   "posterior": {
+    "alpha": 0.489,
+    "beta": 7.511,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.095
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.09
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.041
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072807ffff",
+   "score_a": 1.486,
+   "score_b": 0.099,
+   "pct_a": 65.6,
+   "pct_b": 24.8,
+   "silence": -40.8,
+   "ci_b": [
+    0.011,
+    0.316
+   ],
+   "posterior": {
+    "alpha": 1.592,
+    "beta": 12.408,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.101
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.059
+    },
+    {
+     "feature": "temp_mean",
+     "shap": -0.055
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 8,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072813ffff",
+   "score_a": 2.363,
+   "score_b": 0.096,
+   "pct_a": 90.4,
+   "pct_b": 21.6,
+   "silence": -68.8,
+   "ci_b": [
+    0.025,
+    0.569
+   ],
+   "posterior": {
+    "alpha": 1.577,
+    "beta": 5.423,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "tree_pits",
+     "shap": -0.053
+    },
+    {
+     "feature": "temp_mean",
+     "shap": -0.052
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.04
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072817ffff",
+   "score_a": 1.54,
+   "score_b": 0.104,
+   "pct_a": 67.2,
+   "pct_b": 30.4,
+   "silence": -36.8,
+   "ci_b": [
+    0.0,
+    0.33
+   ],
+   "posterior": {
+    "alpha": 0.625,
+    "beta": 7.375,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.056
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.054
+    },
+    {
+     "feature": "temp_mean",
+     "shap": -0.018
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a107281bffff",
+   "score_a": 1.967,
+   "score_b": 0.123,
+   "pct_a": 83.2,
+   "pct_b": 55.2,
+   "silence": -28.0,
+   "ci_b": [
+    0.001,
+    0.351
+   ],
+   "posterior": {
+    "alpha": 0.737,
+    "beta": 7.263,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.061
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.047
+    },
+    {
+     "feature": "tree_pits",
+     "shap": 0.042
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072883ffff",
+   "score_a": 2.446,
+   "score_b": 0.119,
+   "pct_a": 91.2,
+   "pct_b": 48.8,
+   "silence": -42.4,
+   "ci_b": [
+    0.001,
+    0.338
+   ],
+   "posterior": {
+    "alpha": 0.716,
+    "beta": 7.284,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.086
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": -0.05
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.049
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072887ffff",
+   "score_a": 1.283,
+   "score_b": 0.111,
+   "pct_a": 56.8,
+   "pct_b": 39.2,
+   "silence": -17.6,
+   "ci_b": [
+    0.001,
+    0.438
+   ],
+   "posterior": {
+    "alpha": 0.665,
+    "beta": 5.335,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "lomod_pct",
+     "shap": -0.065
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.046
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.029
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a107288bffff",
+   "score_a": 0.881,
+   "score_b": 0.12,
+   "pct_a": 33.6,
+   "pct_b": 50.4,
+   "silence": 16.8,
+   "ci_b": [
+    0.001,
+    0.407
+   ],
+   "posterior": {
+    "alpha": 0.717,
+    "beta": 6.283,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.042
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": -0.036
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.034
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a107288fffff",
+   "score_a": 1.736,
+   "score_b": 0.114,
+   "pct_a": 72.8,
+   "pct_b": 40.8,
+   "silence": -32.0,
+   "ci_b": [
+    0.018,
+    0.472
+   ],
+   "posterior": {
+    "alpha": 1.684,
+    "beta": 7.316,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": 0.064
+    },
+    {
+     "feature": "tree_pits",
+     "shap": 0.041
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.038
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 3,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072893ffff",
+   "score_a": 1.481,
+   "score_b": 0.093,
+   "pct_a": 64.8,
+   "pct_b": 16.8,
+   "silence": -48.0,
+   "ci_b": [
+    0.0,
+    0.417
+   ],
+   "posterior": {
+    "alpha": 0.561,
+    "beta": 5.439,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "tree_pits",
+     "shap": -0.078
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.073
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.052
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072897ffff",
+   "score_a": 1.083,
+   "score_b": 0.089,
+   "pct_a": 43.2,
+   "pct_b": 12.8,
+   "silence": -30.4,
+   "ci_b": [
+    0.0,
+    0.301
+   ],
+   "posterior": {
+    "alpha": 0.535,
+    "beta": 7.465,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.077
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.071
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.065
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a107289bffff",
+   "score_a": 1.886,
+   "score_b": 0.094,
+   "pct_a": 78.4,
+   "pct_b": 17.6,
+   "silence": -60.8,
+   "ci_b": [
+    0.0,
+    0.345
+   ],
+   "posterior": {
+    "alpha": 0.566,
+    "beta": 6.434,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.06
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.057
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.051
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10728a3ffff",
+   "score_a": 1.916,
+   "score_b": 0.112,
+   "pct_a": 80.4,
+   "pct_b": 40.0,
+   "silence": -40.4,
+   "ci_b": [
+    0.001,
+    0.387
+   ],
+   "posterior": {
+    "alpha": 0.674,
+    "beta": 6.326,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.057
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.043
+    },
+    {
+     "feature": "temp_mean",
+     "shap": -0.04
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10728abffff",
+   "score_a": 0.987,
+   "score_b": 0.095,
+   "pct_a": 39.2,
+   "pct_b": 19.2,
+   "silence": -20.0,
+   "ci_b": [
+    0.0,
+    0.316
+   ],
+   "posterior": {
+    "alpha": 0.572,
+    "beta": 7.428,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.09
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.065
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.056
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10728b3ffff",
+   "score_a": 2.465,
+   "score_b": 0.17,
+   "pct_a": 92.0,
+   "pct_b": 85.6,
+   "silence": -6.4,
+   "ci_b": [
+    0.004,
+    0.366
+   ],
+   "posterior": {
+    "alpha": 1.02,
+    "beta": 7.98,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": 0.087
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": 0.062
+    },
+    {
+     "feature": "tree_pits",
+     "shap": 0.047
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 3,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10728bbffff",
+   "score_a": 1.22,
+   "score_b": 0.085,
+   "pct_a": 52.0,
+   "pct_b": 8.8,
+   "silence": -43.2,
+   "ci_b": [
+    0.023,
+    0.302
+   ],
+   "posterior": {
+    "alpha": 2.509,
+    "beta": 17.491,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.074
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.069
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.047
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 14,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10728c3ffff",
+   "score_a": 0.763,
+   "score_b": 0.082,
+   "pct_a": 24.8,
+   "pct_b": 8.0,
+   "silence": -16.8,
+   "ci_b": [
+    0.0,
+    0.376
+   ],
+   "posterior": {
+    "alpha": 0.492,
+    "beta": 5.508,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.13
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": -0.065
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.058
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10728c7ffff",
+   "score_a": 1.921,
+   "score_b": 0.123,
+   "pct_a": 81.6,
+   "pct_b": 54.4,
+   "silence": -27.2,
+   "ci_b": [
+    0.001,
+    0.352
+   ],
+   "posterior": {
+    "alpha": 0.736,
+    "beta": 7.264,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": 0.041
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.022
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.021
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10728d3ffff",
+   "score_a": 1.801,
+   "score_b": 0.144,
+   "pct_a": 75.6,
+   "pct_b": 71.2,
+   "silence": -4.4,
+   "ci_b": [
+    0.002,
+    0.502
+   ],
+   "posterior": {
+    "alpha": 0.866,
+    "beta": 5.134,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.033
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.028
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.024
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a10728d7ffff",
+   "score_a": 1.224,
+   "score_b": 0.117,
+   "pct_a": 52.8,
+   "pct_b": 47.2,
+   "silence": -5.6,
+   "ci_b": [
+    0.001,
+    0.269
+   ],
+   "posterior": {
+    "alpha": 0.701,
+    "beta": 9.299,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": -0.06
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.052
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.05
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 4,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c03ffff",
+   "score_a": 1.924,
+   "score_b": 0.131,
+   "pct_a": 82.4,
+   "pct_b": 59.2,
+   "silence": -23.2,
+   "ci_b": [
+    0.001,
+    0.391
+   ],
+   "posterior": {
+    "alpha": 0.783,
+    "beta": 6.217,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": 0.049
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.04
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.033
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c07ffff",
+   "score_a": 2.067,
+   "score_b": 0.148,
+   "pct_a": 87.2,
+   "pct_b": 73.6,
+   "silence": -13.6,
+   "ci_b": [
+    0.003,
+    0.5
+   ],
+   "posterior": {
+    "alpha": 0.891,
+    "beta": 5.109,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.078
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.049
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.035
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c0bffff",
+   "score_a": 1.146,
+   "score_b": 0.106,
+   "pct_a": 46.4,
+   "pct_b": 33.6,
+   "silence": -12.8,
+   "ci_b": [
+    0.023,
+    0.523
+   ],
+   "posterior": {
+    "alpha": 1.638,
+    "beta": 6.362,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.064
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.061
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.055
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c0fffff",
+   "score_a": 1.351,
+   "score_b": 0.079,
+   "pct_a": 60.0,
+   "pct_b": 2.4,
+   "silence": -57.6,
+   "ci_b": [
+    0.0,
+    0.206
+   ],
+   "posterior": {
+    "alpha": 0.473,
+    "beta": 10.527,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.114
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.1
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.072
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 5,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c13ffff",
+   "score_a": 1.897,
+   "score_b": 0.098,
+   "pct_a": 79.2,
+   "pct_b": 23.2,
+   "silence": -56.0,
+   "ci_b": [
+    0.0,
+    0.346
+   ],
+   "posterior": {
+    "alpha": 0.585,
+    "beta": 6.415,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": 0.054
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.048
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.041
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c17ffff",
+   "score_a": 1.271,
+   "score_b": 0.134,
+   "pct_a": 56.0,
+   "pct_b": 65.6,
+   "silence": 9.6,
+   "ci_b": [
+    0.023,
+    0.503
+   ],
+   "posterior": {
+    "alpha": 1.804,
+    "beta": 7.196,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.049
+    },
+    {
+     "feature": "tree_pits",
+     "shap": 0.021
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.017
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 3,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c1bffff",
+   "score_a": 1.352,
+   "score_b": 0.08,
+   "pct_a": 60.8,
+   "pct_b": 4.0,
+   "silence": -56.8,
+   "ci_b": [
+    0.0,
+    0.326
+   ],
+   "posterior": {
+    "alpha": 0.479,
+    "beta": 6.521,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.118
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.051
+    },
+    {
+     "feature": "temp_mean",
+     "shap": -0.019
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c23ffff",
+   "score_a": 1.973,
+   "score_b": 0.376,
+   "pct_a": 84.0,
+   "pct_b": 99.2,
+   "silence": 15.2,
+   "ci_b": [
+    0.141,
+    0.806
+   ],
+   "posterior": {
+    "alpha": 3.254,
+    "beta": 3.746,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.276
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": 0.245
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.243
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c27ffff",
+   "score_a": 1.637,
+   "score_b": 0.2,
+   "pct_a": 69.6,
+   "pct_b": 87.2,
+   "silence": 17.6,
+   "ci_b": [
+    0.01,
+    0.568
+   ],
+   "posterior": {
+    "alpha": 1.203,
+    "beta": 4.797,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "lomod_pct",
+     "shap": 0.088
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.061
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.06
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c2bffff",
+   "score_a": 0.795,
+   "score_b": 0.155,
+   "pct_a": 26.4,
+   "pct_b": 77.6,
+   "silence": 51.2,
+   "ci_b": [
+    0.003,
+    0.376
+   ],
+   "posterior": {
+    "alpha": 0.927,
+    "beta": 7.073,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": 0.036
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.033
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.032
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c2fffff",
+   "score_a": 2.308,
+   "score_b": 0.219,
+   "pct_a": 89.6,
+   "pct_b": 91.2,
+   "silence": 1.6,
+   "ci_b": [
+    0.014,
+    0.597
+   ],
+   "posterior": {
+    "alpha": 1.313,
+    "beta": 4.687,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.133
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.094
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.067
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c33ffff",
+   "score_a": 0.661,
+   "score_b": 0.153,
+   "pct_a": 16.8,
+   "pct_b": 75.2,
+   "silence": 58.4,
+   "ci_b": [
+    0.002,
+    0.402
+   ],
+   "posterior": {
+    "alpha": 0.917,
+    "beta": 7.083,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": 0.083
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": 0.061
+    },
+    {
+     "feature": "tree_pits",
+     "shap": 0.06
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c37ffff",
+   "score_a": 0.968,
+   "score_b": 0.279,
+   "pct_a": 36.8,
+   "pct_b": 94.4,
+   "silence": 57.6,
+   "ci_b": [
+    0.1,
+    0.51
+   ],
+   "posterior": {
+    "alpha": 4.676,
+    "beta": 12.324,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.173
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.146
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.13
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 11,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c3bffff",
+   "score_a": 3.339,
+   "score_b": 0.168,
+   "pct_a": 99.2,
+   "pct_b": 84.8,
+   "silence": -14.4,
+   "ci_b": [
+    0.004,
+    0.414
+   ],
+   "posterior": {
+    "alpha": 1.008,
+    "beta": 6.992,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": 0.089
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.086
+    },
+    {
+     "feature": "tree_pits",
+     "shap": 0.057
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c43ffff",
+   "score_a": 1.311,
+   "score_b": 0.096,
+   "pct_a": 58.4,
+   "pct_b": 20.0,
+   "silence": -38.4,
+   "ci_b": [
+    0.0,
+    0.364
+   ],
+   "posterior": {
+    "alpha": 0.575,
+    "beta": 6.425,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": -0.066
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.063
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.053
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c47ffff",
+   "score_a": 2.884,
+   "score_b": 0.096,
+   "pct_a": 97.6,
+   "pct_b": 20.8,
+   "silence": -76.8,
+   "ci_b": [
+    0.0,
+    0.392
+   ],
+   "posterior": {
+    "alpha": 0.576,
+    "beta": 5.424,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.093
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.066
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.061
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c4fffff",
+   "score_a": 1.088,
+   "score_b": 0.09,
+   "pct_a": 44.0,
+   "pct_b": 13.6,
+   "silence": -30.4,
+   "ci_b": [
+    0.0,
+    0.399
+   ],
+   "posterior": {
+    "alpha": 0.542,
+    "beta": 5.458,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.131
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.088
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.051
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c53ffff",
+   "score_a": 1.865,
+   "score_b": 0.136,
+   "pct_a": 77.6,
+   "pct_b": 67.2,
+   "silence": -10.4,
+   "ci_b": [
+    0.002,
+    0.429
+   ],
+   "posterior": {
+    "alpha": 0.818,
+    "beta": 6.182,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.064
+    },
+    {
+     "feature": "temp_mean",
+     "shap": -0.062
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.052
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c57ffff",
+   "score_a": 1.114,
+   "score_b": 0.097,
+   "pct_a": 45.2,
+   "pct_b": 22.4,
+   "silence": -22.8,
+   "ci_b": [
+    0.0,
+    0.387
+   ],
+   "posterior": {
+    "alpha": 0.58,
+    "beta": 5.42,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.094
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.072
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.047
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c63ffff",
+   "score_a": 1.165,
+   "score_b": 0.105,
+   "pct_a": 48.0,
+   "pct_b": 32.0,
+   "silence": -16.0,
+   "ci_b": [
+    0.0,
+    0.211
+   ],
+   "posterior": {
+    "alpha": 0.63,
+    "beta": 12.37,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.057
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.056
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.056
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 7,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c67ffff",
+   "score_a": 1.693,
+   "score_b": 0.125,
+   "pct_a": 70.4,
+   "pct_b": 57.6,
+   "silence": -12.8,
+   "ci_b": [
+    0.001,
+    0.244
+   ],
+   "posterior": {
+    "alpha": 0.749,
+    "beta": 11.251,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.04
+    },
+    {
+     "feature": "temp_mean",
+     "shap": -0.022
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.019
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 6,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c6bffff",
+   "score_a": 1.232,
+   "score_b": 0.091,
+   "pct_a": 53.6,
+   "pct_b": 14.4,
+   "silence": -39.2,
+   "ci_b": [
+    0.0,
+    0.398
+   ],
+   "posterior": {
+    "alpha": 0.545,
+    "beta": 5.455,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.098
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.061
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": -0.058
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c6fffff",
+   "score_a": 1.536,
+   "score_b": 0.099,
+   "pct_a": 66.4,
+   "pct_b": 26.4,
+   "silence": -40.0,
+   "ci_b": [
+    0.0,
+    0.421
+   ],
+   "posterior": {
+    "alpha": 0.594,
+    "beta": 5.406,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.102
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.054
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.049
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c73ffff",
+   "score_a": 0.535,
+   "score_b": 0.072,
+   "pct_a": 8.8,
+   "pct_b": 1.6,
+   "silence": -7.2,
+   "ci_b": [
+    0.0,
+    0.16
+   ],
+   "posterior": {
+    "alpha": 0.431,
+    "beta": 13.569,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.097
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.062
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.047
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 8,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c77ffff",
+   "score_a": 2.623,
+   "score_b": 0.085,
+   "pct_a": 93.6,
+   "pct_b": 9.6,
+   "silence": -84.0,
+   "ci_b": [
+    0.0,
+    0.379
+   ],
+   "posterior": {
+    "alpha": 0.511,
+    "beta": 5.489,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.082
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.033
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.026
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c7bffff",
+   "score_a": 1.234,
+   "score_b": 0.095,
+   "pct_a": 54.4,
+   "pct_b": 18.4,
+   "silence": -36.0,
+   "ci_b": [
+    0.0,
+    0.406
+   ],
+   "posterior": {
+    "alpha": 0.57,
+    "beta": 5.43,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.069
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.054
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.037
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c83ffff",
+   "score_a": 2.808,
+   "score_b": 0.121,
+   "pct_a": 96.0,
+   "pct_b": 52.0,
+   "silence": -44.0,
+   "ci_b": [
+    0.017,
+    0.451
+   ],
+   "posterior": {
+    "alpha": 1.728,
+    "beta": 8.272,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "lomod_pct",
+     "shap": 0.058
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.045
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.037
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 4,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c87ffff",
+   "score_a": 0.559,
+   "score_b": 0.144,
+   "pct_a": 9.6,
+   "pct_b": 70.4,
+   "silence": 60.8,
+   "ci_b": [
+    0.002,
+    0.445
+   ],
+   "posterior": {
+    "alpha": 0.862,
+    "beta": 6.138,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.07
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.044
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.035
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c8bffff",
+   "score_a": 1.589,
+   "score_b": 0.11,
+   "pct_a": 68.0,
+   "pct_b": 38.4,
+   "silence": -29.6,
+   "ci_b": [
+    0.0,
+    0.344
+   ],
+   "posterior": {
+    "alpha": 0.661,
+    "beta": 7.339,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": -0.056
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.027
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.027
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c8fffff",
+   "score_a": 4.492,
+   "score_b": 0.116,
+   "pct_a": 100.0,
+   "pct_b": 44.8,
+   "silence": -55.2,
+   "ci_b": [
+    0.001,
+    0.376
+   ],
+   "posterior": {
+    "alpha": 0.697,
+    "beta": 6.303,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.067
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.065
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.04
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c93ffff",
+   "score_a": 0.51,
+   "score_b": 0.116,
+   "pct_a": 8.0,
+   "pct_b": 43.2,
+   "silence": 35.2,
+   "ci_b": [
+    0.001,
+    0.381
+   ],
+   "posterior": {
+    "alpha": 0.696,
+    "beta": 6.304,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.07
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.053
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.025
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c97ffff",
+   "score_a": 0.468,
+   "score_b": 0.146,
+   "pct_a": 2.8,
+   "pct_b": 72.0,
+   "silence": 69.2,
+   "ci_b": [
+    0.039,
+    0.4
+   ],
+   "posterior": {
+    "alpha": 2.875,
+    "beta": 13.125,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.048
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.039
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.029
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 10,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072c9bffff",
+   "score_a": 1.36,
+   "score_b": 0.136,
+   "pct_a": 61.6,
+   "pct_b": 66.4,
+   "silence": 4.8,
+   "ci_b": [
+    0.001,
+    0.363
+   ],
+   "posterior": {
+    "alpha": 0.816,
+    "beta": 7.184,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.059
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": -0.048
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.038
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072ca3ffff",
+   "score_a": 0.817,
+   "score_b": 0.123,
+   "pct_a": 28.8,
+   "pct_b": 56.0,
+   "silence": 27.2,
+   "ci_b": [
+    0.061,
+    0.354
+   ],
+   "posterior": {
+    "alpha": 4.739,
+    "beta": 21.261,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.065
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.035
+    },
+    {
+     "feature": "tree_pits",
+     "shap": 0.031
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 20,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072ca7ffff",
+   "score_a": 0.808,
+   "score_b": 0.163,
+   "pct_a": 27.2,
+   "pct_b": 80.8,
+   "silence": 53.6,
+   "ci_b": [
+    0.038,
+    0.362
+   ],
+   "posterior": {
+    "alpha": 2.98,
+    "beta": 15.02,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": 0.038
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": 0.03
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.027
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 12,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072cabffff",
+   "score_a": 2.532,
+   "score_b": 0.133,
+   "pct_a": 92.8,
+   "pct_b": 63.2,
+   "silence": -29.6,
+   "ci_b": [
+    0.001,
+    0.303
+   ],
+   "posterior": {
+    "alpha": 0.799,
+    "beta": 9.201,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.043
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.039
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.038
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 4,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072cafffff",
+   "score_a": 1.418,
+   "score_b": 0.158,
+   "pct_a": 62.4,
+   "pct_b": 80.0,
+   "silence": 17.6,
+   "ci_b": [
+    0.096,
+    0.558
+   ],
+   "posterior": {
+    "alpha": 3.947,
+    "beta": 9.053,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.053
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.043
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": 0.04
+    }
+   ],
+   "cd": "102",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 7,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072cb3ffff",
+   "score_a": 0.455,
+   "score_b": 0.147,
+   "pct_a": 0.8,
+   "pct_b": 72.8,
+   "silence": 72.0,
+   "ci_b": [
+    0.001,
+    0.247
+   ],
+   "posterior": {
+    "alpha": 0.88,
+    "beta": 12.12,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "tree_pits",
+     "shap": 0.053
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.043
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.027
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 7,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072cb7ffff",
+   "score_a": 0.571,
+   "score_b": 0.117,
+   "pct_a": 12.0,
+   "pct_b": 46.4,
+   "silence": 34.4,
+   "ci_b": [
+    0.0,
+    0.169
+   ],
+   "posterior": {
+    "alpha": 0.699,
+    "beta": 16.301,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.104
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.06
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.051
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 11,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072cbbffff",
+   "score_a": 2.939,
+   "score_b": 0.167,
+   "pct_a": 98.4,
+   "pct_b": 84.0,
+   "silence": -14.4,
+   "ci_b": [
+    0.036,
+    0.576
+   ],
+   "posterior": {
+    "alpha": 2.004,
+    "beta": 5.996,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "lomod_pct",
+     "shap": 0.03
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.03
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.026
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072cc3ffff",
+   "score_a": 1.619,
+   "score_b": 0.103,
+   "pct_a": 68.8,
+   "pct_b": 28.8,
+   "silence": -40.0,
+   "ci_b": [
+    0.0,
+    0.325
+   ],
+   "posterior": {
+    "alpha": 0.619,
+    "beta": 7.381,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.085
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.058
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.043
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072cc7ffff",
+   "score_a": 0.918,
+   "score_b": 0.157,
+   "pct_a": 36.0,
+   "pct_b": 78.4,
+   "silence": 42.4,
+   "ci_b": [
+    0.002,
+    0.324
+   ],
+   "posterior": {
+    "alpha": 0.942,
+    "beta": 9.058,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "lomod_pct",
+     "shap": 0.055
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.026
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.018
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 4,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072ccbffff",
+   "score_a": 1.451,
+   "score_b": 0.114,
+   "pct_a": 63.2,
+   "pct_b": 41.6,
+   "silence": -21.6,
+   "ci_b": [
+    0.001,
+    0.31
+   ],
+   "posterior": {
+    "alpha": 0.686,
+    "beta": 8.314,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.073
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.056
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.039
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 3,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072ccfffff",
+   "score_a": 2.185,
+   "score_b": 0.099,
+   "pct_a": 88.8,
+   "pct_b": 25.6,
+   "silence": -63.2,
+   "ci_b": [
+    0.0,
+    0.402
+   ],
+   "posterior": {
+    "alpha": 0.592,
+    "beta": 5.408,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.104
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.074
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.073
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072cd3ffff",
+   "score_a": 2.631,
+   "score_b": 0.088,
+   "pct_a": 94.4,
+   "pct_b": 11.2,
+   "silence": -83.2,
+   "ci_b": [
+    0.039,
+    0.443
+   ],
+   "posterior": {
+    "alpha": 2.527,
+    "beta": 10.473,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.089
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.075
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": -0.049
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 7,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072cd7ffff",
+   "score_a": 1.724,
+   "score_b": 0.108,
+   "pct_a": 72.0,
+   "pct_b": 34.4,
+   "silence": -37.6,
+   "ci_b": [
+    0.001,
+    0.425
+   ],
+   "posterior": {
+    "alpha": 0.648,
+    "beta": 5.352,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": -0.069
+    },
+    {
+     "feature": "temp_mean",
+     "shap": -0.063
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.058
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072cdbffff",
+   "score_a": 2.0,
+   "score_b": 0.154,
+   "pct_a": 84.8,
+   "pct_b": 76.8,
+   "silence": -8.0,
+   "ci_b": [
+    0.004,
+    0.498
+   ],
+   "posterior": {
+    "alpha": 0.924,
+    "beta": 5.076,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "lomod_pct",
+     "shap": -0.048
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.032
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.026
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072d1bffff",
+   "score_a": 1.075,
+   "score_b": 0.132,
+   "pct_a": 41.6,
+   "pct_b": 62.4,
+   "silence": 20.8,
+   "ci_b": [
+    0.002,
+    0.46
+   ],
+   "posterior": {
+    "alpha": 0.793,
+    "beta": 5.207,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.037
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": 0.024
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.024
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072d43ffff",
+   "score_a": 1.216,
+   "score_b": 0.132,
+   "pct_a": 51.2,
+   "pct_b": 61.6,
+   "silence": 10.4,
+   "ci_b": [
+    0.017,
+    0.389
+   ],
+   "posterior": {
+    "alpha": 1.791,
+    "beta": 10.209,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.032
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.031
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.029
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 6,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072d4bffff",
+   "score_a": 1.114,
+   "score_b": 0.061,
+   "pct_a": 45.2,
+   "pct_b": 0.0,
+   "silence": -45.2,
+   "ci_b": [
+    0.0,
+    0.287
+   ],
+   "posterior": {
+    "alpha": 0.366,
+    "beta": 6.634,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.12
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.089
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": -0.083
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072d4fffff",
+   "score_a": 1.916,
+   "score_b": 0.119,
+   "pct_a": 80.4,
+   "pct_b": 48.0,
+   "silence": -32.4,
+   "ci_b": [
+    0.001,
+    0.455
+   ],
+   "posterior": {
+    "alpha": 0.714,
+    "beta": 5.286,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": -0.07
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.066
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": -0.065
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072d53ffff",
+   "score_a": 1.047,
+   "score_b": 0.323,
+   "pct_a": 40.8,
+   "pct_b": 96.8,
+   "silence": 56.0,
+   "ci_b": [
+    0.048,
+    0.707
+   ],
+   "posterior": {
+    "alpha": 1.936,
+    "beta": 4.064,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.236
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.164
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.15
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072d57ffff",
+   "score_a": 1.203,
+   "score_b": 0.125,
+   "pct_a": 48.8,
+   "pct_b": 58.4,
+   "silence": 9.6,
+   "ci_b": [
+    0.001,
+    0.408
+   ],
+   "posterior": {
+    "alpha": 0.752,
+    "beta": 6.248,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "tree_pits",
+     "shap": 0.042
+    },
+    {
+     "feature": "lomod_pct",
+     "shap": 0.03
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.026
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072d5bffff",
+   "score_a": 0.917,
+   "score_b": 0.1,
+   "pct_a": 35.2,
+   "pct_b": 27.2,
+   "silence": -8.0,
+   "ci_b": [
+    0.0,
+    0.404
+   ],
+   "posterior": {
+    "alpha": 0.599,
+    "beta": 5.401,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "lomod_pct",
+     "shap": -0.082
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": -0.055
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.032
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072d83ffff",
+   "score_a": 0.491,
+   "score_b": 0.104,
+   "pct_a": 5.6,
+   "pct_b": 29.6,
+   "silence": 24.0,
+   "ci_b": [
+    0.0,
+    0.432
+   ],
+   "posterior": {
+    "alpha": 0.625,
+    "beta": 5.375,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.091
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.067
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.052
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 0,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072d8bffff",
+   "score_a": 0.56,
+   "score_b": 0.165,
+   "pct_a": 10.4,
+   "pct_b": 82.4,
+   "silence": 72.0,
+   "ci_b": [
+    0.043,
+    0.638
+   ],
+   "posterior": {
+    "alpha": 1.99,
+    "beta": 5.01,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.087
+    },
+    {
+     "feature": "temp_mean",
+     "shap": 0.062
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.054
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 1,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072d9bffff",
+   "score_a": 0.714,
+   "score_b": 0.089,
+   "pct_a": 20.8,
+   "pct_b": 12.0,
+   "silence": -8.8,
+   "ci_b": [
+    0.0,
+    0.257
+   ],
+   "posterior": {
+    "alpha": 0.534,
+    "beta": 9.466,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.06
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": -0.047
+    },
+    {
+     "feature": "tree_pits",
+     "shap": -0.045
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 4,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072dc3ffff",
+   "score_a": 0.348,
+   "score_b": 0.317,
+   "pct_a": 0.0,
+   "pct_b": 96.0,
+   "silence": 96.0,
+   "ci_b": [
+    0.108,
+    0.522
+   ],
+   "posterior": {
+    "alpha": 4.901,
+    "beta": 12.099,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.264
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.186
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.152
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 11,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072dc7ffff",
+   "score_a": 0.746,
+   "score_b": 0.21,
+   "pct_a": 24.0,
+   "pct_b": 88.8,
+   "silence": 64.8,
+   "ci_b": [
+    0.058,
+    0.502
+   ],
+   "posterior": {
+    "alpha": 3.26,
+    "beta": 9.74,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.104
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.099
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.094
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 7,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072dcbffff",
+   "score_a": 0.859,
+   "score_b": 0.255,
+   "pct_a": 31.2,
+   "pct_b": 93.6,
+   "silence": 62.4,
+   "ci_b": [
+    0.095,
+    0.489
+   ],
+   "posterior": {
+    "alpha": 4.531,
+    "beta": 12.469,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.157
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": 0.125
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.12
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 11,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072dcfffff",
+   "score_a": 1.21,
+   "score_b": 0.221,
+   "pct_a": 50.4,
+   "pct_b": 92.0,
+   "silence": 41.6,
+   "ci_b": [
+    0.049,
+    0.593
+   ],
+   "posterior": {
+    "alpha": 2.327,
+    "beta": 6.673,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.122
+    },
+    {
+     "feature": "catch_basins_100m",
+     "shap": 0.102
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.093
+    }
+   ],
+   "cd": "103",
+   "rmz": null,
+   "n_inspections": 3,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072dd3ffff",
+   "score_a": 0.86,
+   "score_b": 0.339,
+   "pct_a": 32.0,
+   "pct_b": 98.4,
+   "silence": 66.4,
+   "ci_b": [
+    0.184,
+    0.616
+   ],
+   "posterior": {
+    "alpha": 7.031,
+    "beta": 10.969,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.291
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.226
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": 0.182
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 12,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072dd7ffff",
+   "score_a": 0.869,
+   "score_b": 0.157,
+   "pct_a": 32.8,
+   "pct_b": 79.2,
+   "silence": 46.4,
+   "ci_b": [
+    0.018,
+    0.35
+   ],
+   "posterior": {
+    "alpha": 1.944,
+    "beta": 12.056,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": 0.057
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.046
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.044
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 8,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072ddbffff",
+   "score_a": 0.737,
+   "score_b": 0.338,
+   "pct_a": 22.0,
+   "pct_b": 97.6,
+   "silence": 75.6,
+   "ci_b": [
+    0.104,
+    0.495
+   ],
+   "posterior": {
+    "alpha": 5.03,
+    "beta": 12.97,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.288
+    },
+    {
+     "feature": "park_adjacent",
+     "shap": 0.201
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.174
+    }
+   ],
+   "cd": "103",
+   "rmz": "Chinatown/East Village/LES",
+   "n_inspections": 12,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072ea7ffff",
+   "score_a": 0.985,
+   "score_b": 0.082,
+   "pct_a": 38.0,
+   "pct_b": 6.4,
+   "silence": -31.6,
+   "ci_b": [
+    0.024,
+    0.293
+   ],
+   "posterior": {
+    "alpha": 2.49,
+    "beta": 17.51,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "park_adjacent",
+     "shap": -0.092
+    },
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": -0.08
+    },
+    {
+     "feature": "temp_mean",
+     "shap": -0.069
+    }
+   ],
+   "cd": "101",
+   "rmz": null,
+   "n_inspections": 14,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a1072eb7ffff",
+   "score_a": 1.266,
+   "score_b": 0.131,
+   "pct_a": 55.2,
+   "pct_b": 60.0,
+   "silence": 4.8,
+   "ci_b": [
+    0.001,
+    0.258
+   ],
+   "posterior": {
+    "alpha": 0.784,
+    "beta": 11.216,
+    "n_events": 0
+   },
+   "reasons": [
+    {
+     "feature": "temp_mean",
+     "shap": 0.059
+    },
+    {
+     "feature": "pluto_bldg_age",
+     "shap": 0.051
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.044
+    }
+   ],
+   "cd": "102",
+   "rmz": null,
+   "n_inspections": 6,
+   "last_event_at": null
+  },
+  {
+   "h3": "892a100d2c3ffff",
+   "score_a": 1.331,
+   "score_b": 0.419,
+   "pct_a": 59.2,
+   "pct_b": 100.0,
+   "silence": 40.8,
+   "ci_b": [
+    0.311,
+    0.841
+   ],
+   "posterior": {
+    "alpha": 6.514,
+    "beta": 4.486,
+    "n_events": 3
+   },
+   "reasons": [
+    {
+     "feature": "restaurant_vermin_12mo",
+     "shap": 0.361
+    },
+    {
+     "feature": "dob_nb_permits_6mo",
+     "shap": 0.263
+    },
+    {
+     "feature": "litter_baskets_100m",
+     "shap": 0.235
+    }
+   ],
+   "cd": "105",
+   "rmz": null,
+   "n_inspections": 2,
+   "last_event_at": "2026-08-28T22:26:00Z"
+  }
+ ]
+}

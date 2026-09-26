@@ -1,23 +1,49 @@
-# data never goes in the repo (raw pulls are ~1 GB, live outside at ../../data)
-data/
-*.csv
-*.parquet
-*.geojson
-*.duckdb
+# Barn Owl — snapshot repo
 
 # secrets
 .env
-*.key
+CREDENTIALS.txt
 
-# python
+# large data (never commit)
+data/raw/
+data/parquet/
+*.parquet
+*.csv
+*.MOV
+*.mov
+*.mp4
+
+# vision artefacts
+vision/frames/
+vision/frames_pruned/
+vision/labels/
+vision/dataset/
+vision/runs/
+vision/clips/
+vision/pi/wheels/
+*.pt
+*.onnx
+!vision/pi/world_rat_person.onnx
+runs/
+weights/
+
+# renders (PNG output of the Gemini tool; keep the deck set under renders/ tracked explicitly)
+renders/node/
+
+# python / node
 __pycache__/
 *.pyc
 .venv/
-.ipynb_checkpoints/
+node_modules/
+dist/
 
-# model artifacts
-*.onnx
-*.pt
-*.pkl
-
+# OS
 .DS_Store
+
+# model pipeline (Sanjavan): raw data lives outside the repo, intermediates never committed
+data/processed/
+*.geojson
+*.duckdb
+*.pkl
+__pycache__/
+.ipynb_checkpoints/

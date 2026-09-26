@@ -1,0 +1,86 @@
+{
+ "month": "2026-08",
+ "k": 8,
+ "nodes": [
+  {
+   "rank": 1,
+   "h3": "892a100d2c3ffff",
+   "lat": 40.749626,
+   "lon": -73.989868,
+   "tree_id": "443742",
+   "expected_gain": 1.1873,
+   "silence": 40.8,
+   "reason": "P(active) 0.42 [0.31-0.84], silence +41; top driver restaurant_vermin_12mo"
+  },
+  {
+   "rank": 2,
+   "h3": "892a100d343ffff",
+   "lat": 40.72657,
+   "lon": -73.983025,
+   "tree_id": "243195",
+   "expected_gain": 1.74,
+   "silence": 88.8,
+   "reason": "P(active) 0.31 [0.10-0.75], silence +89; top driver restaurant_vermin_12mo"
+  },
+  {
+   "rank": 3,
+   "h3": "892a1072d53ffff",
+   "lat": 40.709573,
+   "lon": -73.994358,
+   "tree_id": "427109",
+   "expected_gain": 1.5732,
+   "silence": 56.0,
+   "reason": "P(active) 0.32 [0.05-0.71], silence +56; top driver restaurant_vermin_12mo"
+  },
+  {
+   "rank": 4,
+   "h3": "892a1072c23ffff",
+   "lat": 40.715326,
+   "lon": -73.999753,
+   "tree_id": "694666",
+   "expected_gain": 1.3469,
+   "silence": 15.2,
+   "reason": "P(active) 0.38 [0.14-0.81], silence +15; top driver restaurant_vermin_12mo"
+  },
+  {
+   "rank": 5,
+   "h3": "892a100d35bffff",
+   "lat": 40.728389,
+   "lon": -73.985388,
+   "tree_id": "593116",
+   "expected_gain": 0.8943,
+   "silence": 88.0,
+   "reason": "P(active) 0.21 [0.05-0.60], silence +88; top driver restaurant_vermin_12mo"
+  },
+  {
+   "rank": 6,
+   "h3": "892a1072d8bffff",
+   "lat": 40.710116,
+   "lon": -73.982171,
+   "tree_id": "149011",
+   "expected_gain": 0.7218,
+   "silence": 72.0,
+   "reason": "P(active) 0.17 [0.04-0.64], silence +72; top driver restaurant_vermin_12mo"
+  },
+  {
+   "rank": 7,
+   "h3": "892a1072dc3ffff",
+   "lat": 40.712331,
+   "lon": -73.988604,
+   "tree_id": "115817",
+   "expected_gain": 0.7082,
+   "silence": 96.0,
+   "reason": "P(active) 0.32 [0.11-0.52], silence +96; top driver restaurant_vermin_12mo"
+  },
+  {
+   "rank": 8,
+   "h3": "892a1072dd3ffff",
+   "lat": 40.715501,
+   "lon": -73.986764,
+   "tree_id": "519202",
+   "expected_gain": 0.7067,
+   "silence": 66.4,
+   "reason": "P(active) 0.34 [0.18-0.62], silence +66; top driver restaurant_vermin_12mo"
+  }
+ ]
+}
