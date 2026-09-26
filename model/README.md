@@ -1,6 +1,85 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 16:40** (hotspot click zooms in and opens the popup).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 16:55** (teammate handoff added).
+
+## For teammates: start here
+
+### What this branch has (`sanjavan/model`)
+
+| Piece | Status | Where |
+|---|---|---|
+| Data pipeline: every NYC H3 r9 cell × month since 2010, sweep flag, complaint dedupe | done | `01_build_cells.py`, `02_features.py` |
+| Model A (complaints), Model B (rats, physical features only), Silence Score, uncertainty | done | `03_models.py` |
+| Backtest on real sweeps, 119 months: +28% more rats than "go where people complain" | done | `05_backtest.py` → `out/backtest.json` |
+| Validation: quiet ≠ rat-free, out-of-time check, binning before/after | done | `validate_silence.py`, `binning_effect.py` |
+| Node planner: 20 sites on real tree pits | done | `04_optimizer.py` → `out/plan.json` |
+| Building list: top 5 buildings to inspect per silent block / node site | done | `06_buildings.py` → `out/buildings.json` |
+| Hotspot rankings: top 10 risk / silent, top-1% tiers, neighborhoods | done | `08_hotspots.py` → `out/hotspots.json` |
+| Map JSON in the `api/` + `web/` contract | done | `export.py` → `out/cells.json`, `out/plan.json` |
+| Map: "NYC hotspots" panel, click flies in + opens popup, minimize buttons, popup shows neighborhood + tier | done | `web/src/components/Hotspots.tsx` + small edits (below) |
+
+### What each of you gets from this branch
+
+**Ethan (api/, web/, deck)**
+- `api/` works unchanged with these files: it reads `model/out/cells.json`, `plan.json`, `backtest.json` first
+  and only falls back to the fixtures if they're missing. Tested: one fake event on the demo cell moves `score_b`
+  0.038 → 0.118.
+- **Please use this `out/backtest.json`, not the one scored on all inspections.** Scoring on all T+1 inspections
+  makes silent picks look 24× worse than 311, because silent blocks are rarely inspected. This one scores only on
+  cells that were swept that month.
+- `web/` edits on this branch (heads-up before merging): new `components/Hotspots.tsx`; small edits to `App.tsx`
+  (hotspots panel, pinned popup), `city/scene.ts` (focus now zooms in, `FOCUS_DISTANCE = 900`),
+  `components/CellPopup.tsx` (where / hotspot rows), `components/EventFeed.tsx` (minimize), `components/Header.tsx`
+  (subtitle), `index.css`, `types.ts` (optional ranking fields). Typecheck and `npm run build` pass.
+- Asks: the **Rat Mitigation Zone polygons** (`rmz` is null in `cells.json` until then); one owner for `model/out/`
+  (both branches write `cells.json`, `plan.json`).
+
+**Utsav (detector / YOLO)**
+- The only link to the model is `POST /event` on `api/`. Body (`api/main.py`, extra keys rejected):
+  `{node_id, h3, ts, class: "rat"|"person", conf 0-1, n_hits, bbox [x,y,w,h] 0-1, crop_b64, fw}`.
+  The posterior only moves when `conf >= 0.5` and `n_hits >= 3`. Test without the Pi: `./api/fake_event.sh`.
+- **Demo cell:** `892a100d2c3ffff` (27th & 6th, the current `DEMO_H3` in `vision/pi/detect.py` and
+  `city/make_fixture.py`) is **not silent in the real data** (silence −7). Real silent cells inside the 3D map area:
+
+  | h3 | where | lat, lon | silence | P(rats) | complaints/yr |
+  |---|---|---|---|---|---|
+  | **`892a1072c37ffff`** (suggested) | **Chinatown-Two Bridges (CD 103)** | 40.7153, -73.9951 | +56 | 7.3% | **0** |
+  | `892a10728bbffff` | Financial District-Battery Park City (CD 101) | 40.7044, -74.0075 | +72 | 5.1% | 6 |
+  | `892a107289bffff` | Tribeca-Civic Center (CD 101) | 40.7123, -74.0099 | +69 | 4.9% | 0 |
+
+  Chinatown-Two Bridges fits the pitch hook (Manhattan CD 3). Changing it = the `DEMO_H3` constant in both files.
+- Training-data notes: grayscale for training and on the Pi (removes the NoIR tint); split train/val by clip, ideally
+  hold out a whole floor type; 1 fps (frames in a clip are near-duplicates); hard negatives incl. hands, shoes, bags,
+  cables and a hand pushing the rat (label only the rat); hand-check every empty pre-label on rat clips; gate on
+  events (fires within 1 s per push, false events per 10 min), not mAP.
+
+**Bruno (Pi / hardware)**: nothing to change for the model. Test the Pi on Columbia wifi early (login pages or
+device isolation would block `POST /event`); phone hotspot as backup.
+
+### How to use this branch
+
+```
+git fetch origin && git checkout sanjavan/model
+```
+
+**See the map with the real model output** (two terminals, from the repo root):
+```
+python3 -m uvicorn main:app --app-dir api --port 8000      # server (needs: pip install fastapi "uvicorn[standard]" pydantic)
+cd web && npm install && npm run dev                        # map at http://localhost:5173 ("API: live" = real data)
+./api/fake_event.sh                                         # optional: fake rat event on the demo cell
+curl -X DELETE -H 'X-Demo-Reset: yes' localhost:8000/events # reset events between rehearsals
+```
+The committed `model/out/*.json` files are enough for this. No data download needed.
+
+**Re-run the model** (only if you change it): needs the raw data in `../../data/raw/` next to the repo (≈1 GB,
+NYC Open Data + Census/NOAA; list and pull method in `data/DATA_DICTIONARY.md` of the project folder, or set
+`DATA_DIR=...`) and `pip install pandas duckdb h3 geopandas shapely lightgbm scikit-learn scipy`. Then:
+```
+python3 model/01_build_cells.py && python3 model/02_features.py && python3 model/03_models.py \
+  && python3 model/04_optimizer.py && python3 model/05_backtest.py && python3 model/export.py \
+  && python3 model/06_buildings.py && python3 model/08_hotspots.py
+```
+About 5 minutes on an M-series Mac (the backtests are the slow part).
 
 ## Headline results
 
