@@ -104,6 +104,16 @@ static = (cells.set_index("h3")[["lat", "lng", "boro_cd", "real_cd"]]
 count_cols = ["n_lots", "units_res", "bldg_area", "retail_area", "com_area", "n_restaurants",
               "n_litter_baskets", "n_catch_basins", "n_trees", "n_subway_entrances", "share_park"]
 static[count_cols] = static[count_cols].fillna(0)
+
+# Neighbourhood context: rats don't stop at hexagon edges. Mean of the 6 ring-1 neighbours
+# (missing neighbours = water/outside NYC are skipped).
+NBR_COLS = ["floors_mean", "year_built_median", "share_pre1940", "share_vacant", "share_residential",
+            "share_commercial", "n_restaurants", "n_litter_baskets", "n_catch_basins", "n_trees",
+            "units_res", "share_park"]
+ring = {c: [n for n in h3.grid_ring(c, 1) if n in static.index] for c in static.index}
+for col in NBR_COLS:
+    v = static[col]
+    static[f"nbr_{col}"] = [v.loc[ns].mean() if ns else np.nan for ns in ring.values()]
 static.reset_index().to_parquet(PROCESSED / "features_static.parquet", index=False)
 
 # ---------------------------------------------------------------- time-varying features
