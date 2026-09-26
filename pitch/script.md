@@ -1,6 +1,6 @@
 # Barn Owl: three-minute pitch
 
-Use the live map on slide 2 and the physical prop on slide 4. Keep the deck visible during the other slides. The spoken text below is about 365 words; leave roughly 20 seconds for the live trigger.
+Use the live map on slide 2 and the verified recorded-footage replay on slide 4. Try the physical prop only after a fresh Pi test succeeds. Keep the deck visible during the other slides. The spoken text is about 360 words; leave time for the replay.
 
 ## 1. Reporting gap, 0:00–0:25
 
@@ -16,11 +16,11 @@ We replayed 119 months. For each month, Model B trained on earlier data. Then we
 
 ## 4. Node and live trigger, 1:40–2:30
 
-A ranking is a place to start, so the planner proposes tree-pit sites where modeled risk and the data gap are high. The Pi 5 camera points down at our room-lit toy rat. PIR wakes capture; the detector still needs to confirm the object. [Move the toy rat. Wait for the event.] If it fires, the event sends the cell, confidence, and a crop. The API updates that cell's chosen prior and re-ranks candidates. The displayed score changes; the city model does not retrain on stage. [Point to a changed value only if it appears.]
+A ranking is a place to start, so the planner proposes tree-pit sites where risk and the data gap are high. We replayed original room-lit camera footage through the exported detector and Pi event rules. One accepted event reached the local API and live map: the score moved from 9.2 to 13.0 percent, and a candidate rose from rank 11 to 2. That verifies the recorded-footage software loop. [Show the replay. Try a physical trigger only if it works in a fresh test, and name which one the audience sees.] The event updates a chosen prior; the city model does not retrain on stage.
 
 ## 5. What is real, 2:30–3:00
 
-The city data, cell models, and backtest are real. Teammates report the Pi camera, PIR, and IR capture work. The first prop detector failed its event test; a revision is underway, with held-out tests pending. We have not deployed a field network or counted rat populations. Our next step is a supervised 50-node pilot checked against later sweeps. Barn Owl helps inspectors ask where to look next.
+The city data, cell models, backtest, and recorded-footage map update are real. Teammates report that the Pi camera, PIR, and IR capture work. The room-lit plush model scored .94 AP50 on 22 held-out close-view frames, but .79 across both clips, below our .90 gate. The formal push test and physical Pi inference remain untested. We have no field deployment or rat count. Next is a supervised 50-node pilot checked against later sweeps.
 
 ## Presenter guardrails
 
@@ -29,10 +29,12 @@ The city data, cell models, and backtest are real. Teammates report the Pi camer
 - The East Harlem North and West Village numbers on slide 2 are model export values for two cells. They are examples, not citywide prevalence or evidence that income caused reporting differences. The screenshot's income and recent-inspection denominators were not reproducible from the available exports, so they are omitted.
 - The Pi PIR wakes capture. It does not recognize rats. A successful live event needs the detector, the API, and the map.
 - An accepted event updates a chosen Beta prior and may re-rank candidate sites. It does not refit Model B. Model exports also contain historical sweep-informed posteriors; use the API's live event value when speaking about the stage update.
-- The toy-rat detector is a prop demo. Replace “held-out rig tests pending” with a measured result only after the clip and event evaluation is complete.
+- The toy-rat detector is a prop demo. V1 failed box detection validation (rat AP50 .00755), not an event test. V2 PyTorch and ONNX matched at square 416: .93674 on 22 held-out close-view frames (17 rat boxes), .65108 on 27 separate floor frames (12 rat boxes), and .79031 combined. The combined result missed the >.9 rat gate. These boxes had agent review and no independent human signoff.
+- The formal 20-push / 3-minute-negative event gate and physical Pi inference are not evaluated. Keep the saved-video integration result separate from those tests.
+- The saved-video integration replay produced exactly one accepted event from original `zoom15_b` footage at 59–63 seconds. Exported ONNX, Pi Detector rules, crop, local API, and frontend map were exercised on a Mac. Score moved 0.0923→0.1297 and plan candidate rank 11→2. This is recorded-footage integration evidence; it does not establish physical Pi performance or the formal event gate.
 - The stage prop is lit by room lights. Hardware IR capture and new rig footage do not establish detector performance under IR.
 - If the live event is a canned POST or the feed fails, tell the audience exactly which part ran.
 
 ## Source snapshot
 
-`model/out/backtest.json`, `model/out/cells.json`, and `model/out/metrics.json` in this checkout, read 2026-09-26. Hardware status came from `node/DEBRIEF-utsav.md` and the team's later confirmation that the Pi 5 camera is aimed at the table with new IR footage. The plan's older pitch and “What's real” section contain future-tense claims; this script uses the current artifacts.
+`model/out/backtest.json`, `model/out/cells.json`, `model/out/metrics.json`, and `vision/TRAINING_RESULTS.md` in this checkout, read 2026-09-26. Hardware status came from `node/DEBRIEF-utsav.md` and the team's later confirmation that the Pi 5 camera is aimed at the table with new IR footage. The recorded-footage integration result came from the team's local replay and frontend screenshot. The plan's older pitch and “What's real” section contain future-tense claims; this script uses the current artifacts.
