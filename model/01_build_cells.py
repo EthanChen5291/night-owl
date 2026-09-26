@@ -67,6 +67,10 @@ comp = con.sql(f"""
       and {in_nyc}
 """).df()
 comp = add_h3(comp)
+# One app user in East Harlem filed up to 36/day for 1,300+ days at one GPS point.
+# Count at most one complaint per exact spot per day (~6% of rows are such repeats).
+spot = comp.latitude.round(5).astype(str) + "," + comp.longitude.round(5).astype(str)
+comp["is_repeat"] = spot.groupby([spot, comp.date]).cumcount() > 0
 
 # ---- Ethan's rule, for cross-checking: was there a rat complaint on the same lot before?
 con.register("insp_df", insp[["job_id", "bbl", "date"]])
@@ -81,11 +85,13 @@ days = (pd.to_datetime(insp.date) - pd.to_datetime(insp.last_complaint_date)).dt
 insp["prior_complaint_any"] = days.notna()
 insp["prior_complaint_365d"] = days.le(365)
 
-# ---- Cells: centroid + community district (by centroid-in-polygon)
-cells = pd.DataFrame({"h3": pd.unique(pd.concat([insp.h3, comp.h3]))})
-cells[["lat", "lng"]] = [h3.cell_to_latlng(c) for c in cells.h3]
+# ---- Cells: every H3 cell covering NYC (silent blocks may have zero records),
+#      plus any record cells on the edges. Centroid + community district.
 cd = gpd.read_file(RAW / "community_districts.geojson")[["boro_cd", "geometry"]]
 cd["boro_cd"] = cd.boro_cd.astype(int)
+land = set().union(*(h3.geo_to_cells(g, H3_RES) for g in cd.to_crs(4326).geometry))
+cells = pd.DataFrame({"h3": sorted(land | set(insp.h3) | set(comp.h3))})
+cells[["lat", "lng"]] = [h3.cell_to_latlng(c) for c in cells.h3]
 pts = gpd.GeoDataFrame(cells, geometry=gpd.points_from_xy(cells.lng, cells.lat), crs=4326)
 cells = (gpd.sjoin(pts, cd.to_crs(4326), how="left", predicate="within")
          .drop(columns=["geometry", "index_right"]))
@@ -103,7 +109,11 @@ im = insp.groupby(["h3", "month"]).agg(
     n_sweep=("is_sweep", "sum"),
     n_sweep_rat=("sweep_rat", "sum"),
 )
-cm = comp.groupby(["h3", "month"]).size().rename("n_complaints")
+comp["is_first"] = ~comp.is_repeat
+cm = comp.groupby(["h3", "month"]).agg(
+    n_complaints=("is_first", "sum"),  # deduped: Model A target
+    n_complaints_raw=("is_first", "size"),
+)
 cell_month = im.join(cm, how="outer").fillna(0).astype(int).reset_index()
 
 # ---- Save
