@@ -2,7 +2,7 @@
 
 FastAPI server that sits between the Pi node, the model output and the web app. It serves the frozen JSON
 contract (`plan/master-plan.md` §6), takes `POST /event` from `vision/pi/detect.py`, keeps one
-Beta-Binomial posterior per H3 cell (plan §4) and overlays it on `/cells` so the map moves when the prop
+Beta-Binomial posterior per H3 cell and month (plan §4) and overlays it on `/cells` so the map moves when the prop
 is waved on stage (plan §9).
 
 ## Run
@@ -28,28 +28,38 @@ Reset between rehearsals: `curl -X DELETE -H 'X-Demo-Reset: yes' localhost:8000/
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/cells?month=YYYY-MM` | `model/out/cells_<month>.json` → `model/out/cells.json` → `city/cells.fixture.json`, with the live posterior overlay |
-| GET | `/plan?month&k` | `model/out/plan_<month>.json` → `model/out/plan.json` → `city/plan.fixture.json`, truncated to `k` |
+| GET | `/cells?month=YYYY-MM` | Exact-month model file or fixture first; otherwise current model output with its actual month. Live posterior overlay applies only to matching-month events. |
+| GET | `/plan?month&k` | Same month selection; accepted detections re-rank existing tree locations when their H3 is a candidate. `replanned` reports whether the plan changed. |
 | GET | `/queue?limit=50` | live events, newest first, `received_at` added. Starts empty (the queue fixture is for the frontend only) |
-| POST | `/event` | the 9-key body; 422 on bad shape (bbox must be 0–1, class `rat`/`person`, conf 0–1), 400 on bad JSON |
+| POST | `/event` | the 9-key body; 400 on malformed shape or JSON (bbox must be 0–1, class `rat`/`person`, conf 0–1) |
 | GET | `/backtest` | `model/out/backtest.json` → `api/fixtures/backtest.json` (synthetic, flagged `"synthetic": true`) |
 | GET | `/stream` | Server-Sent Events: `hello` on connect, `event` per POST, `reset` on DELETE; keepalive every 15 s |
 | GET | `/health` | `{"ok":true,"events":n,"cells_source":path}` |
 | DELETE | `/events` | needs header `X-Demo-Reset: yes`; clears memory and `events.jsonl` |
 
-`/cells` overlay: for every cell that has received an accepted event, `posterior` is replaced,
-`score_b` becomes the posterior mean, `last_event_at` is the event `ts`, then `pct_b` and
-`silence = pct_b − pct_a` are recomputed over the whole set (same percentile-rank rule as
-`city/make_fixture.py`).
+`/cells` and `/plan` report the actual file `month`, `source` (`model` or `fixture`), and `synthetic`
+(`true` for the fixture). A request also echoes `requested_month`, which may differ from the file month
+if no exact source exists. September events cannot alter the August fixture. For each accepted detection
+in the served month, `/cells` replaces `posterior` and `score_b`, computes an approximate current
+`ci_b`, and keeps the exported ensemble interval as `model_ci_b`. It recomputes `pct_b` and
+`silence = pct_b − pct_a` over the served cells.
+
+`/plan` keeps its generated pins when no candidate has new evidence. For an affected candidate, it
+re-ranks the original nodes plus tree-pit options in same-month `model/out/placements.json`, scales
+expected gain by the posterior risk change and remaining uncertainty, and enforces 100 m spacing.
+It never creates a new location. The September demo H3 is in the model cells but outside its planner
+candidate pool, so a demo event updates the map without moving a September plan pin. For a pin-movement
+rehearsal, configure the node with the H3 of a current plan candidate.
 
 ## Posterior (plan §4)
 
-Prior per cell `alpha0 = score_b·n0`, `beta0 = (1−score_b)·n0`, `n0 = 10`, `score_b` read from the cells
-file the first time the cell gets an event (unknown h3 → prior 0.2, logged). Each accepted event adds
+Prior per cell uses a valid exported `posterior` when it is centred on `score_b` and has zero events.
+Otherwise `alpha0 = score_b·n0`, `beta0 = (1−score_b)·n0`, `n0 = 10`; unknown H3 uses prior 0.2.
+Each accepted rat event adds
 `alpha += conf`, `n_events += 1`; `score_b_updated = alpha/(alpha+beta)`. Events with `conf < 0.5` or
-`n_hits < 3` are queued and logged but do not move the posterior (env `BARN_OWL_MIN_CONF`,
-`BARN_OWL_MIN_HITS` to change). The demo cell starts at `n_events = 0` on the server regardless of what
-the cells file says, so the stage line "0 → 1" holds.
+`n_hits < 3` and person events are queued without an update. Exact duplicate deliveries are ignored and do not move
+the posterior (env `BARN_OWL_MIN_CONF`, `BARN_OWL_MIN_HITS` to change). The August fixture has an
+inconsistent old `posterior`, so the server uses the `score_b` fallback for that cell.
 
 ## State
 

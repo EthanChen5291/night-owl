@@ -11,7 +11,11 @@ import re
 from pathlib import Path
 from typing import Literal
 
+from datetime import datetime, timezone
+
+import h3
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
@@ -45,9 +49,21 @@ class Event(BaseModel):
     @field_validator("h3")
     @classmethod
     def _h3_hex(cls, v: str) -> str:
-        if not re.fullmatch(r"[0-9a-fA-F]{15}", v):
-            raise ValueError("h3 must be a 15-hex-char H3 index")
-        return v.lower()
+        v = v.lower()
+        if not re.fullmatch(r"[0-9a-f]{15}", v) or not h3.is_valid_cell(v) or h3.get_resolution(v) != 9:
+            raise ValueError("h3 must be a valid resolution-9 H3 cell")
+        return v
+
+    @field_validator("ts")
+    @classmethod
+    def _utc_timestamp(cls, v: str) -> str:
+        try:
+            parsed = datetime.fromisoformat(v.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("ts must be an ISO 8601 UTC timestamp") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+            raise ValueError("ts must be an ISO 8601 UTC timestamp")
+        return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def create_app(data_dir: Path | None = None, events_file: Path | None = None) -> FastAPI:
@@ -166,6 +182,12 @@ def create_app(data_dir: Path | None = None, events_file: Path | None = None) ->
     @app.exception_handler(json.JSONDecodeError)
     async def _bad_json(_: Request, exc: Exception):
         return JSONResponse({"ok": False, "detail": f"bad JSON: {exc}"}, status_code=400)
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(request: Request, exc: RequestValidationError):
+        if request.url.path == "/event":
+            return JSONResponse({"ok": False, "detail": "invalid event body"}, status_code=400)
+        return JSONResponse({"detail": exc.errors()}, status_code=422)
 
     return app
 

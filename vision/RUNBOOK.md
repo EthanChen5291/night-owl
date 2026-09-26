@@ -7,8 +7,8 @@ the order of operations, with the gates. Every script has `--help`; every gate h
 
 ```
 cd vision
-python3 -m venv .venv && . .venv/bin/activate
-pip install ultralytics opencv-python numpy onnxruntime onnx onnxslim
+uv sync --locked --python 3.12
+. .venv/bin/activate
 ```
 
 Python 3.11+. `ffmpeg` is installed (`extract_frames.py` uses it; `--backend cv2` if not).
@@ -64,7 +64,7 @@ same settings as `camera.py` is fine; ffmpeg turns it into mp4 on the Mac.
 ```
 python3 augment_nostring.py --inpaint --per-frame 2 --photometric 1 --exclude-tags stair_e,new_f
 python3 make_dataset.py --val-tags stair_e,new_f --extra frames_aug:labels_aug
-./train.sh                                   # yolo11n.pt, 416, 60 epochs, batch 32 → runs/rat, pi/rat.onnx
+./train.sh --device mps                     # yolo11n.pt, 416, 60 epochs, batch 32 → runs/rat/candidate.onnx
 ```
 
 Rules that are not optional:
@@ -75,8 +75,15 @@ Rules that are not optional:
 - **Augmented frames never touch val**: `make_dataset.py` drops any augmented frame whose rat
   source or background is a val tag; pass the same tags to `--exclude-tags` so they are not made.
 - `GRAY=True` in `make_dataset.py` and `pi/detect.py` must agree (README decision 7).
-- Smoke test first: `EPOCHS=3 ./train.sh` end to end, then the real run (~20–40 min on an M-series
+- Smoke test first: `./train.sh --epochs 3 --name smoke` end to end, then the real run (~20–40 min on an M-series
   Mac with `DEVICE=mps`).
+
+`make_dataset.py` requires a recorded review decision and a label file for every selected frame.
+An empty label file is a reviewed negative. For a rushed exploratory run, both
+`make_dataset.py --allow-unreviewed` and `train.sh --allow-unreviewed` must be explicit. The
+dataset manifest records that choice. Training always exports `runs/rat/candidate.onnx` and
+`runs/rat/training_report.json`, even if Gate A fails. It checks ONNX output against PyTorch on
+five held-out frames. A failed gate gives exit status 1 and leaves the candidate for diagnosis.
 
 **Gate A: `AP50 rat > 0.9` on the held-out clips**, printed by `train.sh` as `GATE rat AP50`.
 Below 0.9: look at `runs/rat/val_batch*_pred.jpg` before touching hyper-parameters; the usual
@@ -86,14 +93,18 @@ saw (fine, that is the point, add rig clips), or the string (Q6, more `--per-fra
 ## 5. Event-level test (the gate that matters on stage)
 
 ```
-python3 eval_events.py --model pi/rat.onnx --clip clips/rig_pushes_01.mp4 --pushes pushes.csv \
-    --negatives clips/rig_negatives_01.mp4 --conf 0.4,0.5,0.6
+python3 eval_events.py --model runs/rat/candidate.onnx --clip clips/rig_pushes_01.mp4 --pushes pushes.csv \
+    --negatives clips/rig_negatives_01.mp4 --conf 0.4,0.5,0.6 --json runs/rat/events.json
+python3 promote_model.py --training-report runs/rat/training_report.json \
+    --event-report runs/rat/events.json
 ```
 
 **Gate B: ≥ 18 of 20 pushes produce an event, and < 0.5 false events per minute on the negatives
-reel.** The sweep tells you which `CONF` to set in `detect.py`; `--hits`, `--window`, `--cooldown`,
-`--floor-y` sweep the same way. Change the constant in `detect.py`, not just the flag, so the Pi
-runs what was measured.
+reel (at least 3 minutes).** The sweep chooses a confidence threshold. Promotion checks both
+reports against the same ONNX hash and copies the model plus `rat_config.json` to `pi/`.
+`detect.py` reads these measured thresholds for that exact model hash. A failed or incomplete
+gate leaves `pi/rat.onnx` alone. Change `--floor-y`, `--min-rat-width`, and `--max-rat-width` on
+the eval command to tune those rules; keep `--hits 3` for the demo gate.
 
 ## 6. Ship to the node
 
