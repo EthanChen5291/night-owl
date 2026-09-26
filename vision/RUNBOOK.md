@@ -128,7 +128,12 @@ vision/.venv/bin/python vision/replay_video.py --clip vision/clips/zoom15_b.mp4 
 `replay_video.py` uses every video frame and its recorded timestamps, crops the current frame,
 and marks the report `EXPLORATORY_REPLAY`. `--no-pace` speeds up offline inspection. The API
 loads `BARN_OWL_MIN_CONF` when it starts; restart it after changing that value. An HTTP 200
-alone does not prove the event changed the score, so check the API event result and map value.
+alone does not prove the event changed the score; the replay's `score_updated` field uses the
+API's `accepted` response. For a short stage segment, add `--start-sec S --duration-sec 30`
+using a segment whose rat event was observed in the full offline replay. The current plan's
+rank-11 September candidate H3 is `892a100d467ffff`; pass `--h3 892a100d467ffff` to make a
+rank change visible after an accepted event. Check `/plan` again before the demo because an
+earlier rehearsal can change its rank.
 
 ## 6. Ship to the node
 
