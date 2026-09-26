@@ -39,6 +39,7 @@ export default function App() {
   const [buildings, setBuildings] = useState<Building[] | null>(null)
   const [meta, setMeta] = useState<CityMeta | null | undefined>(undefined)
   const [hover, setHover] = useState<{ h3: string; x: number; y: number } | null>(null)
+  const [pinned, setPinned] = useState<string | null>(null) // popup opened from the hotspots list
 
   const seenRef = useRef<Set<string>>(new Set())
   const primedRef = useRef(false) // first queue load does not flash
@@ -156,8 +157,17 @@ export default function App() {
     return centroid(cells.map((c) => ({ lat: cellToLatLng(c.h3)[0], lon: cellToLatLng(c.h3)[1] })))
   }, [meta, cells])
   const hoveredCell = hover ? cells.find((c) => c.h3 === hover.h3) : undefined
+  const pinnedCell = !hover && pinned ? cells.find((c) => c.h3 === pinned) : undefined
   const onHover = useCallback((h3: string | null, x: number, y: number) => {
     setHover(h3 ? { h3, x, y } : null)
+    if (h3) setPinned(null) // hovering another cell replaces the pinned popup
+  }, [])
+  // hotspots list: fly there, pulse the cell, and open its popup
+  const selectHotspot = useCallback((h3: string) => {
+    const seq = ++seqRef.current
+    setFocus({ h3, seq })
+    setFlash({ h3, seq })
+    setPinned(h3)
   }, [])
   const ready = cells.length > 0 && meta !== undefined
 
@@ -182,8 +192,11 @@ export default function App() {
         {!ready && <div className="loading">loading cells...</div>}
         <Toggle mode={mode} onMode={setMode} preset={preset} onPreset={setPreset} />
         <Legend mode={mode} showPlan={showPlan} onShowPlan={setShowPlan} planCount={plan.length} />
-        <Hotspots cells={cells} onSelect={(h3) => setFocus({ h3, seq: ++seqRef.current })} />
+        <Hotspots cells={cells} onSelect={selectHotspot} />
         {hoveredCell && hover && <CellPopup cell={hoveredCell} mode={mode} x={hover.x} y={hover.y} />}
+        {pinnedCell && (
+          <CellPopup cell={pinnedCell} mode={mode} x={window.innerWidth / 2 + 40} y={window.innerHeight / 2 - 200} />
+        )}
         <EventFeed
           events={events}
           source={queueSource}

@@ -24,6 +24,7 @@ interface BuildingRange {
 }
 
 const GROUND = 0x0b0d14
+const FOCUS_DISTANCE = 900 // metres from the camera to a focused cell
 const FLASH_MS = 1500
 const BUILDING_BASE = new THREE.Color(0x2a2d38)
 const BUILDING_TINT = 0.55 // how much of the cell colour the building takes
@@ -53,6 +54,7 @@ export class CityScene {
   private raf = 0
   private disposed = false
   private focusTarget: THREE.Vector3 | null = null
+  private focusCamera: THREE.Vector3 | null = null
   private canvas: HTMLCanvasElement
 
   constructor(canvas: HTMLCanvasElement, centre: LatLon, onHover: HoverHandler) {
@@ -205,12 +207,15 @@ export class CityScene {
     entry.flashUntil = performance.now() + FLASH_MS
   }
 
-  /** Glide the orbit target to a cell (the camera keeps its offset). */
+  /** Fly to a cell: glide the orbit target onto it and bring the camera in to ~FOCUS_DISTANCE,
+   *  keeping the current viewing angle. */
   focusCell(h3: string) {
     const entry = this.hexes.get(h3)
     if (!entry) return
     const p = entry.mesh.position
     this.focusTarget = new THREE.Vector3(p.x, 0, p.z)
+    const dir = this.camera.position.clone().sub(this.controls.target).normalize()
+    this.focusCamera = this.focusTarget.clone().add(dir.multiplyScalar(FOCUS_DISTANCE))
   }
 
   /** Optional bake from city/build_city.py. One merged geometry with vertex colours. */
@@ -347,7 +352,13 @@ export class CityScene {
     }
     if (this.focusTarget) {
       this.controls.target.lerp(this.focusTarget, 0.08)
-      if (this.controls.target.distanceTo(this.focusTarget) < 2) this.focusTarget = null
+      if (this.focusCamera) this.camera.position.lerp(this.focusCamera, 0.08)
+      const doneTarget = this.controls.target.distanceTo(this.focusTarget) < 2
+      const doneCamera = !this.focusCamera || this.camera.position.distanceTo(this.focusCamera) < 5
+      if (doneTarget && doneCamera) {
+        this.focusTarget = null
+        this.focusCamera = null
+      }
     }
     if (this.pointerDirty) this.pick()
     this.controls.update()

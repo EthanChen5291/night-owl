@@ -1,6 +1,6 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 16:30** (hotspots panel on the map, minimize buttons; ci_b fix).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 16:40** (hotspot click zooms in and opens the popup).
 
 ## Headline results
 
@@ -123,7 +123,7 @@ Every eligible cell in `cells.json` now carries `rank_risk` / `tier_risk` (1 = h
 | 10 | East Harlem (North) | Manhattan | 8.2% | +80 | 0 | 322 EAST 126 STREET |
 
 **On the map:** a "NYC hotspots" panel (`web/src/components/Hotspots.tsx`, tabs Silent / Rat risk, click = fly
-to the cell) reads these rank fields straight from `/cells`; the cell popup shows neighborhood and tier. Both the hotspots and events panels have a minimize (–/+) button. Both hide
+to the cell) reads these rank fields straight from `/cells`; the cell popup shows neighborhood and tier. Both the hotspots and events panels have a minimize (–/+) button. Clicking a hotspot flies the camera in (~900 m), pulses the cell and opens its popup; clicking an event also zooms in now. Both hide
 themselves on fixture data, which has no ranks.
 
 Scope: models train and rank on all five boroughs (the silent blocks are mostly in the Bronx and Queens; dropping
