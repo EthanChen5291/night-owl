@@ -47,3 +47,6 @@ data/processed/
 *.pkl
 __pycache__/
 .ipynb_checkpoints/
+
+# city bake for the web app (regenerate with city/build_city.py)
+web/public/city/

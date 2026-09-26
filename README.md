@@ -288,7 +288,7 @@ vision/RUNBOOK.md, RECORDING.md, HANDOFF-sanjavan-training-data.md
 vision/*.py, train.sh               extract → autolabel → review → prune → augment → make_dataset → train → eval_events
 vision/pi/*.py, bundle_wheels.sh, README.md   camera, detect, grab_frames, selftest, ir_check
 renders/render_node.py, README.md   the Gemini render tool (PNG outputs gitignored)
-model/  feature table, Model A/B, backtest, scoring → model/out/
+model/                              Sanjavan's pipeline: 01_build_cells → 02_features → 03_models → 04_optimizer → 05_backtest → export; outputs in model/out/ (cells.json, plan.json, backtest.json, metrics.json, validation.json)
 ```
 
 The CAD (SCAD sources, STLs, previews) is not rebuilt here: the hardware is mostly done, so this repo

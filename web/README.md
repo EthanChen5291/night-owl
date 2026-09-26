@@ -40,26 +40,36 @@ If a request fails or times out (3 s) the app imports the repo fixtures directly
 without the API the panel says "backtest not available". Polling keeps trying `/api/queue` every 2 s,
 so starting the server later flips the feed to live without a reload.
 
-## Buildings (optional)
+## The city (optional bake)
 
 The scene renders the ground, the hex prisms, the plan pins and the events without any city bake.
-If `web/public/city/buildings.json` exists (shape `[{id, h3, footprint: [[x, y], ...], height}]`, local
-metres) the buildings are drawn as one merged extruded mesh tinted by their cell's colour. It is produced by
-`city/build_city.py` from the open-data footprints:
+Everything else comes from `web/public/city/*.json`, produced by `city/build_city.py` and gitignored:
+
+| File | Drawn as |
+|---|---|
+| `buildings.json` `[{id, h3, footprint, height}]` | one merged extruded mesh: walls carry a procedural facade texture (window grid, lit windows at night), roofs are plain; colour = height band (brick / stone / glass) blended with the cell colour |
+| `land.json`, `roads.json`, `parks.json`, `water.json` `[{id, ring}]` | flat merged meshes stacked on the water-coloured ground plane |
+| `trees.json` `[{id, x, y, h3}]` | one instanced low-poly canopy per tree |
+| `meta.json` | its `centre` is the projection origin so everything lines up with the cells; without it the centroid of the served cells is the origin |
+
+From the raw GeoJSON downloads (the bbox includes the demo cell at 27th St):
 
 ```
-./city/build_city.py --buildings data/raw/open/building_footprints.csv \
-                     --trees data/raw/open/street_trees_2015.csv --out web/public/city
+R=~/divMap/data/raw
+./city/build_city.py --buildings $R/buildings.geojson --trees $R/trees.json --land $R/boroughs.geojson \
+    --roads $R/roadbed.geojson --parks $R/parks.geojson --water $R/hydro.geojson \
+    --bbox=-74.03,40.688,-73.94,40.76 --out web/public/city
 ```
 
-`meta.json` from the same bake (its `centre`) is used as the projection origin so the buildings line up
-with the cells; without it the centroid of the served cells is the origin. The file is not in git.
+Lighting presets (`day` is the default, `night` is the stage look): sky dome, fog, sun with shadows and
+the facade/window mix all live in `LOOKS` in `src/city/scene.ts`; the UI theme tokens follow the preset
+through `data-theme` on `<html>` (`src/index.css`).
 
 ## Behaviour
 
-- Toggle (top-left): `What the city sees` (pct_a), `What's there` (pct_b), `Silence` (silence,
+- Toggle (top centre): `What the city sees` (pct_a), `What's there` (pct_b), `Silence` (silence,
   diverging, orange = silent blocks). The mode is kept in the URL hash (`#mode=silence`).
-  Lighting: `night` (warm key light, fog) or `flat`.
+  Lighting: `day` (hazy afternoon, light glass UI) or `night` (stage preset, dark glass UI).
 - Hover a hex: CellPopup with h3, cd, rmz, score_a, score_b, pct_a/pct_b, silence, ci_b, posterior
   (alpha, beta, n_events), top-3 reasons as SHAP bars, n_inspections, last_event_at.
 - Legend (bottom-left) follows the mode and has the plan-markers checkbox.

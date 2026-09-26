@@ -5,15 +5,23 @@ Inputs (nothing is downloaded here; pass paths to the CSV/Parquet you already ha
 ~/divMap/data/raw/open/ or data/parquet/):
 
   --buildings  NYC Building Footprints, dataset 5zhs-2jue on data.cityofnewyork.us.
-               Needs a WKT geometry column (the_geom, MULTIPOLYGON in lon/lat), an id
-               (bin or doitt_id) and heightroof / groundelev, both in FEET in the source.
+               CSV/Parquet with a WKT geometry column (the_geom, MULTIPOLYGON in lon/lat), or a
+               GeoJSON FeatureCollection. Needs an id (bin or doitt_id) and heightroof /
+               groundelev (height_roof / ground_elevation in the GeoJSON), both in FEET.
   --trees      2015 Street Tree Census (uvpi-gqnh): tree_id, latitude, longitude, status.
+               CSV/Parquet or the Socrata JSON export (a list of records).
+  --land       Borough Boundaries (gthc-hcne) polygons: the land mass; everything else is water.
+  --roads      Roadbed (i36f-5ih7) polygons.
+  --parks      Parks Properties (y6ja-fw4f) polygons.
+  --water      Hydrography (pjs3-c3z5) polygons: inland water inside the land mass.
   --bridges    optional: any CSV/Parquet with a WKT LINESTRING/MULTILINESTRING column.
+  The polygon layers take GeoJSON or a WKT CSV/Parquet, like --buildings.
 
 Outputs, in --out (default public/city/):
 
   buildings.json  [{id, h3, footprint: [[x, y], ...], height}]   height in metres, footprint = exterior ring (+elev with --elev)
   trees.json      [{id, x, y, h3}]
+  land.json, roads.json, parks.json, water.json   [{id, ring: [[x, y], ...]}]   exterior rings clipped to the bbox
   bridges.json    [{id, path: [[x, y], ...]}]                    only when --bridges is given
   meta.json       {centre, bbox, counts, h3_res, crs, generated_at}
 
@@ -27,6 +35,13 @@ Typical run (Lower Manhattan, the default bbox):
 
   ./city/build_city.py --buildings data/raw/open/building_footprints.csv \\
                        --trees data/raw/open/street_trees_2015.csv --out public/city
+
+The full city look (what the web app draws when the files exist), from the raw GeoJSON downloads:
+
+  R=~/divMap/data/raw
+  ./city/build_city.py --buildings $R/buildings.geojson --trees $R/trees.json --land $R/boroughs.geojson \\
+      --roads $R/roadbed.geojson --parks $R/parks.geojson --water $R/hydro.geojson \\
+      --bbox -74.03,40.688,-73.94,40.76 --out web/public/city
 
 --limit N is for smoke tests. DuckDB does the bbox prefilter on the raw text so the 1.1M-row
 footprints file never fully materialises; shapely does the exact clip, projection and simplify.
@@ -51,6 +66,10 @@ HEIGHT_COLS = ("heightroof", "height_roof", "height")
 ELEV_COLS = ("groundelev", "ground_elev", "elevation")
 TREE_ID_COLS = ("tree_id", "id", "objectid")
 BRIDGE_ID_COLS = ("id", "objectid", "bridge_id", "name")
+POLYGON_ID_COLS = ("objectid", "id", "source_id", "parknum", "borocode", "name", "park_name", "boroname")
+
+# flat polygon layers: name -> (simplify metres, min part area m2)
+POLYGON_LAYERS = {"land": (2.0, 200.0), "roads": (1.0, 20.0), "parks": (1.0, 40.0), "water": (2.0, 200.0)}
 
 
 # ---------------------------------------------------------------- geometry helpers
@@ -136,82 +155,179 @@ def wkt_prefilter(geom_col: str, bbox, pad: float) -> str:
     )
 
 
-# ---------------------------------------------------------------- bakes
+# ---------------------------------------------------------------- polygon sources
 
-def bake_buildings(con, path: Path, bbox, proj: Projector, res: int, simplify_m: float,
-                   min_area_m2: float, height_units: str, limit: int | None, keep_elev: bool, log) -> list[dict]:
-    import h3
+def is_geojson(path: Path) -> bool:
+    return path.suffix.lower() in (".geojson",) or (path.suffix.lower() == ".json" and _json_is_featurecollection(path))
+
+
+def _json_is_featurecollection(path: Path) -> bool:
+    with path.open() as f:
+        head = f.read(200)
+    return "FeatureCollection" in head or '"Feature"' in head
+
+
+def to_float(v) -> float | None:
+    try:
+        return None if v in (None, "") else float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def geojson_polygons(path: Path, bbox, pad: float):
+    """Yield (properties with lowercase keys, shapely geometry) for every feature whose bounds touch the padded bbox."""
+    from shapely.geometry import shape
+
+    with path.open() as f:
+        data = json.load(f)
+    feats = data.get("features", []) if isinstance(data, dict) else data
+    for feat in feats:
+        geom = feat.get("geometry")
+        if not geom:
+            continue
+        try:
+            g = shape(geom)
+        except Exception:
+            continue
+        b = g.bounds
+        if b[2] < bbox[0] - pad or b[0] > bbox[2] + pad or b[3] < bbox[1] - pad or b[1] > bbox[3] + pad:
+            continue
+        yield {k.lower(): v for k, v in (feat.get("properties") or {}).items()}, g
+
+
+def wkt_polygons(con, path: Path, bbox, pad: float, id_cols, extra_cols, log):
+    """Yield (props, shapely geometry) from a CSV/Parquet with a WKT column; props has 'id' plus extra_cols by role."""
     from shapely import wkt as shapely_wkt
-    from shapely.geometry import MultiPolygon, Polygon
 
     src = source_sql(path)
     cols = columns(con, src)
     geom = pick(cols, GEOM_COLS, "WKT geometry")
-    bid = pick(cols, BUILDING_ID_COLS, "building id")
-    hcol = pick(cols, HEIGHT_COLS, "heightroof", required=False)
-    ecol = pick(cols, ELEV_COLS, "groundelev", required=False)
-    h_expr = f"TRY_CAST({q(hcol)} AS DOUBLE)" if hcol else "NULL"
-    e_expr = f"TRY_CAST({q(ecol)} AS DOUBLE)" if ecol else "NULL"
-    sql = (
-        f"SELECT CAST({q(bid)} AS VARCHAR), {q(geom)}, {h_expr}, {e_expr} FROM {src} "
-        f"WHERE {q(geom)} IS NOT NULL AND {wkt_prefilter(geom, bbox, pad=0.004)}"
-    )
-    if limit:
-        sql += f" LIMIT {int(limit)}"
-    log(f"buildings: {path.name} geom={geom} id={bid} height={hcol} elev={ecol}")
-
-    scale = FT_TO_M if height_units == "feet" else 1.0
-    out: list[dict] = []
-    n_in = n_bad = n_small = 0
+    rid = pick(cols, id_cols, "id", required=False)
+    id_expr = f"CAST({q(rid)} AS VARCHAR)" if rid else "CAST(row_number() OVER () AS VARCHAR)"
+    roles = {role: pick(cols, cands, role, required=False) for role, cands in extra_cols.items()}
+    exprs = [f"TRY_CAST({q(c)} AS DOUBLE)" if c else "NULL" for c in roles.values()]
+    sql = f"SELECT {id_expr}, {q(geom)}{''.join(', ' + e for e in exprs)} FROM {src} WHERE {q(geom)} IS NOT NULL AND {wkt_prefilter(geom, bbox, pad=pad)}"
+    log(f"{path.name}: geom={geom} id={rid} {' '.join(f'{k}={v}' for k, v in roles.items())}")
     cur = con.execute(sql)
     while True:
         rows = cur.fetchmany(5000)
         if not rows:
             break
-        for rid, wkt, height, elev in rows:
-            n_in += 1
+        for row in rows:
             try:
-                g = shapely_wkt.loads(wkt)
+                g = shapely_wkt.loads(row[1])
             except Exception:
-                n_bad += 1
                 continue
-            parts = list(g.geoms) if isinstance(g, MultiPolygon) else [g] if isinstance(g, Polygon) else []
-            if not parts:
-                n_bad += 1
+            props = {"id": row[0], **{role: row[2 + i] for i, role in enumerate(roles)}}
+            yield props, g
+
+
+def polygon_parts(g):
+    from shapely.geometry import MultiPolygon, Polygon
+
+    if isinstance(g, Polygon):
+        return [g]
+    if isinstance(g, MultiPolygon):
+        return list(g.geoms)
+    if hasattr(g, "geoms"):  # GeometryCollection from a clip
+        return [p for p in g.geoms if isinstance(p, Polygon)]
+    return []
+
+
+def local_ring(proj: Projector, part, simplify_m: float, min_area_m2: float) -> list[list[float]] | None:
+    """Project one polygon part to local metres, simplify, return its exterior ring (unclosed) or None."""
+    from shapely.geometry import Polygon
+
+    ring = proj.ring(part.exterior.coords)
+    if len(ring) < 3:
+        return None
+    local = Polygon(ring)
+    if local.area < min_area_m2:
+        return None
+    if simplify_m > 0:
+        local = local.simplify(simplify_m, preserve_topology=True)
+    out = [[round(x, 1), round(y, 1)] for x, y in local.exterior.coords]
+    if out and out[0] == out[-1]:
+        out.pop()
+    return out if len(out) >= 3 else None
+
+
+# ---------------------------------------------------------------- bakes
+
+def bake_buildings(con, path: Path, bbox, proj: Projector, res: int, simplify_m: float,
+                   min_area_m2: float, height_units: str, limit: int | None, keep_elev: bool, log) -> list[dict]:
+    import h3
+
+    if is_geojson(path):
+        log(f"buildings: {path.name} (GeoJSON)")
+        rows = geojson_polygons(path, bbox, pad=0.004)
+    else:
+        rows = wkt_polygons(con, path, bbox, 0.004, BUILDING_ID_COLS, {"height": HEIGHT_COLS, "elev": ELEV_COLS}, log)
+
+    scale = FT_TO_M if height_units == "feet" else 1.0
+    out: list[dict] = []
+    n_in = n_bad = n_small = 0
+    for props, g in rows:
+        n_in += 1
+        if limit and n_in > limit:
+            break
+        rid = next((str(props[c]) for c in ("id",) + BUILDING_ID_COLS if props.get(c) not in (None, "")), str(n_in))
+        height = to_float(props.get("height")) if "height" in props else next((to_float(props[c]) for c in HEIGHT_COLS if c in props), None)
+        elev = to_float(props.get("elev")) if "elev" in props else next((to_float(props[c]) for c in ELEV_COLS if c in props), None)
+        parts = polygon_parts(g)
+        if not parts:
+            n_bad += 1
+            continue
+        h_m = round((height or 0.0) * scale, 1)
+        if h_m <= 0:
+            h_m = 3.0  # source has nulls/zeros; give it one storey rather than a hole
+        for i, part in enumerate(parts):
+            c = part.centroid
+            if not in_bbox(c.x, c.y, bbox):
                 continue
-            h_m = round((height or 0.0) * scale, 1)
-            if h_m <= 0:
-                h_m = 3.0  # source has nulls/zeros; give it one storey rather than a hole
-            for i, part in enumerate(parts):
-                c = part.centroid
-                if not in_bbox(c.x, c.y, bbox):
-                    continue
-                ring = proj.ring(part.exterior.coords)
-                if len(ring) < 3:
-                    n_bad += 1
-                    continue
-                local = Polygon(ring)
-                if local.area < min_area_m2:
-                    n_small += 1
-                    continue
-                if simplify_m > 0:
-                    local = local.simplify(simplify_m, preserve_topology=True)
-                footprint = [[round(x, 1), round(y, 1)] for x, y in local.exterior.coords]
-                if footprint[0] == footprint[-1]:
-                    footprint.pop()
-                if len(footprint) < 3:
-                    n_bad += 1
-                    continue
-                rec = {
-                    "id": rid if len(parts) == 1 else f"{rid}.{i + 1}",
-                    "h3": h3.latlng_to_cell(c.y, c.x, res),
-                    "footprint": footprint,
-                    "height": h_m,
-                }
-                if keep_elev and elev is not None:
-                    rec["elev"] = round(elev * scale, 1)  # opt-in: not in the renderer contract
-                out.append(rec)
-    log(f"buildings: {n_in} candidates -> {len(out)} kept ({n_small} below {min_area_m2} m2, {n_bad} unparseable)")
+            footprint = local_ring(proj, part, simplify_m, min_area_m2)
+            if footprint is None:
+                n_small += 1
+                continue
+            rec = {
+                "id": rid if len(parts) == 1 else f"{rid}.{i + 1}",
+                "h3": h3.latlng_to_cell(c.y, c.x, res),
+                "footprint": footprint,
+                "height": h_m,
+            }
+            if keep_elev and elev is not None:
+                rec["elev"] = round(elev * scale, 1)  # opt-in: not in the renderer contract
+            out.append(rec)
+    log(f"buildings: {n_in} candidates -> {len(out)} kept ({n_small} below {min_area_m2} m2 or degenerate, {n_bad} unparseable)")
+    return out
+
+
+def bake_polygons(con, name: str, path: Path, bbox, proj: Projector, log) -> list[dict]:
+    """Flat layer: every polygon part clipped to the bbox, as {id, ring} in local metres."""
+    from shapely.geometry import box
+
+    simplify_m, min_area_m2 = POLYGON_LAYERS[name]
+    if is_geojson(path):
+        log(f"{name}: {path.name} (GeoJSON)")
+        rows = geojson_polygons(path, bbox, pad=0.0)
+    else:
+        rows = wkt_polygons(con, path, bbox, 0.03, POLYGON_ID_COLS, {}, log)
+    clip = box(*bbox)
+    out: list[dict] = []
+    n_in = 0
+    for props, g in rows:
+        n_in += 1
+        rid = next((str(props[c]) for c in ("id",) + POLYGON_ID_COLS if props.get(c) not in (None, "")), str(n_in))
+        try:
+            g = g.buffer(0).intersection(clip)
+        except Exception:
+            continue
+        parts = [p for p in polygon_parts(g) if not p.is_empty]
+        for i, part in enumerate(parts):
+            ring = local_ring(proj, part, simplify_m, min_area_m2)
+            if ring is not None:
+                out.append({"id": rid if len(parts) == 1 else f"{rid}.{i + 1}", "ring": ring})
+    log(f"{name}: {n_in} features -> {len(out)} parts")
     return out
 
 
@@ -279,6 +395,8 @@ def main(argv=None) -> int:
     ap.add_argument("--buildings", type=Path, help="Building Footprints CSV/Parquet (5zhs-2jue)")
     ap.add_argument("--trees", type=Path, help="2015 Street Tree Census CSV/Parquet (uvpi-gqnh)")
     ap.add_argument("--bridges", type=Path, help="optional WKT line file for bridges")
+    for layer in POLYGON_LAYERS:
+        ap.add_argument(f"--{layer}", type=Path, help=f"optional polygon file (GeoJSON or WKT) -> {layer}.json")
     ap.add_argument("--out", type=Path, default=Path("public/city"), help="output directory (default public/city)")
     ap.add_argument("--bbox", type=parse_bbox, default=DEFAULT_BBOX,
                     help="min_lon,min_lat,max_lon,max_lat (default Lower Manhattan south of 14th St)")
@@ -292,9 +410,10 @@ def main(argv=None) -> int:
     ap.add_argument("--indent", type=int, default=None, help="pretty-print JSON (default compact)")
     args = ap.parse_args(argv)
 
-    if not (args.buildings or args.trees or args.bridges):
-        ap.error("nothing to do: pass at least one of --buildings, --trees, --bridges")
-    for p in (args.buildings, args.trees, args.bridges):
+    layer_paths = {layer: getattr(args, layer) for layer in POLYGON_LAYERS}
+    if not (args.buildings or args.trees or args.bridges or any(layer_paths.values())):
+        ap.error("nothing to do: pass at least one of --buildings, --trees, --bridges, --land, --roads, --parks, --water")
+    for p in (args.buildings, args.trees, args.bridges, *layer_paths.values()):
         if p and not p.exists():
             ap.error(f"{p} does not exist (this script never downloads; see data/bake_open_data.py)")
 
@@ -329,6 +448,11 @@ def main(argv=None) -> int:
         br = bake_bridges(con, args.bridges, bbox, proj, args.simplify, log)
         dump("bridges.json", br)
         counts["bridges"] = len(br)
+    for layer, path in layer_paths.items():
+        if path:
+            polys = bake_polygons(con, layer, path, bbox, proj, log)
+            dump(f"{layer}.json", polys)
+            counts[layer] = len(polys)
 
     meta_path = args.out / "meta.json"
     meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}

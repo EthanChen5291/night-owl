@@ -83,10 +83,10 @@ export interface BacktestResponse {
 }
 
 export type Mode = 'a' | 'b' | 'silence'
-export type Preset = 'night' | 'flat'
+export type Preset = 'day' | 'night'
 export type Source = 'live' | 'fixture'
 
-// Shape of city/build_city.py's buildings.json, served from public/city/ when present.
+// Shapes of city/build_city.py's outputs, served from public/city/ when present.
 export interface Building {
   id: string
   h3: string
@@ -94,6 +94,29 @@ export interface Building {
   height: number
 }
 
+/** One exterior ring of a flat layer (land, roads, parks, water), local metres. */
+export interface Poly {
+  id: string
+  ring: [number, number][]
+}
+
+export interface Tree {
+  id: string
+  x: number
+  y: number
+  h3: string
+}
+
+/** The optional flat layers under the buildings; a missing file just leaves that layer out. */
+export interface CityLayers {
+  land: Poly[] | null
+  roads: Poly[] | null
+  parks: Poly[] | null
+  water: Poly[] | null
+  trees: Tree[] | null
+}
+
 export interface CityMeta {
   centre: { lat: number; lon: number }
+  counts?: Record<string, number>
 }

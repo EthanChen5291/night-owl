@@ -129,6 +129,22 @@ just works. It never downloads: pass paths to the raw CSVs (or the Parquet from
                      [--bridges bridges.csv] --out ~/divMap/public/city
 ```
 
+Inputs can also be GeoJSON FeatureCollections (the raw downloads in `~/divMap/data/raw/*.geojson`) and
+the Socrata JSON export for trees. Four optional flat layers, each a polygon file in the same formats,
+write `<layer>.json` as `[{id, ring: [[x, y], ...]}]` clipped to the bbox: `--land` (borough boundaries,
+the land mass), `--roads` (roadbed), `--parks` (parks properties), `--water` (hydrography). The full
+city look is:
+
+```
+R=~/divMap/data/raw
+./city/build_city.py --buildings $R/buildings.geojson --trees $R/trees.json --land $R/boroughs.geojson \
+    --roads $R/roadbed.geojson --parks $R/parks.geojson --water $R/hydro.geojson \
+    --bbox=-74.03,40.688,-73.94,40.76 --out web/public/city
+```
+
+(`--bbox=` with the equals sign: a value starting with `-` is otherwise read as a flag.) That bbox reaches
+27th St so the demo cell sits inside the city. Ten seconds on a laptop.
+
 Flags: `--bbox min_lon,min_lat,max_lon,max_lat` (default Lower Manhattan south of 14th St),
 `--centre lat,lon` (origin of the metre frame, default bbox centre), `--res 9`, `--simplify 0.5`
 (metres, Douglas-Peucker), `--min-area 8` (m², drops sheds and slivers), `--height-units feet|metres`

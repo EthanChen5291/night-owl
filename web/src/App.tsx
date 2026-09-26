@@ -9,9 +9,22 @@ import Header from './components/Header'
 import Legend from './components/Legend'
 import Scene from './components/Scene'
 import Toggle from './components/Toggle'
-import type { BacktestResponse, Building, Cell, CityMeta, Mode, PlanNode, Preset, RatEvent, Source } from './types'
+import type {
+  BacktestResponse,
+  Building,
+  Cell,
+  CityLayers,
+  CityMeta,
+  Mode,
+  PlanNode,
+  Poly,
+  Preset,
+  RatEvent,
+  Source,
+  Tree,
+} from './types'
 
-const DEFAULT_MONTH = '2026-08'
+const DEFAULT_MONTH = '2026-09'
 const POLL_MS = 2000
 const QUEUE_LIMIT = 20
 
@@ -22,7 +35,7 @@ function modeFromHash(): Mode {
 
 export default function App() {
   const [mode, setModeState] = useState<Mode>(modeFromHash)
-  const [preset, setPreset] = useState<Preset>('night')
+  const [preset, setPreset] = useState<Preset>('day')
   const [month, setMonth] = useState(DEFAULT_MONTH)
   const [cells, setCells] = useState<Cell[]>([])
   const [cellsSource, setCellsSource] = useState<Source | null>(null)
@@ -36,12 +49,14 @@ export default function App() {
   const [focus, setFocus] = useState<{ h3: string; seq: number } | null>(null)
   const [backtest, setBacktest] = useState<BacktestResponse | null | undefined>(undefined)
   const [buildings, setBuildings] = useState<Building[] | null>(null)
+  const [layers, setLayers] = useState<CityLayers | null>(null)
   const [meta, setMeta] = useState<CityMeta | null | undefined>(undefined)
   const [hover, setHover] = useState<{ h3: string; x: number; y: number } | null>(null)
 
   const seenRef = useRef<Set<string>>(new Set())
   const primedRef = useRef(false) // first queue load does not flash
   const seqRef = useRef(0)
+  const liveRef = useRef({ cells: false, queue: false }) // once live, a failed refresh keeps the live data
 
   // ---- mode in the URL hash so a reload keeps it
   const setMode = useCallback((m: Mode) => {
@@ -54,9 +69,16 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
+  // ---- the UI theme follows the lighting preset (index.css tokens)
+  useEffect(() => {
+    document.documentElement.dataset.theme = preset
+  }, [preset])
+
   // ---- cells and plan
   const loadCells = useCallback(async (m: string) => {
     const { data, source } = await fetchCells(m)
+    if (source === 'fixture' && liveRef.current.cells) return // transient failure: keep what the API gave us
+    liveRef.current.cells = source === 'live'
     setCells(data.cells)
     setCellsSource(source)
   }, [])
@@ -69,6 +91,15 @@ export default function App() {
     void fetchPublic<CityMeta>('/city/meta.json').then((m) => setMeta(m))
     void fetchPublic<Building[]>('/city/buildings.json').then((b) => {
       if (Array.isArray(b)) setBuildings(b)
+    })
+    void Promise.all([
+      fetchPublic<Poly[]>('/city/land.json'),
+      fetchPublic<Poly[]>('/city/roads.json'),
+      fetchPublic<Poly[]>('/city/parks.json'),
+      fetchPublic<Poly[]>('/city/water.json'),
+      fetchPublic<Tree[]>('/city/trees.json'),
+    ]).then(([land, roads, parks, water, trees]) => {
+      if (land || roads || parks || water || trees) setLayers({ land, roads, parks, water, trees })
     })
   }, [])
 
@@ -118,6 +149,8 @@ export default function App() {
     const tick = async () => {
       const { data, source } = await fetchQueue(QUEUE_LIMIT)
       if (!alive) return
+      if (source === 'fixture' && liveRef.current.queue) return // one missed poll must not inject fixture events
+      liveRef.current.queue = source === 'live'
       setQueueSource(source)
       ingestRef.current(data.events, source)
     }
@@ -173,6 +206,7 @@ export default function App() {
             plan={plan}
             showPlan={showPlan}
             buildings={buildings}
+            layers={layers}
             flash={flash}
             focus={focus}
             onHover={onHover}

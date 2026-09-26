@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { CityScene, type HoverHandler } from '../city/scene'
-import type { Building, Cell, Mode, PlanNode, Preset } from '../types'
+import type { Building, Cell, CityLayers, Mode, PlanNode, Preset } from '../types'
 import type { LatLon } from '../city/projection'
 
 interface Props {
@@ -11,13 +11,14 @@ interface Props {
   plan: PlanNode[]
   showPlan: boolean
   buildings: Building[] | null
+  layers: CityLayers | null
   flash: { h3: string; seq: number } | null
   focus: { h3: string; seq: number } | null
   onHover: HoverHandler
 }
 
 /** The only component that touches three.js. Owns one CityScene for the life of the canvas. */
-export default function Scene({ centre, cells, mode, preset, plan, showPlan, buildings, flash, focus, onHover }: Props) {
+export default function Scene({ centre, cells, mode, preset, plan, showPlan, buildings, layers, flash, focus, onHover }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<CityScene | null>(null)
   const hoverRef = useRef(onHover)
@@ -59,6 +60,10 @@ export default function Scene({ centre, cells, mode, preset, plan, showPlan, bui
   useEffect(() => {
     if (buildings) sceneRef.current?.setBuildings(buildings)
   }, [buildings])
+
+  useEffect(() => {
+    if (layers) sceneRef.current?.setLayers(layers)
+  }, [layers])
 
   useEffect(() => {
     if (flash) sceneRef.current?.flash(flash.h3)

@@ -5,7 +5,7 @@ import type { BacktestResponse, CellsResponse, PlanResponse, QueueResponse, Sour
 
 export const API = '/api'
 
-async function getJson<T>(path: string, timeoutMs = 3000): Promise<T> {
+async function getJson<T>(path: string, timeoutMs = 8000): Promise<T> {
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), timeoutMs)
   try {

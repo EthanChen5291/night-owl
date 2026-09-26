@@ -38,11 +38,17 @@ export default function BacktestChart({ data }: Props) {
             <>
               <ResponsiveContainer width="100%" height={170}>
                 <LineChart data={data.series} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-                  <CartesianGrid stroke="#242938" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#9aa0b0' }} minTickGap={24} stroke="#333a4d" />
-                  <YAxis domain={[0, 1]} tick={{ fontSize: 10, fill: '#9aa0b0' }} width={32} stroke="#333a4d" />
+                  <CartesianGrid stroke="rgba(128, 140, 155, 0.3)" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#7c8794' }} minTickGap={24} stroke="rgba(128, 140, 155, 0.5)" />
+                  <YAxis domain={[0, 1]} tick={{ fontSize: 10, fill: '#7c8794' }} width={32} stroke="rgba(128, 140, 155, 0.5)" />
                   <Tooltip
-                    contentStyle={{ background: '#12151f', border: '1px solid #2a2f40', fontSize: 12 }}
+                    contentStyle={{
+                      background: 'var(--glass-strong)',
+                      border: '1px solid var(--glass-line)',
+                      borderRadius: 10,
+                      color: 'var(--ink)',
+                      fontSize: 12,
+                    }}
                     formatter={(v) => fmtNum(v)}
                   />
                   <RLegend wrapperStyle={{ fontSize: 11 }} />

@@ -8,10 +8,15 @@ interface Props {
   onPreset: (p: Preset) => void
 }
 
+const PRESETS: { id: Preset; label: string }[] = [
+  { id: 'day', label: 'day' },
+  { id: 'night', label: 'night' },
+]
+
 export default function Toggle({ mode, onMode, preset, onPreset }: Props) {
   return (
-    <div className="toggle panel">
-      <div className="toggle-row" role="radiogroup" aria-label="Colour mode">
+    <div className="toggle">
+      <div className="segmented panel" role="radiogroup" aria-label="Colour mode">
         {MODES.map((m) => (
           <button
             key={m.id}
@@ -25,15 +30,15 @@ export default function Toggle({ mode, onMode, preset, onPreset }: Props) {
           </button>
         ))}
       </div>
-      <div className="toggle-hint">{MODES.find((m) => m.id === mode)?.hint}</div>
-      <div className="toggle-row small">
-        <span className="muted">lighting</span>
-        <button className={preset === 'night' ? 'active' : ''} onClick={() => onPreset('night')}>
-          night
-        </button>
-        <button className={preset === 'flat' ? 'active' : ''} onClick={() => onPreset('flat')}>
-          flat
-        </button>
+      <div className="toggle-sub">
+        <span className="chip panel muted">{MODES.find((m) => m.id === mode)?.hint}</span>
+        <div className="segmented small panel" role="radiogroup" aria-label="Lighting">
+          {PRESETS.map((p) => (
+            <button key={p.id} role="radio" aria-checked={preset === p.id} className={preset === p.id ? 'active' : ''} onClick={() => onPreset(p.id)}>
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

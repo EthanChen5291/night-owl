@@ -1,9 +1,11 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { cellToBoundary, cellToLatLng } from 'h3-js'
 import { colourFor, heightFor } from '../colours'
-import type { Building, Cell, Mode, PlanNode, Preset } from '../types'
+import type { Building, Cell, CityLayers, Mode, PlanNode, Poly, Preset, Tree } from '../types'
 import { makeProjector, type LatLon, type Projector } from './projection'
+import { FACADE_TILE_M, facadeTextures } from './facade'
 
 // No React in here. App owns the data; Scene.tsx owns the lifecycle; this class owns three.js.
 // Coordinates: local metres, x east, y north (from the projector); mapped to three.js x / -z.
@@ -21,12 +23,70 @@ interface BuildingRange {
   h3: string
   start: number // first vertex index
   count: number
+  band: 0 | 1 | 2 // low / mid / tall, picks the facade colour
+  shade: number // per-building variation, ~0.9..1.1
 }
 
-const GROUND = 0x0b0d14
 const FLASH_MS = 1500
-const BUILDING_BASE = new THREE.Color(0x2a2d38)
-const BUILDING_TINT = 0.55 // how much of the cell colour the building takes
+
+// Flat layers from city/build_city.py, drawn in this order (later wins where they overlap).
+const FLAT_LAYERS = ['land', 'roads', 'parks', 'water'] as const
+type FlatLayer = (typeof FLAT_LAYERS)[number]
+
+/** Everything that changes between the two lighting presets. */
+interface Look {
+  background: number
+  fog: [number, number]
+  zenith: number
+  horizon: number
+  ambient: { colour: number; intensity: number }
+  hemi: { sky: number; ground: number; intensity: number }
+  sun: { colour: number; intensity: number; shadows: boolean }
+  exposure: number
+  /** ground is the water: everything not covered by land */
+  layers: Record<FlatLayer | 'ground' | 'trees', number>
+  /** building base colours by height band: low (brick), mid (stone), tall (glass) */
+  facades: [number, number, number]
+  buildingTint: number // how much of the cell colour a building takes
+  tintLift: number // how far the cell colour is pushed toward white before tinting (keeps day facades pastel)
+  windows: number // emissive intensity of the lit-window mask
+  hexOpacity: number
+}
+
+const LOOKS: Record<Preset, Look> = {
+  day: {
+    background: 0xd3dde4,
+    fog: [2200, 15000],
+    zenith: 0x7ea3cc,
+    horizon: 0xe3e9ec,
+    ambient: { colour: 0xffffff, intensity: 0.3 },
+    hemi: { sky: 0xa9bdd6, ground: 0x8c8274, intensity: 0.85 },
+    sun: { colour: 0xfff0d8, intensity: 2.4, shadows: true },
+    exposure: 1.05,
+    layers: { ground: 0x6d9dbb, water: 0x6d9dbb, land: 0xd2cec5, roads: 0xbbb8b0, parks: 0x9ab97c, trees: 0x4e8a48 },
+    facades: [0xb59782, 0xcdc4b3, 0x9fb4c6],
+    buildingTint: 0.38,
+    tintLift: 0.5,
+    windows: 0,
+    hexOpacity: 0.5,
+  },
+  night: {
+    background: 0x05060a,
+    fog: [3500, 14000],
+    zenith: 0x04050a,
+    horizon: 0x0d1220,
+    ambient: { colour: 0x8090c0, intensity: 0.12 },
+    hemi: { sky: 0x3a4a7a, ground: 0x0a0a10, intensity: 0.45 },
+    sun: { colour: 0xffb070, intensity: 1.5, shadows: false },
+    exposure: 1.0,
+    layers: { ground: 0x04060c, water: 0x06091a, land: 0x10131b, roads: 0x1a1e2a, parks: 0x0e1d18, trees: 0x2c5a3a },
+    facades: [0x262a35, 0x2a2d38, 0x2c3140],
+    buildingTint: 0.55,
+    tintLift: 0,
+    windows: 0.65,
+    hexOpacity: 0.88,
+  },
+}
 
 export class CityScene {
   private renderer: THREE.WebGLRenderer
@@ -40,8 +100,17 @@ export class CityScene {
   private hexes = new Map<string, HexEntry>()
   private hexGroup = new THREE.Group()
   private planGroup = new THREE.Group()
+  private layerGroup = new THREE.Group()
+  private layerMeshes = new Map<FlatLayer | 'trees', THREE.Mesh | THREE.InstancedMesh>()
+  private ground: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>
+  private sky: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>
+  private grid: THREE.GridHelper
+  private look: Look = LOOKS.day
   private buildingMesh: THREE.Mesh | null = null
   private buildingRanges: BuildingRange[] = []
+  private wallMaterial: THREE.MeshStandardMaterial | null = null
+  private roofMaterial: THREE.MeshStandardMaterial | null = null
+  private facade = facadeTextures()
   private hemi: THREE.HemisphereLight
   private key: THREE.DirectionalLight
   private ambient: THREE.AmbientLight
@@ -61,9 +130,12 @@ export class CityScene {
     this.projector = makeProjector(centre)
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    this.renderer.shadowMap.enabled = false
+    this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
 
-    this.camera = new THREE.PerspectiveCamera(50, 1, 5, 30_000)
+    // near = 20 (minDistance is 150) keeps enough depth precision for the flat layers to stack cleanly
+    this.camera = new THREE.PerspectiveCamera(50, 1, 20, 40_000)
     this.camera.position.set(1800, 1500, 2600)
     this.controls = new OrbitControls(this.camera, canvas)
     this.controls.enableDamping = true
@@ -73,25 +145,39 @@ export class CityScene {
     this.controls.maxDistance = 12_000
     this.controls.target.set(0, 0, 0)
 
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(40_000, 40_000),
-      new THREE.MeshStandardMaterial({ color: GROUND, roughness: 1, metalness: 0 }),
+    this.ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(60_000, 60_000),
+      new THREE.MeshStandardMaterial({ color: LOOKS.day.layers.ground, roughness: 0.9, metalness: 0 }),
     )
-    ground.rotation.x = -Math.PI / 2
-    ground.position.y = -0.5
-    this.scene.add(ground)
+    this.ground.rotation.x = -Math.PI / 2
+    this.ground.position.y = -0.5
+    this.ground.receiveShadow = true
+    this.scene.add(this.ground)
 
-    const grid = new THREE.GridHelper(12_000, 60, 0x1b2030, 0x151926)
-    grid.position.y = -0.2
-    this.scene.add(grid)
+    this.grid = new THREE.GridHelper(12_000, 60, 0x1b2030, 0x151926)
+    this.grid.position.y = -0.2
+    this.scene.add(this.grid)
+
+    this.sky = makeSky()
+    this.scene.add(this.sky)
 
     this.ambient = new THREE.AmbientLight(0xffffff, 0.15)
     this.hemi = new THREE.HemisphereLight(0x3a4a7a, 0x0a0a10, 0.5)
+    // sun from the south-west so the faces the opening camera sees are lit
     this.key = new THREE.DirectionalLight(0xffb070, 1.6)
-    this.key.position.set(-2500, 1800, 1200)
-    this.scene.add(this.ambient, this.hemi, this.key)
-    this.scene.add(this.hexGroup, this.planGroup)
-    this.setPreset('night')
+    this.key.position.set(-3200, 4600, 2800)
+    this.key.target.position.set(0, 0, 0)
+    this.key.shadow.mapSize.set(4096, 4096)
+    const sc = this.key.shadow.camera
+    sc.left = sc.bottom = -4200
+    sc.right = sc.top = 4200
+    sc.near = 500
+    sc.far = 16_000
+    this.key.shadow.bias = -0.0004
+    this.key.shadow.normalBias = 2
+    this.scene.add(this.ambient, this.hemi, this.key, this.key.target)
+    this.scene.add(this.layerGroup, this.hexGroup, this.planGroup)
+    this.setPreset('day')
 
     canvas.addEventListener('pointermove', this.handlePointerMove)
     canvas.addEventListener('pointerleave', this.handlePointerLeave)
@@ -147,21 +233,26 @@ export class CityScene {
   }
 
   setPreset(preset: Preset) {
-    if (preset === 'flat') {
-      this.scene.background = new THREE.Color(0x14161e)
-      this.scene.fog = null
-      this.ambient.intensity = 1.0
-      this.ambient.color.set(0xffffff)
-      this.hemi.intensity = 0.0
-      this.key.intensity = 0.0
-    } else {
-      this.scene.background = new THREE.Color(0x05060a)
-      this.scene.fog = new THREE.Fog(0x05060a, 4000, 14_000)
-      this.ambient.intensity = 0.12
-      this.ambient.color.set(0x8090c0)
-      this.hemi.intensity = 0.45
-      this.key.intensity = 1.5
-    }
+    const L = LOOKS[preset]
+    this.look = L
+    this.scene.background = new THREE.Color(L.background)
+    this.scene.fog = new THREE.Fog(L.background, L.fog[0], L.fog[1])
+    ;(this.sky.material.uniforms.zenith.value as THREE.Color).set(L.zenith)
+    ;(this.sky.material.uniforms.horizon.value as THREE.Color).set(L.horizon)
+    this.ambient.color.set(L.ambient.colour)
+    this.ambient.intensity = L.ambient.intensity
+    this.hemi.color.set(L.hemi.sky)
+    this.hemi.groundColor.set(L.hemi.ground)
+    this.hemi.intensity = L.hemi.intensity
+    this.key.color.set(L.sun.colour)
+    this.key.intensity = L.sun.intensity
+    this.key.castShadow = L.sun.shadows
+    this.renderer.toneMappingExposure = L.exposure
+    this.ground.material.color.set(L.layers.ground)
+    for (const [name, obj] of this.layerMeshes) (obj.material as THREE.MeshStandardMaterial).color.set(L.layers[name])
+    if (this.wallMaterial) this.wallMaterial.emissiveIntensity = L.windows
+    for (const [h3, entry] of this.hexes) entry.mesh.material.opacity = h3 === this.hovered ? Math.min(1, L.hexOpacity + 0.15) : L.hexOpacity
+    this.retintBuildings()
   }
 
   setPlan(nodes: PlanNode[]) {
@@ -213,7 +304,7 @@ export class CityScene {
     this.focusTarget = new THREE.Vector3(p.x, 0, p.z)
   }
 
-  /** Optional bake from city/build_city.py. One merged geometry with vertex colours. */
+  /** Bake from city/build_city.py: one merged geometry, walls with the facade texture, roofs plain, vertex colours. */
   setBuildings(buildings: Building[]) {
     if (this.buildingMesh) {
       this.scene.remove(this.buildingMesh)
@@ -223,11 +314,61 @@ export class CityScene {
     }
     if (buildings.length === 0) return
     const geometry = buildExtrusions(buildings, this.buildingRanges)
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.05 })
-    this.buildingMesh = new THREE.Mesh(geometry, material)
+    this.wallMaterial ??= new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      map: this.facade.map,
+      emissiveMap: this.facade.emissive,
+      emissive: new THREE.Color(0xffd9a0),
+      emissiveIntensity: this.look.windows,
+      roughness: 0.7,
+      metalness: 0.08,
+    })
+    this.roofMaterial ??= new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 })
+    this.buildingMesh = new THREE.Mesh(geometry, [this.wallMaterial, this.roofMaterial])
     this.buildingMesh.rotation.x = -Math.PI / 2 // shape (x, y=north, z=up) -> three (x, y=up, -z)
+    this.buildingMesh.castShadow = true
+    this.buildingMesh.receiveShadow = true
     this.scene.add(this.buildingMesh)
     this.retintBuildings()
+  }
+
+  /** Flat layers (land, roads, parks, water) as merged meshes, trees as one instanced canopy. */
+  setLayers(layers: CityLayers) {
+    for (const obj of this.layerMeshes.values()) {
+      this.layerGroup.remove(obj)
+      obj.geometry.dispose()
+      ;(obj.material as THREE.Material).dispose()
+    }
+    this.layerMeshes.clear()
+    const L = this.look
+    FLAT_LAYERS.forEach((name, i) => {
+      const polys = layers[name]
+      if (!polys || polys.length === 0) return
+      const geometry = buildFlat(polys)
+      if (!geometry) return
+      const material = new THREE.MeshStandardMaterial({
+        color: L.layers[name],
+        roughness: name === 'water' ? 0.35 : 1,
+        metalness: 0,
+        polygonOffset: true, // stack the coplanar layers without z-fighting
+        polygonOffsetFactor: -(i + 1) * 2,
+        polygonOffsetUnits: -(i + 1) * 2,
+      })
+      const mesh = new THREE.Mesh(geometry, material)
+      mesh.rotation.x = -Math.PI / 2
+      mesh.position.y = -0.4
+      mesh.renderOrder = -20 + i
+      mesh.receiveShadow = true
+      this.layerMeshes.set(name, mesh)
+      this.layerGroup.add(mesh)
+    })
+    if (layers.trees && layers.trees.length > 0) {
+      const canopy = buildTrees(layers.trees, new THREE.MeshStandardMaterial({ color: L.layers.trees, roughness: 0.95 }))
+      this.layerMeshes.set('trees', canopy)
+      this.layerGroup.add(canopy)
+    }
+    // the grid was the placeholder for a city; hide it once there is land
+    this.grid.visible = !this.layerMeshes.has('land')
   }
 
   dispose() {
@@ -245,6 +386,8 @@ export class CityScene {
         else m.dispose()
       }
     })
+    this.facade.map.dispose()
+    this.facade.emissive.dispose()
     this.renderer.dispose()
   }
 
@@ -266,7 +409,7 @@ export class CityScene {
       roughness: 0.6,
       metalness: 0.05,
       transparent: true,
-      opacity: 0.88,
+      opacity: this.look.hexOpacity,
       emissive: 0x000000,
     })
     const mesh = new THREE.Mesh(geometry, material)
@@ -279,12 +422,16 @@ export class CityScene {
 
   private retintBuildings() {
     if (!this.buildingMesh) return
+    const L = this.look
     const attr = this.buildingMesh.geometry.getAttribute('color') as THREE.BufferAttribute
     const tmp = new THREE.Color()
+    const base = new THREE.Color()
+    const white = new THREE.Color(0xffffff)
     for (const range of this.buildingRanges) {
+      base.set(L.facades[range.band]).multiplyScalar(range.shade)
       const cell = this.cells.get(range.h3)
-      if (cell) tmp.set(colourFor(this.mode, cell)).lerp(BUILDING_BASE, 1 - BUILDING_TINT)
-      else tmp.copy(BUILDING_BASE)
+      if (cell) tmp.set(colourFor(this.mode, cell)).lerp(white, L.tintLift).lerp(base, 1 - L.buildingTint)
+      else tmp.copy(base)
       for (let i = range.start; i < range.start + range.count; i++) attr.setXYZ(i, tmp.r, tmp.g, tmp.b)
     }
     attr.needsUpdate = true
@@ -320,9 +467,9 @@ export class CityScene {
     }
     if (hit !== this.hovered) {
       const prev = this.hovered ? this.hexes.get(this.hovered) : undefined
-      if (prev) prev.mesh.material.opacity = 0.88
+      if (prev) prev.mesh.material.opacity = this.look.hexOpacity
       const next = hit ? this.hexes.get(hit) : undefined
-      if (next) next.mesh.material.opacity = 1
+      if (next) next.mesh.material.opacity = Math.min(1, this.look.hexOpacity + 0.15)
       this.hovered = hit
     }
     this.onHover(hit, this.pointerClient.x, this.pointerClient.y)
@@ -357,6 +504,78 @@ export class CityScene {
 
 // ---------------------------------------------------------------- helpers
 
+/** Gradient sky dome, unlit, behind everything; runs through the same tone mapping as the scene. */
+function makeSky(): THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> {
+  const material = new THREE.ShaderMaterial({
+    uniforms: { zenith: { value: new THREE.Color(0x7ea3cc) }, horizon: { value: new THREE.Color(0xe3e9ec) } },
+    vertexShader: `
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 zenith;
+      uniform vec3 horizon;
+      varying vec3 vDir;
+      void main() {
+        float t = pow(clamp(vDir.y, 0.0, 1.0), 0.55);
+        gl_FragColor = vec4(mix(horizon, zenith, t), 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+  })
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(30_000, 32, 16), material)
+  sky.renderOrder = -100
+  sky.frustumCulled = false
+  return sky
+}
+
+function hashId(id: string): number {
+  let h = 2166136261
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619)
+  return ((h >>> 0) % 1000) / 1000
+}
+
+/** Every ring as a triangulated flat shape in shape space (x east, y north), merged into one geometry. */
+function buildFlat(polys: Poly[]): THREE.BufferGeometry | null {
+  const parts: THREE.BufferGeometry[] = []
+  for (const p of polys) {
+    if (p.ring.length < 3) continue
+    const shape = new THREE.Shape()
+    p.ring.forEach(([x, y], i) => (i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y)))
+    shape.closePath()
+    const g = new THREE.ShapeGeometry(shape)
+    g.deleteAttribute('uv')
+    parts.push(g)
+  }
+  if (parts.length === 0) return null
+  const merged = mergeGeometries(parts, false)
+  for (const g of parts) g.dispose()
+  if (!merged) return null
+  merged.computeBoundingSphere()
+  return merged
+}
+
+/** One low-poly canopy per tree, instanced: 41k trees in one draw call. */
+function buildTrees(trees: Tree[], material: THREE.Material): THREE.InstancedMesh {
+  const geometry = new THREE.SphereGeometry(2.8, 7, 5)
+  geometry.translate(0, 4.2, 0)
+  const mesh = new THREE.InstancedMesh(geometry, material, trees.length)
+  const m = new THREE.Matrix4()
+  trees.forEach((t, i) => {
+    m.makeTranslation(t.x, 0, -t.y)
+    mesh.setMatrixAt(i, m)
+  })
+  mesh.instanceMatrix.needsUpdate = true
+  mesh.computeBoundingSphere()
+  mesh.castShadow = true
+  return mesh
+}
+
 function makeLabel(text: string): THREE.Sprite {
   const size = 96
   const c = document.createElement('canvas')
@@ -384,25 +603,33 @@ function makeLabel(text: string): THREE.Sprite {
 }
 
 /**
- * Extrude every footprint into one indexed BufferGeometry (top cap + walls, no bottom cap).
+ * Extrude every footprint into one indexed BufferGeometry: roof cap + walls, no bottom cap.
  * Built in shape space (x east, y north, z up); the mesh is rotated -90deg about x afterwards.
+ * Walls get UVs in facade tiles (u along the wall, v up) and go in material group 0; roofs in group 1.
  * `ranges` receives the vertex range of each building so its colour can be updated per mode.
  */
 function buildExtrusions(buildings: Building[], ranges: BuildingRange[]): THREE.BufferGeometry {
   let nVerts = 0
-  let nIndex = 0
+  let nRoof = 0
+  let nWall = 0
   for (const b of buildings) {
     const n = b.footprint.length
     if (n < 3) continue
     nVerts += n + 4 * n
-    nIndex += (n - 2) * 3 + 6 * n
+    nRoof += (n - 2) * 3
+    nWall += 6 * n
   }
   const pos = new Float32Array(nVerts * 3)
   const nor = new Float32Array(nVerts * 3)
   const col = new Float32Array(nVerts * 3)
-  const idx = nVerts > 65_535 ? new Uint32Array(nIndex) : new Uint16Array(nIndex)
+  const uv = new Float32Array(nVerts * 2)
+  const IndexArray = nVerts > 65_535 ? Uint32Array : Uint16Array
+  const roofIdx = new IndexArray(nRoof)
+  const wallIdx = new IndexArray(nWall)
+  const [tileU, tileV] = FACADE_TILE_M
   let v = 0
-  let k = 0
+  let kr = 0
+  let kw = 0
   for (const b of buildings) {
     const pts = b.footprint
     const n = pts.length
@@ -411,7 +638,7 @@ function buildExtrusions(buildings: Building[], ranges: BuildingRange[]): THREE.
     const start = v
     // enforce counter-clockwise so the walls face outward
     const ccw = THREE.ShapeUtils.isClockWise(pts.map(([x, y]) => new THREE.Vector2(x, y))) ? [...pts].reverse() : pts
-    // top cap
+    // roof cap
     const tri = THREE.ShapeUtils.triangulateShape(
       ccw.map(([x, y]) => new THREE.Vector2(x, y)),
       [],
@@ -421,12 +648,13 @@ function buildExtrusions(buildings: Building[], ranges: BuildingRange[]): THREE.
       nor.set([0, 0, 1], (v + i) * 3)
     }
     for (const [a, b2, c] of tri) {
-      idx[k++] = v + a
-      idx[k++] = v + b2
-      idx[k++] = v + c
+      roofIdx[kr++] = v + a
+      roofIdx[kr++] = v + b2
+      roofIdx[kr++] = v + c
     }
     v += n
-    // walls, 4 verts per edge for flat normals
+    // walls, 4 verts per edge for flat normals and a continuous facade u along the perimeter
+    let along = 0
     for (let i = 0; i < n; i++) {
       const [x0, y0] = ccw[i]
       const [x1, y1] = ccw[(i + 1) % n]
@@ -436,23 +664,40 @@ function buildExtrusions(buildings: Building[], ranges: BuildingRange[]): THREE.
       const nx = dy / len
       const ny = -dx / len
       const base = v
+      const u0 = along / tileU
+      const u1 = (along + len) / tileU
+      const v1 = h / tileV
       pos.set([x0, y0, 0, x1, y1, 0, x1, y1, h, x0, y0, h], base * 3)
+      uv.set([u0, 0, u1, 0, u1, v1, u0, v1], base * 2)
       for (let j = 0; j < 4; j++) nor.set([nx, ny, 0], (base + j) * 3)
-      idx[k++] = base
-      idx[k++] = base + 1
-      idx[k++] = base + 2
-      idx[k++] = base
-      idx[k++] = base + 2
-      idx[k++] = base + 3
+      wallIdx[kw++] = base
+      wallIdx[kw++] = base + 1
+      wallIdx[kw++] = base + 2
+      wallIdx[kw++] = base
+      wallIdx[kw++] = base + 2
+      wallIdx[kw++] = base + 3
       v += 4
+      along += len
     }
-    ranges.push({ h3: b.h3, start, count: v - start })
+    ranges.push({
+      h3: b.h3,
+      start,
+      count: v - start,
+      band: h < 15 ? 0 : h < 45 ? 1 : 2,
+      shade: 0.88 + 0.24 * hashId(b.id),
+    })
   }
+  const index = new IndexArray(nWall + nRoof)
+  index.set(wallIdx, 0)
+  index.set(roofIdx, nWall)
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3))
   g.setAttribute('color', new THREE.BufferAttribute(col, 3))
-  g.setIndex(new THREE.BufferAttribute(idx, 1))
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
+  g.setIndex(new THREE.BufferAttribute(index, 1))
+  g.addGroup(0, nWall, 0) // walls: facade material
+  g.addGroup(nWall, nRoof, 1) // roofs: plain
   g.computeBoundingSphere()
   return g
 }
