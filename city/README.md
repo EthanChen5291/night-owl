@@ -145,6 +145,22 @@ R=~/divMap/data/raw
 (`--bbox=` with the equals sign: a value starting with `-` is otherwise read as a flag.) That bbox reaches
 27th St so the demo cell sits inside the city. Ten seconds on a laptop.
 
+Citywide base under the model's 5k cells, buildings still local: two runs into the same `--out` with the
+same `--centre` (the second run keeps the first run's files and merges the counts in `meta.json`):
+
+```
+C=40.724,-73.985
+./city/build_city.py --land $R/boroughs.geojson --parks $R/city/parks_citywide.geojson \
+    --water $R/city/hydro_citywide.geojson --bbox=-74.27,40.49,-73.69,40.92 --centre $C --out web/public/city
+./city/build_city.py --buildings $R/buildings.geojson --trees $R/trees.json --roads $R/roadbed.geojson \
+    --bbox=-74.03,40.688,-73.94,40.76 --centre $C --out web/public/city
+```
+
+`parks_citywide.geojson` and `hydro_citywide.geojson` are the full GeoJSON exports of y6ja-fw4f and
+pjs3-c3z5 (about 45 MB each); the bbox-limited copies in `raw/` stop at the Lower Manhattan box. All
+1.08M citywide building footprints would be ~25x the local bake (180 MB of JSON), so buildings stay local
+until there is a tiled, lazy-loading bake.
+
 Flags: `--bbox min_lon,min_lat,max_lon,max_lat` (default Lower Manhattan south of 14th St),
 `--centre lat,lon` (origin of the metre frame, default bbox centre), `--res 9`, `--simplify 0.5`
 (metres, Douglas-Peucker), `--min-area 8` (m², drops sheds and slivers), `--height-units feet|metres`

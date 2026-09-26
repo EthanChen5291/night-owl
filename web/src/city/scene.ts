@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { cellToBoundary, cellToLatLng } from 'h3-js'
+import { cellToBoundary, cellToLatLng, cellToParent } from 'h3-js'
 import { colourFor, heightFor } from '../colours'
 import type { Building, Cell, CityLayers, Mode, PlanNode, Poly, Preset, Tree } from '../types'
 import { makeProjector, type LatLon, type Projector } from './projection'
@@ -28,6 +28,9 @@ interface BuildingRange {
 }
 
 const FLASH_MS = 1500
+const COARSE_RES = 7 // ~2.4 km across; 5k r9 cells become ~120 prisms
+const COARSE_HEIGHT = 4 // r7 prisms are taller so they still read from 30 km up
+const COARSE_DISTANCE = 9000 // orbit distance (m) past which the coarse prisms replace the r9 ones
 
 // Flat layers from city/build_city.py, drawn in this order (later wins where they overlap).
 const FLAT_LAYERS = ['land', 'roads', 'parks', 'water'] as const
@@ -99,6 +102,10 @@ export class CityScene {
   private pointerDirty = false
   private hexes = new Map<string, HexEntry>()
   private hexGroup = new THREE.Group()
+  // citywide level of detail: the cells aggregated to their r7 parents, shown when the camera pulls back
+  private coarse = new Map<string, HexEntry>()
+  private coarseCells = new Map<string, Cell>()
+  private coarseGroup = new THREE.Group()
   private planGroup = new THREE.Group()
   private layerGroup = new THREE.Group()
   private layerMeshes = new Map<FlatLayer | 'trees', THREE.Mesh | THREE.InstancedMesh>()
@@ -135,18 +142,18 @@ export class CityScene {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
 
     // near = 20 (minDistance is 150) keeps enough depth precision for the flat layers to stack cleanly
-    this.camera = new THREE.PerspectiveCamera(50, 1, 20, 40_000)
+    this.camera = new THREE.PerspectiveCamera(50, 1, 20, 150_000)
     this.camera.position.set(1800, 1500, 2600)
     this.controls = new OrbitControls(this.camera, canvas)
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.08
     this.controls.maxPolarAngle = Math.PI * 0.47
     this.controls.minDistance = 150
-    this.controls.maxDistance = 12_000
+    this.controls.maxDistance = 40_000
     this.controls.target.set(0, 0, 0)
 
     this.ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(60_000, 60_000),
+      new THREE.PlaneGeometry(160_000, 160_000),
       new THREE.MeshStandardMaterial({ color: LOOKS.day.layers.ground, roughness: 0.9, metalness: 0 }),
     )
     this.ground.rotation.x = -Math.PI / 2
@@ -176,7 +183,8 @@ export class CityScene {
     this.key.shadow.bias = -0.0004
     this.key.shadow.normalBias = 2
     this.scene.add(this.ambient, this.hemi, this.key, this.key.target)
-    this.scene.add(this.layerGroup, this.hexGroup, this.planGroup)
+    this.coarseGroup.visible = false
+    this.scene.add(this.layerGroup, this.hexGroup, this.coarseGroup, this.planGroup)
     this.setPreset('day')
 
     canvas.addEventListener('pointermove', this.handlePointerMove)
@@ -217,6 +225,7 @@ export class CityScene {
         this.cells.delete(h3)
       }
     }
+    this.rebuildCoarse()
     this.retintBuildings()
   }
 
@@ -229,7 +238,58 @@ export class CityScene {
       entry.targetHeight = heightFor(mode, cell)
       entry.targetColour.set(colourFor(mode, cell))
     }
+    for (const [h3, entry] of this.coarse) {
+      const cell = this.coarseCells.get(h3)
+      if (!cell) continue
+      entry.targetHeight = heightFor(mode, cell) * COARSE_HEIGHT
+      entry.targetColour.set(colourFor(mode, cell))
+    }
     this.retintBuildings()
+  }
+
+  /** Average every r9 cell into its r7 parent (mean of the percentile fields) and keep one big prism per parent. */
+  private rebuildCoarse() {
+    const groups = new Map<string, Cell[]>()
+    for (const cell of this.cells.values()) {
+      const parent = cellToParent(cell.h3, COARSE_RES)
+      const list = groups.get(parent)
+      if (list) list.push(cell)
+      else groups.set(parent, [cell])
+    }
+    const seen = new Set<string>()
+    for (const [parent, members] of groups) {
+      const mean = (f: (c: Cell) => number) => members.reduce((s, c) => s + f(c), 0) / members.length
+      const cell: Cell = {
+        ...members[0],
+        h3: parent,
+        score_a: mean((c) => c.score_a),
+        score_b: mean((c) => c.score_b),
+        pct_a: mean((c) => c.pct_a),
+        pct_b: mean((c) => c.pct_b),
+        silence: mean((c) => c.silence),
+        n_inspections: members.reduce((s, c) => s + c.n_inspections, 0),
+      }
+      this.coarseCells.set(parent, cell)
+      seen.add(parent)
+      let entry = this.coarse.get(parent)
+      if (!entry) {
+        entry = this.makeHex(cell)
+        entry.mesh.material.opacity = Math.min(1, this.look.hexOpacity + 0.3)
+        this.coarse.set(parent, entry)
+        this.coarseGroup.add(entry.mesh)
+      }
+      entry.targetHeight = heightFor(this.mode, cell) * COARSE_HEIGHT
+      entry.targetColour.set(colourFor(this.mode, cell))
+    }
+    for (const [parent, entry] of this.coarse) {
+      if (!seen.has(parent)) {
+        this.coarseGroup.remove(entry.mesh)
+        entry.mesh.geometry.dispose()
+        entry.mesh.material.dispose()
+        this.coarse.delete(parent)
+        this.coarseCells.delete(parent)
+      }
+    }
   }
 
   setPreset(preset: Preset) {
@@ -252,6 +312,7 @@ export class CityScene {
     for (const [name, obj] of this.layerMeshes) (obj.material as THREE.MeshStandardMaterial).color.set(L.layers[name])
     if (this.wallMaterial) this.wallMaterial.emissiveIntensity = L.windows
     for (const [h3, entry] of this.hexes) entry.mesh.material.opacity = h3 === this.hovered ? Math.min(1, L.hexOpacity + 0.15) : L.hexOpacity
+    for (const entry of this.coarse.values()) entry.mesh.material.opacity = Math.min(1, L.hexOpacity + 0.3)
     this.retintBuildings()
   }
 
@@ -462,7 +523,7 @@ export class CityScene {
     let hit: string | null = null
     if (this.pointer.x <= 1 && this.pointer.x >= -1) {
       this.raycaster.setFromCamera(this.pointer, this.camera)
-      const hits = this.raycaster.intersectObjects(this.hexGroup.children, false)
+      const hits = this.hexGroup.visible ? this.raycaster.intersectObjects(this.hexGroup.children, false) : []
       hit = hits.length ? (hits[0].object.userData.h3 as string) : null
     }
     if (hit !== this.hovered) {
@@ -479,6 +540,15 @@ export class CityScene {
     if (this.disposed) return
     this.raf = requestAnimationFrame(this.loop)
     const now = performance.now()
+    // past COARSE_DISTANCE the r9 prisms are a few pixels wide: show the r7 aggregates instead
+    const wide = this.camera.position.distanceTo(this.controls.target) > COARSE_DISTANCE
+    this.hexGroup.visible = !wide
+    this.coarseGroup.visible = wide && this.coarse.size > 0
+    if (wide && this.hovered) this.pointerDirty = true
+    for (const entry of this.coarse.values()) {
+      entry.mesh.scale.z += (entry.targetHeight - entry.mesh.scale.z) * 0.12
+      entry.mesh.material.color.lerp(entry.targetColour, 0.15)
+    }
     for (const entry of this.hexes.values()) {
       const m = entry.mesh
       m.scale.z += (entry.targetHeight - m.scale.z) * 0.12
@@ -495,6 +565,13 @@ export class CityScene {
     if (this.focusTarget) {
       this.controls.target.lerp(this.focusTarget, 0.08)
       if (this.controls.target.distanceTo(this.focusTarget) < 2) this.focusTarget = null
+    }
+    // fog scales with the orbit distance so pulling back to the whole city does not fog it out
+    const fog = this.scene.fog as THREE.Fog | null
+    if (fog) {
+      const s = Math.max(1, this.camera.position.distanceTo(this.controls.target) / 3500)
+      fog.near = this.look.fog[0] * s
+      fog.far = this.look.fog[1] * s
     }
     if (this.pointerDirty) this.pick()
     this.controls.update()
@@ -528,7 +605,7 @@ function makeSky(): THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> {
     depthWrite: false,
     fog: false,
   })
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(30_000, 32, 16), material)
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(70_000, 32, 16), material)
   sky.renderOrder = -100
   sky.frustumCulled = false
   return sky

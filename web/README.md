@@ -61,6 +61,10 @@ R=~/divMap/data/raw
     --bbox=-74.03,40.688,-73.94,40.76 --out web/public/city
 ```
 
+Citywide: land, parks and water are baked for all five boroughs (the two-run recipe in `city/README.md`),
+buildings, roads and trees only for the Lower Manhattan bbox. Past a 9 km orbit distance the r9 prisms are
+a few pixels wide, so the scene swaps to one prism per r7 parent (mean of the percentile fields, no hover).
+
 Lighting presets (`day` is the default, `night` is the stage look): sky dome, fog, sun with shadows and
 the facade/window mix all live in `LOOKS` in `src/city/scene.ts`; the UI theme tokens follow the preset
 through `data-theme` on `<html>` (`src/index.css`).
