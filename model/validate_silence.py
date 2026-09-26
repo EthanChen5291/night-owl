@@ -72,4 +72,55 @@ print("TEST 2: quiet cells swept in 2024, by end-2023 model risk tier")
 print(t2.round(3).to_string())
 print(t2s.rename(index={True: "flagged silent", False: "not flagged"}).round(3).to_string())
 
+# ---- Test 3: independent evidence where DOHMH never swept.
+# Restaurant cycle inspections are scheduled (not complaint-driven) and citywide.
+# Model B never sees them. Among cells with NO sweep 2022-2024, does B's end-2023
+# risk predict 2024 restaurant rat violations (04K) per restaurant inspection?
+import duckdb, h3
+from config import H3_RES, RAW
+
+rest = duckdb.sql(f"""
+    select Latitude as lat, Longitude as lng, CAMIS, "INSPECTION DATE" as d,
+           max(case when "VIOLATION CODE" = '04K' then 1 else 0 end) as rat
+    from read_csv_auto('{RAW / "restaurant_inspections.csv"}', sample_size = 50000)
+    where "INSPECTION TYPE" like 'Cycle Inspection%' and year("INSPECTION DATE") = 2024
+      and Latitude between 40.4 and 41
+    group by all""").df()
+rest["h3"] = [h3.latlng_to_cell(a, b, H3_RES) for a, b in zip(rest.lat, rest.lng)]
+r = rest.groupby("h3").agg(insp=("rat", "size"), rat=("rat", "sum"))
+swept = df[df.month.between("2022-01", "2024-12")].groupby("h3").n_sweep.sum()
+never = s[s.eligible & ~s.h3.isin(swept[swept > 0].index)].set_index("h3").join(r, how="inner")
+never["tier"] = pd.qcut(never.risk_b.rank(method="first"), 3, labels=["low", "mid", "high"])
+t3 = never.groupby("tier", observed=True).apply(lambda g: pd.Series({
+    "cells": len(g), "restaurant_inspections": g.insp.sum(), "rat_violation_rate": g.rat.sum() / g.insp.sum()}))
+t3s = never.groupby("is_silent").apply(lambda g: pd.Series({
+    "cells": len(g), "restaurant_inspections": g.insp.sum(), "rat_violation_rate": g.rat.sum() / g.insp.sum()}))
+res["test3"] = {"by_risk_tier": t3.round(4).reset_index().to_dict(orient="records"),
+                "by_silent_flag": t3s.round(4).reset_index().to_dict(orient="records")}
+print("\nTEST 3: NEVER-swept cells, 2024 restaurant rat violations (04K) by end-2023 model tier")
+print(t3.round(4).to_string())
+print(t3s.rename(index={True: "flagged silent", False: "not flagged"}).round(4).to_string())
+
+# ---- Test 4: how the silent-block equity result depends on normalising Model A
+from scipy.stats import rankdata
+
+cur = pd.read_parquet(PROCESSED / "scores.parquet").merge(
+    df[df.month == df.month.max()][["h3", "units_res"]], on="h3")
+e = cur[cur.eligible]
+pr = lambda x: rankdata(x) / len(x)
+rows = []
+for label, a in {"raw count": e.risk_a_var, "per property": e.risk_a_var / e.n_lots,
+                 "per home": e.risk_a_var / e.units_res.clip(lower=1),
+                 "per resident (used)": e.risk_a_var / e.pop_density}.items():
+    sil = e[(pr(e.risk_b) >= 0.6) & (pr(e.risk_b) - pr(a) > 0.25)]
+    rows.append({"normalisation": label, "silent_cells": len(sil),
+                 "median_income": sil.median_income.median(),
+                 "limited_english": sil.limited_english_share.median()})
+rows.append({"normalisation": "ALL eligible", "silent_cells": len(e),
+             "median_income": e.median_income.median(), "limited_english": e.limited_english_share.median()})
+t4 = pd.DataFrame(rows)
+res["test4"] = t4.round(3).to_dict(orient="records")
+print("\nTEST 4: silent-block profile under each normalisation of Model A")
+print(t4.round(3).to_string(index=False))
+
 (PROCESSED / "validation.json").write_text(json.dumps(res, indent=2, default=str))

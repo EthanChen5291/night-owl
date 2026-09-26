@@ -40,12 +40,14 @@ PHYSICAL = [
     "share_mixed_use", "share_commercial", "share_industrial", "floors_mean", "units_res",
     "bldg_area", "retail_area", "com_area", "n_restaurants", "n_litter_baskets",
     "n_catch_basins", "n_trees", "n_subway_entrances", "share_park",
-    "dob_permits_3m", "rest_04k_12m", "rest_08a_12m", "temp_c", "month_of_year",
-    "refuse_tons_cd",
+    "dob_permits_3m", "temp_c", "month_of_year", "refuse_tons_cd",
 ]
 CONTROLS = ["median_income", "pop_density"]           # controls only, per the spec
 B_FEATS = PHYSICAL + CONTROLS                          # never complaint/inspection counts, never HPD
-A_FEATS = B_FEATS + ["hpd_rodent_12m", "complaints_1m", "complaints_12m"]
+# Restaurant rat/pest violations (04K/08A) are kept OUT of B (costs 0.003 AUC) so
+# they can independently validate B where DOHMH never swept (validate_silence.py).
+A_FEATS = B_FEATS + ["rest_04k_12m", "rest_08a_12m", "hpd_rodent_12m",
+                     "complaints_1m", "complaints_12m"]
 # limited_english_share is deliberately in neither model: it's the bias we measure.
 
 PARAMS = dict(n_estimators=400, learning_rate=0.05, num_leaves=31, min_child_samples=50,
