@@ -1,6 +1,6 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 15:30** (building-level backtest added).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 15:55** (hotspot rankings added; silent needs ≥100 homes).
 
 ## Headline results
 
@@ -13,8 +13,8 @@ Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day
 | Quiet ≠ rat-free | loudest vs quietest areas: complaints differ **17.8×**, rats found in sweeps only **2.3×** | `out/validation.json` test 1 |
 | Out-of-time check | trained to 2023-12; quiet cells swept in 2024: high-risk third 20.0% vs low-risk third 7.2% | test 2 |
 | No ground truth where nobody complains | **97%** of the quietest-quartile cells had no proactive sweep in 24 months, vs 55% of the loudest | `03_models.py` data_gap |
-| Silent blocks (high B, low A) | **508 cells**, median income **$69k vs $92k**, limited-English households 14.5% vs 9.2% | `out/cells.json` (`is_silent`) |
-| Sensor picks | 20 sites on real tree pits, 95% never swept, median income $61k | `out/plan.json` |
+| Silent blocks (high B, low A) | **382 cells** with ≥100 homes, median income **$62k vs $92k**, limited-English households **17.1% vs 9.2%** | `out/cells.json` (`is_silent`) |
+| Sensor picks | 20 sites on real tree pits, 95% never swept, median income $59k | `out/plan.json` |
 | Model B accuracy | AUC **0.633** on held-out community districts (logistic baseline 0.567) | `out/metrics.json` |
 | **Which buildings first** | building-level model ranks swept buildings at AUC **0.692** (vs 0.630 for the cell model); top 5 buildings for each of 519 silent blocks / node sites | `out/buildings.json` |
 | **Buildings with no inspection history** (silent-block case) | building model's top picks had rats **18.5%** vs complaints 9.9% vs random 8.5% (**2.2×**), won **105 of 121 months** vs random | `out/building_backtest.json` |
@@ -85,6 +85,46 @@ its tax block that day).
 
 Neighbour (ring-1) features were also tested: no gain (0.633 → 0.632), not used.
 
+## Hotspot rankings (`08_hotspots.py` → `out/hotspots.json`)
+
+Every eligible cell in `cells.json` now carries `rank_risk` / `tier_risk` (1 = highest Model B risk) and
+`rank_silent` / `tier_silent` (silent cells only; 1 = biggest gap), with tiers "top 1%" (52 cells), "top 5%",
+"top 10%", plus `neighborhood` and `borough`. `--boroughs Manhattan,Brooklyn` writes a re-ranked
+`out/hotspots_manhattan_brooklyn.json`.
+
+**Top 10 rat-risk hotspots** (where rats are most likely, whatever people report). Top 1% by borough: {'Bronx': 24, 'Manhattan': 27, 'Brooklyn': 1}
+
+| # | Neighborhood | Borough | risk | silence | complaints/yr | inspect first |
+|---|---|---|---|---|---|---|
+| 1 | Pelham Parkway-Van Nest | Bronx | 15.7% | +21 | 7 | 2167 CRUGER AVENUE |
+| 2 | Bedford Park | Bronx | 15.3% | +26 | 18 | 2914 JEROME AVENUE |
+| 3 | Inwood | Manhattan | 14.7% | +36 | 12 | 232 SHERMAN AVENUE |
+| 4 | Concourse-Concourse Village | Bronx | 14.4% | +30 | 15 | 111 EAST 167 STREET |
+| 5 | Mount Eden-Claremont (West) | Bronx | 14.0% | +21 | 11 | 1420 GRAND CONCOURSE |
+| 6 | Mount Eden-Claremont (West) | Bronx | 13.9% | +38 | 8 | 1460 MACOMBS ROAD |
+| 7 | Concourse-Concourse Village | Bronx | 13.8% | +36 | 6 | 1150 COLLEGE AVENUE |
+| 8 | Harlem (South) | Manhattan | 13.8% | +4 | 36 | 89 LENOX AVENUE |
+| 9 | Claremont Village-Claremont (East) | Bronx | 13.7% | +75 | 1 | 1674 CARTER AVENUE |
+| 10 | Washington Heights (North) | Manhattan | 13.6% | +2 | 7 | 38 SICKLES STREET |
+
+**Top 10 silent hotspots** (rats likely, far fewer complaints than expected). Top 1% by borough: {'Manhattan': 16, 'Bronx': 16, 'Brooklyn': 7, 'Queens': 13}
+
+| # | Neighborhood | Borough | risk | silence | complaints/yr | inspect first |
+|---|---|---|---|---|---|---|
+| 1 | Harlem (North) | Manhattan | 8.5% | +94 | 5 | 2918 FREDRICK DOUGLASS BL |
+| 2 | Mount Eden-Claremont (West) | Bronx | 8.8% | +93 | 2 | 1570 WEBSTER AVENUE |
+| 3 | Highbridge | Bronx | 6.6% | +90 | 0 | 903 SUMMIT AVENUE |
+| 4 | South Williamsburg | Brooklyn | 7.2% | +88 | 1 | 265 LEE AVENUE |
+| 5 | Corona | Queens | 6.1% | +87 | 3 | 55-25 98 PLACE |
+| 6 | Forest Hills | Queens | 6.9% | +86 | 2 | 104-15 QUEENS BOULEVARD |
+| 7 | Flushing-Willets Point | Queens | 6.2% | +85 | 2 | 43-23 COLDEN STREET |
+| 8 | Norwood | Bronx | 12.6% | +82 | 9 | 3525 DECATUR AVENUE |
+| 9 | Kingsbridge-Marble Hill | Manhattan | 8.5% | +80 | 9 | 5210 BROADWAY |
+| 10 | East Harlem (North) | Manhattan | 8.2% | +80 | 0 | 322 EAST 126 STREET |
+
+Scope: models train and rank on all five boroughs (the silent blocks are mostly in the Bronx and Queens; dropping
+them would lose data and the equity story). The 3D demo map only draws Lower Manhattan.
+
 ## Honest limits (say these before a judge does)
 
 - **Never-swept areas can't be validated with existing data.** We tried restaurant rat violations (04K) as an
@@ -107,6 +147,7 @@ Neighbour (ring-1) features were also tested: no gain (0.633 → 0.632), not use
 | 5 | `05_backtest.py` | rolling backtest on sweeps, refit every 6 months | ~40 s |
 | – | `validate_silence.py` | tests 1–4 above | ~60 s |
 | – | `binning_effect.py` | before/after test of the Nov 2024 bin rule | ~20 s |
+| 8 | `08_hotspots.py` | top 10 risk + top 10 silent hotspots, top-1% tiers (`--boroughs` to filter) | 1 s |
 | 6 | `06_buildings.py` | top 5 buildings per silent block / node site (building-level Model B, `lots.py`) | ~15 s |
 | – | `lot_model.py` | building- vs cell-level comparison (spatial CV) | ~50 s |
 | – | `export.py` | `out/cells.json`, `out/plan.json` in the `web/src/types.ts` / `api/` contract | ~10 s |
@@ -132,7 +173,8 @@ Raw data lives outside the repo in `../../data/raw/` (override with `DATA_DIR=..
 - **Model A** (LightGBM, Poisson): rat complaints per cell-month, all features + past complaints + HPD. The
   **A-variant** uses B's features only, so the Silence Score compares labels, not model capacity.
 - **Silence** = pct(B) − pct(A-variant complaints **per resident**), per bootstrap copy. Silent = B in the top 40%,
-  every copy agrees (interval excludes 0), gap > 25 points.
+  every copy agrees (interval excludes 0), gap > 25 points, and **≥100 homes** in the cell (people who could report;
+  without this, empty industrial/park cells like Hunts Point or the Red Hook waterfront topped the list).
 - **Uncertainty**: tree copies agree on unseen areas (false confidence), so a Beta-Binomial posterior (B = prior
   worth 20 lots, sweeps update it) plus `data_gap` = share of the estimate still a guess (1 = never swept).
 - **Optimizer**: score = B × data_gap; cells where recent sweeps already found rats are skipped (known problems

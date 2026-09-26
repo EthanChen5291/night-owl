@@ -34,6 +34,7 @@ N_COPIES = 5
 A_TRAIN_FROM = "2018-01"  # enough history, keeps Model A fast
 MIN_LOTS = 20             # cells with fewer tax lots aren't ranked for silence
 PRIOR_LOTS = 20           # Model B's prediction counts as this many inspected lots
+MIN_HOMES = 100           # silent needs residents who could report: skips industrial/park cells
 
 PHYSICAL = [
     "n_lots", "year_built_median", "share_pre1940", "share_vacant", "share_residential",
@@ -146,11 +147,13 @@ def train_until(df: pd.DataFrame, month_T: str, score_month: str | None = None) 
     out["silence"] = silence.mean(0)
     out["silence_lo"] = silence.min(0)
     out["silence_hi"] = silence.max(0)
-    # Silent = high B, low A: B ranks it in the top 40%, every copy agrees B ranks
+    # Silent = high B, low A, in a cell where people live (>= MIN_HOMES homes, so under-reporting
+    # is possible; industrial/park cells are excluded): B ranks it in the top 40%, every copy agrees B ranks
     # it above A (interval excludes zero), and meaningfully so (top-quarter gap).
     b_pct = np.full(len(target), np.nan)
     b_pct[ok] = pct(prior[ok])
-    out["is_silent"] = ok & (b_pct >= 0.6) & (out.silence_lo > 0) & (out.silence > 0.25)
+    homes = target.units_res.to_numpy(float) >= MIN_HOMES
+    out["is_silent"] = ok & homes & (b_pct >= 0.6) & (out.silence_lo > 0) & (out.silence > 0.25)
     return out
 
 

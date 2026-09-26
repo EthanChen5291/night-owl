@@ -62,15 +62,15 @@
     "by_silent_flag": [
       {
         "is_silent": false,
-        "cells": 290.0,
-        "lots": 34917.0,
+        "cells": 298.0,
+        "lots": 35076.0,
         "rat_rate": 0.1371
       },
       {
         "is_silent": true,
-        "cells": 94.0,
-        "lots": 5865.0,
-        "rat_rate": 0.177
+        "cells": 86.0,
+        "lots": 5706.0,
+        "rat_rate": 0.1781
       }
     ]
   },
@@ -98,15 +98,15 @@
     "by_silent_flag": [
       {
         "is_silent": false,
-        "cells": 1369.0,
-        "restaurant_inspections": 8096.0,
-        "rat_violation_rate": 0.0288
+        "cells": 1406.0,
+        "restaurant_inspections": 8242.0,
+        "rat_violation_rate": 0.0286
       },
       {
         "is_silent": true,
-        "cells": 178.0,
-        "restaurant_inspections": 1266.0,
-        "rat_violation_rate": 0.0197
+        "cells": 141.0,
+        "restaurant_inspections": 1120.0,
+        "rat_violation_rate": 0.0196
       }
     ]
   },

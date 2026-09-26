@@ -6,7 +6,7 @@ Uses the building-level Model B (lots.py). It ranks buildings far better than th
 "inside this block, start here" list.
 
 Output: model/out/buildings.json  {month, cells: {h3: [{bbl, address, risk, year_built, units,
-         floors, bldg_class, has_restaurant}, ...top 5]}}  for silent cells and plan.json nodes.
+         floors, bldg_class, has_restaurant}, ...top 5]}}  for silent cells, plan.json nodes and top-10% risk cells.
 
 Run: python3 model/06_buildings.py [--top 5]
 """
@@ -29,11 +29,16 @@ def main(top: int) -> None:
     scores = pd.read_parquet(PROCESSED / "scores.parquet")
     month = scores.month.iloc[0]
     plan = json.loads((OUT / "plan.json").read_text())
-    wanted = set(scores[scores.is_silent].h3) | {n["h3"] for n in plan["nodes"]}
+    cells = json.loads((OUT / "cells.json").read_text())["cells"]
+    top_risk = {c["h3"] for c in cells if c.get("tier_risk")}  # top 10% risk cells
+    wanted = set(scores[scores.is_silent].h3) | {n["h3"] for n in plan["nodes"]} | top_risk
 
     model = lots.fit(lots.training_rows(df, str(pd.Period(month, "M") - 1)))
     x = lots.predict_lots(model, df[(df.month == month) & df.h3.isin(wanted)])
-    x = x[x.lot_is_vacant == 0].sort_values("risk", ascending=False)  # vacant lots have no building to enter
+    # an inspector needs a door: skip vacant lots and lots with no house number (rail, utility, road lots)
+    numbered = x.address.str.match(r"^\d", na=False) & ~x.address.str.match(
+        r"^\d+(ST|ND|RD|TH)? (AVENUE|STREET|ROAD|PLACE|DRIVE)$", na=False)  # "7 AVENUE" = street name only
+    x = x[(x.lot_is_vacant == 0) & numbered].sort_values("risk", ascending=False)
 
     def row(r):
         return {"bbl": r.bbl, "address": r.address, "risk": round(float(r.risk), 3),
@@ -44,7 +49,7 @@ def main(top: int) -> None:
 
     out = {h: [row(r) for r in g.head(top).itertuples()] for h, g in x.groupby("h3", sort=False)}
     (OUT / "buildings.json").write_text(json.dumps({"month": month, "top": top, "cells": out}))
-    print(f"buildings.json: {len(out)} cells (silent + node sites), top {top} buildings each")
+    print(f"buildings.json: {len(out)} cells (silent + node sites + top-10% risk), top {top} buildings each")
     n1 = plan["nodes"][0]["h3"]
     print(f"node #1 {n1}:")
     for b in out.get(n1, []):
