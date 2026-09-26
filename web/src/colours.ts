@@ -4,8 +4,9 @@ import type { Cell, Mode } from './types'
 //   sequential: viridis-like, for the two percentile modes (0..100)
 //   diverging:  blue - neutral - orange, centred on 0, for silence (-100..100);
 //               silent blocks (high B, low A) are the strong orange end.
-const SEQUENTIAL = ['#3a1c52', '#40498e', '#2f6f8f', '#2a9180', '#7fb84a', '#e6d84c']
-const DIVERGING = ['#1d5b9e', '#7cabd0', '#d9d5cc', '#eaa25a', '#c04f06']
+// both are kept a notch muted so the city underneath still reads, and the warm end is a clay orange, not a warning
+const SEQUENTIAL = ['#33204f', '#3f4c8c', '#2f6f8f', '#2f9282', '#6fb35e', '#cbcf5a']
+const DIVERGING = ['#2a66a8', '#8db6d8', '#d8d6d0', '#dba370', '#b45a2a']
 
 export const MODES: { id: Mode; label: string; field: 'pct_a' | 'pct_b' | 'silence'; hint: string }[] = [
   { id: 'a', label: 'What the city sees', field: 'pct_a', hint: 'percentile of predicted 311 complaints (Model A)' },

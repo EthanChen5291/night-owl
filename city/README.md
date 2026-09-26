@@ -157,9 +157,34 @@ C=40.724,-73.985
 ```
 
 `parks_citywide.geojson` and `hydro_citywide.geojson` are the full GeoJSON exports of y6ja-fw4f and
-pjs3-c3z5 (about 45 MB each); the bbox-limited copies in `raw/` stop at the Lower Manhattan box. All
-1.08M citywide building footprints would be ~25x the local bake (180 MB of JSON), so buildings stay local
-until there is a tiled, lazy-loading bake.
+pjs3-c3z5 (about 45 MB each); the bbox-limited copies in `raw/` stop at the Lower Manhattan box.
+
+## Tiles: `make_tiles.py` (the whole city, streamed)
+
+The second run above is superseded by tiles. `make_tiles.py` streams the citywide exports once (ijson, so
+the 856 MB footprints file never sits in memory), joins PLUTO addresses by BBL, and writes one file per H3
+r7 tile plus a manifest and the borough areas; the web app streams tiles around the camera (see
+`web/README.md`). Inputs, ~1.5 GB, from the API export endpoints:
+
+```
+C=~/divMap/data/raw/city
+curl -L -o $C/buildings_citywide.geojson 'https://data.cityofnewyork.us/api/geospatial/5zhs-2jue?method=export&format=GeoJSON'
+curl -L -o $C/roadbed_citywide.geojson   'https://data.cityofnewyork.us/api/geospatial/i36f-5ih7?method=export&format=GeoJSON'
+curl -L -G -o $C/trees_citywide.json 'https://data.cityofnewyork.us/resource/uvpi-gqnh.json' \
+    --data-urlencode '$select=tree_id,latitude,longitude,address,status' --data-urlencode '$limit=1000000'
+./city/make_tiles.py          # ~3 min -> web/public/city/tiles/*.json, tiles.json, areas.json
+./city/make_areas.py          # <1 min -> web/public/city/areas/<id>/{land,parks,water}.json, tiles.json gets "a"
+```
+
+`city/areas.json` is the source of the boroughs' names and landing centres and of the shared projection
+centre; `make_tiles.py` adds each borough's outline from `boroughs.geojson`.
+
+`make_areas.py` runs after it (or alone, after editing `city/areas.json`): it cuts each borough's own
+land, parks and water out of `boroughs.geojson`, `parks_citywide.geojson` and `hydro_citywide.geojson`
+(the web app draws only the active borough's ground, so the rest of the city costs nothing while you are
+in one), and stamps every entry in `tiles.json` with `"a": <area id>`, the borough its centre falls in
+(a tile centred on water goes to the nearest borough within 1.5 km, otherwise `null`). The app streams
+only the active area's tiles.
 
 Flags: `--bbox min_lon,min_lat,max_lon,max_lat` (default Lower Manhattan south of 14th St),
 `--centre lat,lon` (origin of the metre frame, default bbox centre), `--res 9`, `--simplify 0.5`

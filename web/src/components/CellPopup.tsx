@@ -1,70 +1,65 @@
 import { colourFor } from '../colours'
 import type { Cell, Mode } from '../types'
+import { CloseIcon } from './Icons'
 
 interface Props {
   cell: Cell
   mode: Mode
-  x: number
-  y: number
+  addr: string | null
+  onClose: () => void
 }
 
 const feature = (s: string) => s.replace(/_/g, ' ')
 const fmt = (v: number, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '-')
-const fmtTs = (iso: string | null) => (iso ? iso.replace('T', ' ').replace(/\.\d+Z$/, 'Z') : 'none')
 
-export default function CellPopup({ cell, mode, x, y }: Props) {
-  const maxShap = Math.max(1e-6, ...cell.reasons.map((r) => Math.abs(r.shap)))
-  // keep the card inside the viewport
-  const w = 300
-  const h = 330
-  const left = Math.min(x + 16, window.innerWidth - w - 8)
-  const top = Math.min(y + 16, window.innerHeight - h - 8)
+function Bar({ label, value, max = 100, tone }: { label: string; value: number; max?: number; tone: 'a' | 'b' | 'silence' }) {
+  const w = Math.max(0, Math.min(100, (Math.abs(value) / max) * 100))
   return (
-    <div className="popup panel" style={{ left, top, width: w }}>
-      <div className="popup-head">
+    <div className="stat">
+      <span className="stat-label">{label}</span>
+      <span className="stat-bar">
+        <span className={`stat-fill ${tone} ${value < 0 ? 'neg' : ''}`} style={{ width: `${w}%` }} />
+      </span>
+      <b className="stat-val">{tone === 'silence' ? (value > 0 ? '+' : '') + fmt(value, 0) : fmt(value, 0)}</b>
+    </div>
+  )
+}
+
+/** Pinned by clicking a cell: the three views as bars, the posterior, the top reasons. */
+export default function CellPopup({ cell, mode, addr, onClose }: Props) {
+  const maxShap = Math.max(1e-6, ...cell.reasons.map((r) => Math.abs(r.shap)))
+  return (
+    <div className="cellcard panel">
+      <div className="cellcard-head">
         <span className="swatch" style={{ background: colourFor(mode, cell) }} />
-        <code>{cell.h3}</code>
+        <div className="cellcard-title">
+          <b>{addr ?? `Block ${cell.h3.slice(-5)}`}</b>
+          <span className="muted small">
+            district {cell.cd}
+            {cell.rmz ? ` · ${cell.rmz}` : ''} · {cell.n_inspections} inspections
+          </span>
+        </div>
+        <button className="icon-btn" onClick={onClose} aria-label="Close">
+          <CloseIcon size={15} />
+        </button>
       </div>
-      <div className="popup-grid">
-        <span>cd</span>
-        <b>{cell.cd}</b>
-        <span>rmz</span>
-        <b>{cell.rmz ?? 'none'}</b>
-        <span>score_a</span>
-        <b>{fmt(cell.score_a)} complaints/mo</b>
-        <span>score_b</span>
-        <b>{fmt(cell.score_b, 3)} P(active)</b>
-        <span>pct_a / pct_b</span>
-        <b>
-          {fmt(cell.pct_a, 1)} / {fmt(cell.pct_b, 1)}
-        </b>
-        <span>silence</span>
-        <b className={cell.silence > 0 ? 'pos' : 'neg'}>
-          {cell.silence > 0 ? '+' : ''}
-          {fmt(cell.silence, 1)}
-        </b>
-        <span>ci_b</span>
-        <b>
-          [{fmt(cell.ci_b[0], 3)}, {fmt(cell.ci_b[1], 3)}]
-        </b>
-        <span>posterior</span>
-        <b>
-          α {fmt(cell.posterior.alpha)} / β {fmt(cell.posterior.beta)}, {cell.posterior.n_events} events
-        </b>
-        <span>n_inspections</span>
-        <b>{cell.n_inspections}</b>
-        <span>last_event_at</span>
-        <b>{fmtTs(cell.last_event_at)}</b>
+      <Bar label="city sees" value={cell.pct_a} tone="a" />
+      <Bar label="what's there" value={cell.pct_b} tone="b" />
+      <Bar label="silence" value={cell.silence} tone="silence" />
+      <div className="cellcard-row muted small">
+        <span>
+          P(active) <b>{fmt(cell.score_b, 2)}</b> [{fmt(cell.ci_b[0], 2)}–{fmt(cell.ci_b[1], 2)}]
+        </span>
+        <span>
+          <b>{cell.posterior.n_events}</b> sightings
+        </span>
       </div>
       <div className="popup-reasons">
         {cell.reasons.slice(0, 3).map((r) => (
           <div key={r.feature} className="reason">
             <span className="reason-name">{feature(r.feature)}</span>
             <span className="reason-bar">
-              <span
-                className={r.shap >= 0 ? 'pos' : 'neg'}
-                style={{ width: `${(Math.abs(r.shap) / maxShap) * 100}%` }}
-              />
+              <span className={r.shap >= 0 ? 'pos' : 'neg'} style={{ width: `${(Math.abs(r.shap) / maxShap) * 100}%` }} />
             </span>
             <span className="reason-val">
               {r.shap >= 0 ? '+' : ''}

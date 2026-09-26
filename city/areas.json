@@ -1,0 +1,11 @@
+{
+  "_comment": "City areas the web app can fly into: the five boroughs, each with a hand-picked centre the camera lands on. Outlines come from boroughs.geojson at bake time (make_tiles.py). Buildings stream in as r7 hex tiles around the camera wherever it goes, so the area is only a starting point, not a boundary.",
+  "centre": { "lat": 40.724, "lon": -73.985 },
+  "areas": [
+    { "id": "manhattan", "name": "Manhattan", "borocode": "1", "lat": 40.735, "lon": -73.99 },
+    { "id": "brooklyn", "name": "Brooklyn", "borocode": "3", "lat": 40.69, "lon": -73.96 },
+    { "id": "queens", "name": "Queens", "borocode": "4", "lat": 40.75, "lon": -73.915 },
+    { "id": "bronx", "name": "The Bronx", "borocode": "2", "lat": 40.83, "lon": -73.905 },
+    { "id": "staten-island", "name": "Staten Island", "borocode": "5", "lat": 40.635, "lon": -74.08 }
+  ]
+}

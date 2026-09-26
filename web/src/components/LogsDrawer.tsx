@@ -1,0 +1,58 @@
+import type { OwlNode, RatEvent } from '../types'
+import { CloseIcon, RatIcon } from './Icons'
+
+interface Props {
+  events: RatEvent[] // newest first
+  nodes: OwlNode[]
+  selected: string | null
+  onClose: () => void
+  onSelect: (id: string) => void
+}
+
+const fmt = (iso: string) => {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+}
+
+/** Every sighting with its crop, address and time; filtered to the selected owl when there is one. */
+export default function LogsDrawer({ events, nodes, selected, onClose, onSelect }: Props) {
+  const byNodeId = new Map(nodes.map((n) => [n.nodeId, n]))
+  const owl = selected ? nodes.find((n) => n.id === selected) : null
+  const rows = owl ? events.filter((e) => e.node_id === owl.nodeId) : events
+  return (
+    <section className="logs panel">
+      <div className="logs-head">
+        <span className="nodes-title">
+          <RatIcon size={20} />
+          Sightings
+          <span className="count">{rows.length}</span>
+          {owl && <span className="muted small"> · {owl.name}</span>}
+        </span>
+        <button className="icon-btn" onClick={onClose} aria-label="Close log">
+          <CloseIcon size={16} />
+        </button>
+      </div>
+      {rows.length === 0 && <div className="muted logs-empty">No sightings yet. When an owl sees a rat, the crop lands here.</div>}
+      <ul className="logs-list">
+        {rows.map((e) => {
+          const n = byNodeId.get(e.node_id)
+          return (
+            <li key={`${e.node_id}|${e.ts}`} className="log" onClick={() => n && onSelect(n.id)}>
+              {e.crop_b64 ? <img className="log-crop" alt="rat crop" src={`data:image/jpeg;base64,${e.crop_b64}`} /> : <div className="log-crop empty" />}
+              <div className="log-text">
+                <div className="owl-row">
+                  <b>{n?.name ?? e.node_id}</b>
+                  <span className="muted small">{fmt(e.ts)}</span>
+                </div>
+                <div className="owl-addr">{n?.addr ?? e.h3}</div>
+                <div className="small muted">
+                  {e.class} · {Math.round(e.conf * 100)}% · {e.n_hits} frames
+                </div>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}

@@ -64,6 +64,7 @@ GEOM_COLS = ("the_geom", "geometry", "geom", "wkt", "multipolygon", "shape")
 BUILDING_ID_COLS = ("bin", "doitt_id", "globalid", "objectid", "id")
 HEIGHT_COLS = ("heightroof", "height_roof", "height")
 ELEV_COLS = ("groundelev", "ground_elev", "elevation")
+BBL_COLS = ("base_bbl", "mappluto_bbl", "bbl")
 TREE_ID_COLS = ("tree_id", "id", "objectid")
 BRIDGE_ID_COLS = ("id", "objectid", "bridge_id", "name")
 POLYGON_ID_COLS = ("objectid", "id", "source_id", "parknum", "borocode", "name", "park_name", "boroname")
@@ -254,24 +255,57 @@ def local_ring(proj: Projector, part, simplify_m: float, min_area_m2: float) -> 
 
 # ---------------------------------------------------------------- bakes
 
+def load_addresses(con, pluto: Path, log) -> dict[str, str]:
+    """bbl -> address from PLUTO (Parquet/CSV); keys are the integer BBL as a string."""
+    src = source_sql(pluto)
+    cols = columns(con, src)
+    bbl = pick(cols, ("bbl",), "bbl")
+    addr = pick(cols, ("address",), "address")
+    rows = con.execute(f"SELECT CAST(CAST({q(bbl)} AS BIGINT) AS VARCHAR), {q(addr)} FROM {src} WHERE {q(addr)} IS NOT NULL").fetchall()
+    out = {b: a.strip().title() for b, a in rows if b and a}
+    log(f"addresses: {len(out)} lots from {pluto.name}")
+    return out
+
+
+def parse_disc(s: str) -> tuple[str, int]:
+    cell, k = s.split(",")
+    return cell.strip(), int(k)
+
+
+def disc_cells(cell: str, k: int) -> set[str]:
+    """Every r9 cell within k rings of `cell`: the hex-edged disc a district keeps."""
+    import h3
+
+    return set(h3.grid_disk(cell, k))
+
+
 def bake_buildings(con, path: Path, bbox, proj: Projector, res: int, simplify_m: float,
-                   min_area_m2: float, height_units: str, limit: int | None, keep_elev: bool, log) -> list[dict]:
+                   min_area_m2: float, height_units: str, limit: int | None, keep_elev: bool, log,
+                   addresses: dict[str, str] | None = None, disc: set[str] | None = None) -> list[dict]:
     import h3
 
     if is_geojson(path):
         log(f"buildings: {path.name} (GeoJSON)")
         rows = geojson_polygons(path, bbox, pad=0.004)
     else:
-        rows = wkt_polygons(con, path, bbox, 0.004, BUILDING_ID_COLS, {"height": HEIGHT_COLS, "elev": ELEV_COLS}, log)
+        rows = wkt_polygons(con, path, bbox, 0.004, BUILDING_ID_COLS, {"height": HEIGHT_COLS, "elev": ELEV_COLS, "bbl": BBL_COLS}, log)
 
     scale = FT_TO_M if height_units == "feet" else 1.0
     out: list[dict] = []
-    n_in = n_bad = n_small = 0
+    n_in = n_bad = n_small = n_addr = n_disc = 0
     for props, g in rows:
         n_in += 1
         if limit and n_in > limit:
             break
         rid = next((str(props[c]) for c in ("id",) + BUILDING_ID_COLS if props.get(c) not in (None, "")), str(n_in))
+        addr = None
+        if addresses:
+            bbl = next((props[c] for c in ("bbl",) + BBL_COLS if props.get(c) not in (None, "")), None)
+            if bbl is not None:
+                try:
+                    addr = addresses.get(str(int(float(bbl))))
+                except (TypeError, ValueError):
+                    addr = None
         height = to_float(props.get("height")) if "height" in props else next((to_float(props[c]) for c in HEIGHT_COLS if c in props), None)
         elev = to_float(props.get("elev")) if "elev" in props else next((to_float(props[c]) for c in ELEV_COLS if c in props), None)
         parts = polygon_parts(g)
@@ -285,25 +319,34 @@ def bake_buildings(con, path: Path, bbox, proj: Projector, res: int, simplify_m:
             c = part.centroid
             if not in_bbox(c.x, c.y, bbox):
                 continue
+            cell = h3.latlng_to_cell(c.y, c.x, res)
+            if disc is not None and cell not in disc:
+                n_disc += 1
+                continue
             footprint = local_ring(proj, part, simplify_m, min_area_m2)
             if footprint is None:
                 n_small += 1
                 continue
             rec = {
                 "id": rid if len(parts) == 1 else f"{rid}.{i + 1}",
-                "h3": h3.latlng_to_cell(c.y, c.x, res),
+                "h3": cell,
                 "footprint": footprint,
                 "height": h_m,
             }
             if keep_elev and elev is not None:
                 rec["elev"] = round(elev * scale, 1)  # opt-in: not in the renderer contract
+            if addr:
+                rec["addr"] = addr
+                n_addr += 1
             out.append(rec)
-    log(f"buildings: {n_in} candidates -> {len(out)} kept ({n_small} below {min_area_m2} m2 or degenerate, {n_bad} unparseable)")
+    log(f"buildings: {n_in} candidates -> {len(out)} kept ({n_small} below {min_area_m2} m2 or degenerate, {n_bad} unparseable, "
+        f"{n_disc} outside the disc, {n_addr} with a PLUTO address)")
     return out
 
 
-def bake_polygons(con, name: str, path: Path, bbox, proj: Projector, log) -> list[dict]:
+def bake_polygons(con, name: str, path: Path, bbox, proj: Projector, log, disc: set[str] | None = None) -> list[dict]:
     """Flat layer: every polygon part clipped to the bbox, as {id, ring} in local metres."""
+    import h3
     from shapely.geometry import box
 
     simplify_m, min_area_m2 = POLYGON_LAYERS[name]
@@ -324,6 +367,10 @@ def bake_polygons(con, name: str, path: Path, bbox, proj: Projector, log) -> lis
             continue
         parts = [p for p in polygon_parts(g) if not p.is_empty]
         for i, part in enumerate(parts):
+            if disc is not None:
+                c = part.centroid
+                if h3.latlng_to_cell(c.y, c.x, 9) not in disc:
+                    continue
             ring = local_ring(proj, part, simplify_m, min_area_m2)
             if ring is not None:
                 out.append({"id": rid if len(parts) == 1 else f"{rid}.{i + 1}", "ring": ring})
@@ -331,7 +378,8 @@ def bake_polygons(con, name: str, path: Path, bbox, proj: Projector, log) -> lis
     return out
 
 
-def bake_trees(con, path: Path, bbox, proj: Projector, res: int, limit: int | None, log) -> list[dict]:
+def bake_trees(con, path: Path, bbox, proj: Projector, res: int, limit: int | None, log,
+               disc: set[str] | None = None) -> list[dict]:
     import h3
 
     src = source_sql(path)
@@ -340,22 +388,30 @@ def bake_trees(con, path: Path, bbox, proj: Projector, res: int, limit: int | No
     lat = pick(cols, ("latitude", "lat"), "latitude")
     lon = pick(cols, ("longitude", "lon", "lng"), "longitude")
     status = cols.get("status")
+    addr = cols.get("address")
     where = (
         f"TRY_CAST({q(lon)} AS DOUBLE) BETWEEN {bbox[0]} AND {bbox[2]} AND "
         f"TRY_CAST({q(lat)} AS DOUBLE) BETWEEN {bbox[1]} AND {bbox[3]}"
     )
     if status:
         where += f" AND lower({q(status)}) = 'alive'"
-    sql = f"SELECT CAST({q(tid)} AS VARCHAR), TRY_CAST({q(lat)} AS DOUBLE), TRY_CAST({q(lon)} AS DOUBLE) FROM {src} WHERE {where}"
+    addr_expr = f"CAST({q(addr)} AS VARCHAR)" if addr else "NULL"
+    sql = f"SELECT CAST({q(tid)} AS VARCHAR), TRY_CAST({q(lat)} AS DOUBLE), TRY_CAST({q(lon)} AS DOUBLE), {addr_expr} FROM {src} WHERE {where}"
     if limit:
         sql += f" LIMIT {int(limit)}"
-    log(f"trees: {path.name} id={tid} status_filter={'alive' if status else 'none'}")
+    log(f"trees: {path.name} id={tid} status_filter={'alive' if status else 'none'} address={'yes' if addr else 'no'}")
     out = []
-    for rid, la, lo in con.execute(sql).fetchall():
+    for rid, la, lo, a in con.execute(sql).fetchall():
         if la is None or lo is None:
             continue
+        cell = h3.latlng_to_cell(la, lo, res)
+        if disc is not None and cell not in disc:
+            continue
         x, y = proj.xy(lo, la)
-        out.append({"id": rid, "x": round(x, 1), "y": round(y, 1), "h3": h3.latlng_to_cell(la, lo, res)})
+        rec = {"id": rid, "x": round(x, 1), "y": round(y, 1), "h3": cell}
+        if a:
+            rec["addr"] = a.strip().title()  # the street address the tree pit fronts, e.g. "100 Waverly Avenue"
+        out.append(rec)
     log(f"trees: {len(out)} kept")
     return out
 
@@ -395,6 +451,9 @@ def main(argv=None) -> int:
     ap.add_argument("--buildings", type=Path, help="Building Footprints CSV/Parquet (5zhs-2jue)")
     ap.add_argument("--trees", type=Path, help="2015 Street Tree Census CSV/Parquet (uvpi-gqnh)")
     ap.add_argument("--bridges", type=Path, help="optional WKT line file for bridges")
+    ap.add_argument("--pluto", type=Path, help="PLUTO Parquet/CSV: adds 'addr' to each building by BBL")
+    ap.add_argument("--disc", type=parse_disc, default=None,
+                    help="H3,K: keep only buildings/roads/trees whose r9 cell is within K rings of cell H3 (a hex-edged disc)")
     for layer in POLYGON_LAYERS:
         ap.add_argument(f"--{layer}", type=Path, help=f"optional polygon file (GeoJSON or WKT) -> {layer}.json")
     ap.add_argument("--out", type=Path, default=Path("public/city"), help="output directory (default public/city)")
@@ -413,7 +472,7 @@ def main(argv=None) -> int:
     layer_paths = {layer: getattr(args, layer) for layer in POLYGON_LAYERS}
     if not (args.buildings or args.trees or args.bridges or any(layer_paths.values())):
         ap.error("nothing to do: pass at least one of --buildings, --trees, --bridges, --land, --roads, --parks, --water")
-    for p in (args.buildings, args.trees, args.bridges, *layer_paths.values()):
+    for p in (args.buildings, args.trees, args.bridges, args.pluto, *layer_paths.values()):
         if p and not p.exists():
             ap.error(f"{p} does not exist (this script never downloads; see data/bake_open_data.py)")
 
@@ -436,12 +495,17 @@ def main(argv=None) -> int:
         return path
 
     counts: dict[str, int] = {}
+    disc = disc_cells(*args.disc) if args.disc else None
+    if disc:
+        log(f"disc: {len(disc)} r9 cells within {args.disc[1]} rings of {args.disc[0]}")
     if args.buildings:
-        b = bake_buildings(con, args.buildings, bbox, proj, args.res, args.simplify, args.min_area, args.height_units, args.limit, args.elev, log)
+        addresses = load_addresses(con, args.pluto, log) if args.pluto else None
+        b = bake_buildings(con, args.buildings, bbox, proj, args.res, args.simplify, args.min_area, args.height_units, args.limit, args.elev, log,
+                           addresses=addresses, disc=disc)
         dump("buildings.json", b)
         counts["buildings"] = len(b)
     if args.trees:
-        t = bake_trees(con, args.trees, bbox, proj, args.res, args.limit, log)
+        t = bake_trees(con, args.trees, bbox, proj, args.res, args.limit, log, disc=disc)
         dump("trees.json", t)
         counts["trees"] = len(t)
     if args.bridges:
@@ -450,7 +514,7 @@ def main(argv=None) -> int:
         counts["bridges"] = len(br)
     for layer, path in layer_paths.items():
         if path:
-            polys = bake_polygons(con, layer, path, bbox, proj, log)
+            polys = bake_polygons(con, layer, path, bbox, proj, log, disc=disc)
             dump(f"{layer}.json", polys)
             counts[layer] = len(polys)
 

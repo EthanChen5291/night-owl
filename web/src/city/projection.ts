@@ -11,6 +11,7 @@ export interface LatLon {
 export interface Projector {
   centre: LatLon
   xy(lat: number, lon: number): [number, number]
+  latLon(x: number, y: number): LatLon
 }
 
 export function makeProjector(centre: LatLon): Projector {
@@ -18,6 +19,7 @@ export function makeProjector(centre: LatLon): Projector {
   return {
     centre,
     xy: (lat, lon) => [(lon - centre.lon) * kx, (lat - centre.lat) * M_PER_DEG],
+    latLon: (x, y) => ({ lat: centre.lat + y / M_PER_DEG, lon: centre.lon + x / kx }),
   }
 }
 

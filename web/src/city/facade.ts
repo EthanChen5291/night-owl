@@ -40,7 +40,7 @@ export function facadeTextures(): { map: THREE.CanvasTexture; emissive: THREE.Ca
       a.fillStyle = '#cdc9c1' // sill
       a.fillRect(x - bw * 0.04, y + h, w + bw * 0.08, fh * 0.06)
       if (rnd() < 0.38) {
-        e.fillStyle = `rgba(255, 214, 160, ${(0.55 + rnd() * 0.45).toFixed(2)})`
+        e.fillStyle = `rgba(255, 255, 255, ${(0.55 + rnd() * 0.45).toFixed(2)})` // white mask: the look's window colour tints it
         e.fillRect(x, y, w, h)
       }
     }

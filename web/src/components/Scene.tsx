@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { CityScene, type HoverHandler } from '../city/scene'
-import type { Building, Cell, CityLayers, Mode, PlanNode, Preset } from '../types'
+import { CityScene, type SceneCallbacks } from '../city/scene'
+import type { AddressIndex } from '../city/addresses'
+import type { Area, Cell, CityLayers, Mode, OwlNode, PlanNode, Preset, Spot, Tile } from '../types'
 import type { LatLon } from '../city/projection'
 
 interface Props {
@@ -10,25 +11,42 @@ interface Props {
   preset: Preset
   plan: PlanNode[]
   showPlan: boolean
-  buildings: Building[] | null
-  layers: CityLayers | null
+  spots: Spot[]
+  cityLayers: CityLayers | null
+  areaLayers: CityLayers | null
+  tiles: Map<string, Tile>
+  areas: Area[]
+  tileAreas: Record<string, string | null | undefined>
+  activeArea: string | null
+  nodes: OwlNode[]
+  selectedNode: string | null
+  index: AddressIndex | null
   flash: { h3: string; seq: number } | null
-  focus: { h3: string; seq: number } | null
-  onHover: HoverHandler
+  focus: { lat: number; lon: number; distance?: number; seq: number } | null
+  onHover: SceneCallbacks['onHover']
+  onClick: SceneCallbacks['onClick']
+  onView: SceneCallbacks['onView']
 }
 
 /** The only component that touches three.js. Owns one CityScene for the life of the canvas. */
-export default function Scene({ centre, cells, mode, preset, plan, showPlan, buildings, layers, flash, focus, onHover }: Props) {
+export default function Scene(props: Props) {
+  const { centre, cells, mode, preset, plan, showPlan, spots, cityLayers, areaLayers, tiles, areas, tileAreas, activeArea, nodes, selectedNode, index, flash, focus } = props
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<CityScene | null>(null)
-  const hoverRef = useRef(onHover)
-  hoverRef.current = onHover
+  const cbRef = useRef({ onHover: props.onHover, onClick: props.onClick, onView: props.onView })
+  cbRef.current = { onHover: props.onHover, onClick: props.onClick, onView: props.onView }
+  const firstArea = useRef(true)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const scene = new CityScene(canvas, centre, (h3, x, y) => hoverRef.current(h3, x, y))
+    const scene = new CityScene(canvas, centre, {
+      onHover: (info) => cbRef.current.onHover(info),
+      onClick: (info) => cbRef.current.onClick(info),
+      onView: (view) => cbRef.current.onView(view),
+    })
     sceneRef.current = scene
+    if (import.meta.env.DEV) (window as unknown as { __barnowl?: CityScene }).__barnowl = scene // the screenshot scripts ask it where things are
     return () => {
       scene.dispose()
       sceneRef.current = null
@@ -40,37 +58,51 @@ export default function Scene({ centre, cells, mode, preset, plan, showPlan, bui
   useEffect(() => {
     sceneRef.current?.setCells(cells, mode)
   }, [cells, mode])
-
   useEffect(() => {
     sceneRef.current?.setMode(mode)
   }, [mode])
-
   useEffect(() => {
     sceneRef.current?.setPreset(preset)
   }, [preset])
-
   useEffect(() => {
     sceneRef.current?.setPlan(plan)
   }, [plan, cells])
-
   useEffect(() => {
     sceneRef.current?.setPlanVisible(showPlan)
   }, [showPlan])
-
   useEffect(() => {
-    if (buildings) sceneRef.current?.setBuildings(buildings)
-  }, [buildings])
-
+    sceneRef.current?.setSpots(spots)
+  }, [spots])
   useEffect(() => {
-    if (layers) sceneRef.current?.setLayers(layers)
-  }, [layers])
-
+    if (cityLayers) sceneRef.current?.setCityLayers(cityLayers)
+  }, [cityLayers])
+  useEffect(() => {
+    sceneRef.current?.setAreaLayers(areaLayers)
+  }, [areaLayers])
+  useEffect(() => {
+    sceneRef.current?.setTiles(tiles)
+  }, [tiles])
+  useEffect(() => {
+    sceneRef.current?.setAreas(areas)
+  }, [areas])
+  useEffect(() => {
+    sceneRef.current?.setTileAreas(tileAreas)
+  }, [tileAreas])
+  useEffect(() => {
+    sceneRef.current?.setActiveArea(activeArea, firstArea.current)
+    firstArea.current = false
+  }, [activeArea, areas])
+  useEffect(() => {
+    sceneRef.current?.setNodes(nodes, selectedNode)
+  }, [nodes, selectedNode])
+  useEffect(() => {
+    sceneRef.current?.setAddressIndex(index)
+  }, [index])
   useEffect(() => {
     if (flash) sceneRef.current?.flash(flash.h3)
   }, [flash])
-
   useEffect(() => {
-    if (focus) sceneRef.current?.focusCell(focus.h3)
+    if (focus) sceneRef.current?.focusLatLon(focus.lat, focus.lon, focus.distance)
   }, [focus])
 
   return <canvas ref={canvasRef} className="scene" />
