@@ -4,8 +4,10 @@ frames/
 frames_pruned/
 frames_aug/
 labels/
+labels_person/
 labels_aug/
 dataset/
+dataset_v2/
 runs/
 events/
 *.pt

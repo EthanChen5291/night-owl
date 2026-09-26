@@ -1,21 +1,38 @@
+import io
 import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 VISION = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(VISION))
 sys.path.insert(0, str(VISION / "pi"))
 
-from detect import Det, EventGate  # noqa: E402
+from detect import Det, EventGate, post_event  # noqa: E402
 from eval_events import score_pushes  # noqa: E402
 from make_dataset import check_label, main as make_dataset  # noqa: E402
 from promote_model import main as promote  # noqa: E402
+from replay_video import clip_time  # noqa: E402
 from train_model import sha256  # noqa: E402
 
 
 class EventTests(unittest.TestCase):
+    def test_http_success_without_acceptance_is_not_score_update(self):
+        for accepted in (True, False):
+            response = io.BytesIO(json.dumps({"ok": True, "accepted": accepted}).encode())
+            response.status = 200
+            with patch("urllib.request.urlopen", return_value=response):
+                updated, note = post_event("http://127.0.0.1:8000", {"class": "rat"})
+            self.assertIs(updated, accepted)
+            self.assertIn(f"accepted={str(accepted).lower()}", note)
+
+    def test_video_time_uses_recorded_pts_or_fps(self):
+        self.assertEqual(clip_time(0, 15, 0, None), 0)
+        self.assertAlmostEqual(clip_time(1, 15, 66.67, 0), .06667)
+        self.assertAlmostEqual(clip_time(2, 15, 0, .06667), 2 / 15)
+
     def test_requires_consecutive_hits_and_uses_current_box(self):
         gate = EventGate(hits_needed=3, window_s=1, cooldown_s=2)
         a = Det("rat", .9, .1, .5, .1, .1)
@@ -104,6 +121,12 @@ class DataTests(unittest.TestCase):
             self.assertEqual(promote(args), 0)
             self.assertEqual((root / "pi" / "rat.onnx").read_bytes(), b"candidate")
             self.assertEqual(json.loads((root / "pi" / "rat_config.json").read_text())["conf"], .5)
+            event["selected_conf"] = .4
+            event["results"][0]["conf"] = .4
+            event_path.write_text(json.dumps(event))
+            with self.assertRaises(SystemExit):
+                promote(args)
+            self.assertEqual(promote(args + ["--api-min-conf", ".4"]), 0)
 
 
 if __name__ == "__main__":
