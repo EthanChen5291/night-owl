@@ -324,6 +324,7 @@ export default function App() {
     if (liveRef.current.queue) return false
     liveRef.current.queue = true
     seenRef.current.clear()
+    primedRef.current = false
     setEvents([])
     setFlash(null)
     setQueueSource('live')
@@ -366,11 +367,9 @@ export default function App() {
   // ---- SSE at /api/stream: the server names its messages, so listen for `event`, not the default channel
   useEffect(() => {
     if (typeof EventSource === 'undefined') return
-    const es = new EventSource('/api/stream')
-    es.onopen = () => {
-      setStreaming(true)
-      activateLiveQueue()
-    }
+    let disposed = false
+    let source: EventSource | null = null
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
     const onEvent = (msg: MessageEvent) => {
       try {
         const body = JSON.parse(msg.data as string) as RatEvent | { events: RatEvent[] }
@@ -380,19 +379,46 @@ export default function App() {
         /* not an event */
       }
     }
-    es.addEventListener('event', onEvent)
-    es.onmessage = onEvent
-    es.addEventListener('reset', () => {
+    const onReset = () => {
       activateLiveQueue()
       seenRef.current.clear()
       setEvents([])
       setFlash(null)
       void loadCells(monthRef.current)
       void loadPlan(monthRef.current, planBudgetRef.current)
-    })
-    // EventSource reconnects by itself; polling continues while it is disconnected.
-    es.onerror = () => setStreaming(false)
-    return () => es.close()
+    }
+    const connect = () => {
+      if (disposed) return
+      const es = new EventSource('/api/stream')
+      source = es
+      es.onopen = () => {
+        setStreaming(true)
+        activateLiveQueue()
+      }
+      es.addEventListener('event', onEvent)
+      es.onmessage = onEvent
+      es.addEventListener('reset', onReset)
+      es.onerror = () => {
+        setStreaming(false)
+        // The browser retries CONNECTING streams. A terminal HTTP error closes the
+        // stream, so open a new one while queue polling continues.
+        if (disposed || source !== es || es.readyState !== EventSource.CLOSED) return
+        es.close()
+        source = null
+        if (retryTimer === null) {
+          retryTimer = setTimeout(() => {
+            retryTimer = null
+            connect()
+          }, 3000)
+        }
+      }
+    }
+    connect()
+    return () => {
+      disposed = true
+      if (retryTimer !== null) clearTimeout(retryTimer)
+      source?.close()
+    }
   }, [activateLiveQueue, loadCells, loadPlan])
 
   // ---- derived
