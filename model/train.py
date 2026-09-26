@@ -24,7 +24,7 @@ from sklearn.model_selection import GroupKFold
 from common import (A_FEATURES, A_ONLY_FEATURES, ACS_ABLATION, B_FEATURES, MONTHS, OUT, RMZ_ABLATION, Timer,
                     check_leakage, dump_json, lgb_params, load_features)
 
-N_ROUNDS_A, N_ROUNDS_B, N_ROUNDS_P, N_BOOT = 400, 400, 200, 5
+N_ROUNDS_A, N_ROUNDS_B, N_ROUNDS_P, N_BOOT = 300, 250, 150, 5
 A_START = "2016-01"  # first month with a full 12-month lag history
 
 
@@ -74,9 +74,9 @@ def binary_metrics(y, p):
 
 
 def precision_at_k_cells(rows: pd.DataFrame, p: np.ndarray, k=50) -> float:
-    """Rank cells by mean predicted P(active) over the slice; share of the top-k cells with any active find."""
-    d = pd.DataFrame({"h3": rows.h3.values, "p": p, "y": rows.active.values})
-    g = d.groupby("h3").agg(p=("p", "mean"), y=("y", "max")).sort_values("p", ascending=False)
+    """Rank cell-months by mean predicted P(active); share of the top-k with at least one active find."""
+    d = pd.DataFrame({"h3": rows.h3.values, "month": rows.month.values, "p": p, "y": rows.active.values})
+    g = d.groupby(["h3", "month"]).agg(p=("p", "mean"), y=("y", "max")).sort_values("p", ascending=False)
     return round(float(g.y.head(k).mean()), 4)
 
 
@@ -163,7 +163,7 @@ def main() -> None:
             m = lgb.train(lgb_params("binary"), lgb.Dataset(X[~hold], y[~hold], weight=None if ww is None else ww[~hold]), N_ROUNDS_B)
             ph = m.predict(X[hold])
             res["holdout_rmz_last12"] = binary_metrics(y[hold], ph)
-            res["holdout_rmz_last12"]["precision_at_50_cells"] = precision_at_k_cells(rows[hold], ph)
+            res["holdout_rmz_last12"]["precision_at_50_cell_months"] = precision_at_k_cells(rows[hold], ph)
             metrics["model_b"][name] = res
             print(name, res)
             if name == "B_full":

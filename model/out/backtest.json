@@ -1,0 +1,777 @@
+{
+ "window": [
+  "2016-01",
+  "2026-07"
+ ],
+ "k": 50,
+ "series": [
+  {
+   "month": "2016-01",
+   "precision_silent": 0.0,
+   "precision_311": 0.22,
+   "n_positives": 240
+  },
+  {
+   "month": "2016-02",
+   "precision_silent": 0.0,
+   "precision_311": 0.24,
+   "n_positives": 308
+  },
+  {
+   "month": "2016-03",
+   "precision_silent": 0.0,
+   "precision_311": 0.24,
+   "n_positives": 335
+  },
+  {
+   "month": "2016-04",
+   "precision_silent": 0.0,
+   "precision_311": 0.26,
+   "n_positives": 287
+  },
+  {
+   "month": "2016-05",
+   "precision_silent": 0.02,
+   "precision_311": 0.24,
+   "n_positives": 266
+  },
+  {
+   "month": "2016-06",
+   "precision_silent": 0.02,
+   "precision_311": 0.28,
+   "n_positives": 293
+  },
+  {
+   "month": "2016-07",
+   "precision_silent": 0.0,
+   "precision_311": 0.3,
+   "n_positives": 318
+  },
+  {
+   "month": "2016-08",
+   "precision_silent": 0.0,
+   "precision_311": 0.18,
+   "n_positives": 347
+  },
+  {
+   "month": "2016-09",
+   "precision_silent": 0.0,
+   "precision_311": 0.22,
+   "n_positives": 339
+  },
+  {
+   "month": "2016-10",
+   "precision_silent": 0.08,
+   "precision_311": 0.36,
+   "n_positives": 373
+  },
+  {
+   "month": "2016-11",
+   "precision_silent": 0.02,
+   "precision_311": 0.26,
+   "n_positives": 352
+  },
+  {
+   "month": "2016-12",
+   "precision_silent": 0.02,
+   "precision_311": 0.14,
+   "n_positives": 322
+  },
+  {
+   "month": "2017-01",
+   "precision_silent": 0.02,
+   "precision_311": 0.3,
+   "n_positives": 355
+  },
+  {
+   "month": "2017-02",
+   "precision_silent": 0.04,
+   "precision_311": 0.28,
+   "n_positives": 398
+  },
+  {
+   "month": "2017-03",
+   "precision_silent": 0.02,
+   "precision_311": 0.16,
+   "n_positives": 373
+  },
+  {
+   "month": "2017-04",
+   "precision_silent": 0.02,
+   "precision_311": 0.5,
+   "n_positives": 373
+  },
+  {
+   "month": "2017-05",
+   "precision_silent": 0.02,
+   "precision_311": 0.24,
+   "n_positives": 375
+  },
+  {
+   "month": "2017-06",
+   "precision_silent": 0.04,
+   "precision_311": 0.3,
+   "n_positives": 402
+  },
+  {
+   "month": "2017-07",
+   "precision_silent": 0.0,
+   "precision_311": 0.22,
+   "n_positives": 362
+  },
+  {
+   "month": "2017-08",
+   "precision_silent": 0.0,
+   "precision_311": 0.28,
+   "n_positives": 454
+  },
+  {
+   "month": "2017-09",
+   "precision_silent": 0.02,
+   "precision_311": 0.32,
+   "n_positives": 458
+  },
+  {
+   "month": "2017-10",
+   "precision_silent": 0.0,
+   "precision_311": 0.62,
+   "n_positives": 419
+  },
+  {
+   "month": "2017-11",
+   "precision_silent": 0.0,
+   "precision_311": 0.44,
+   "n_positives": 390
+  },
+  {
+   "month": "2017-12",
+   "precision_silent": 0.0,
+   "precision_311": 0.24,
+   "n_positives": 331
+  },
+  {
+   "month": "2018-01",
+   "precision_silent": 0.02,
+   "precision_311": 0.28,
+   "n_positives": 348
+  },
+  {
+   "month": "2018-02",
+   "precision_silent": 0.02,
+   "precision_311": 0.24,
+   "n_positives": 394
+  },
+  {
+   "month": "2018-03",
+   "precision_silent": 0.02,
+   "precision_311": 0.2,
+   "n_positives": 514
+  },
+  {
+   "month": "2018-04",
+   "precision_silent": 0.02,
+   "precision_311": 0.38,
+   "n_positives": 516
+  },
+  {
+   "month": "2018-05",
+   "precision_silent": 0.02,
+   "precision_311": 0.4,
+   "n_positives": 486
+  },
+  {
+   "month": "2018-06",
+   "precision_silent": 0.0,
+   "precision_311": 0.42,
+   "n_positives": 549
+  },
+  {
+   "month": "2018-07",
+   "precision_silent": 0.0,
+   "precision_311": 0.26,
+   "n_positives": 410
+  },
+  {
+   "month": "2018-08",
+   "precision_silent": 0.0,
+   "precision_311": 0.36,
+   "n_positives": 451
+  },
+  {
+   "month": "2018-09",
+   "precision_silent": 0.02,
+   "precision_311": 0.28,
+   "n_positives": 476
+  },
+  {
+   "month": "2018-10",
+   "precision_silent": 0.0,
+   "precision_311": 0.32,
+   "n_positives": 516
+  },
+  {
+   "month": "2018-11",
+   "precision_silent": 0.0,
+   "precision_311": 0.12,
+   "n_positives": 405
+  },
+  {
+   "month": "2018-12",
+   "precision_silent": 0.02,
+   "precision_311": 0.42,
+   "n_positives": 516
+  },
+  {
+   "month": "2019-01",
+   "precision_silent": 0.0,
+   "precision_311": 0.3,
+   "n_positives": 470
+  },
+  {
+   "month": "2019-02",
+   "precision_silent": 0.0,
+   "precision_311": 0.34,
+   "n_positives": 435
+  },
+  {
+   "month": "2019-03",
+   "precision_silent": 0.0,
+   "precision_311": 0.34,
+   "n_positives": 512
+  },
+  {
+   "month": "2019-04",
+   "precision_silent": 0.04,
+   "precision_311": 0.42,
+   "n_positives": 558
+  },
+  {
+   "month": "2019-05",
+   "precision_silent": 0.02,
+   "precision_311": 0.42,
+   "n_positives": 460
+  },
+  {
+   "month": "2019-06",
+   "precision_silent": 0.0,
+   "precision_311": 0.26,
+   "n_positives": 465
+  },
+  {
+   "month": "2019-07",
+   "precision_silent": 0.0,
+   "precision_311": 0.18,
+   "n_positives": 362
+  },
+  {
+   "month": "2019-08",
+   "precision_silent": 0.04,
+   "precision_311": 0.3,
+   "n_positives": 412
+  },
+  {
+   "month": "2019-09",
+   "precision_silent": 0.02,
+   "precision_311": 0.2,
+   "n_positives": 482
+  },
+  {
+   "month": "2019-10",
+   "precision_silent": 0.06,
+   "precision_311": 0.2,
+   "n_positives": 410
+  },
+  {
+   "month": "2019-11",
+   "precision_silent": 0.0,
+   "precision_311": 0.36,
+   "n_positives": 429
+  },
+  {
+   "month": "2019-12",
+   "precision_silent": 0.04,
+   "precision_311": 0.38,
+   "n_positives": 473
+  },
+  {
+   "month": "2020-01",
+   "precision_silent": 0.0,
+   "precision_311": 0.26,
+   "n_positives": 196
+  },
+  {
+   "month": "2020-02",
+   "precision_silent": 0.02,
+   "precision_311": 0.32,
+   "n_positives": 339
+  },
+  {
+   "month": "2020-03",
+   "precision_silent": 0.02,
+   "precision_311": 0.24,
+   "n_positives": 279
+  },
+  {
+   "month": "2020-04",
+   "precision_silent": 0.0,
+   "precision_311": 0.0,
+   "n_positives": 0
+  },
+  {
+   "month": "2020-05",
+   "precision_silent": 0.0,
+   "precision_311": 0.18,
+   "n_positives": 118
+  },
+  {
+   "month": "2020-06",
+   "precision_silent": 0.0,
+   "precision_311": 0.22,
+   "n_positives": 229
+  },
+  {
+   "month": "2020-07",
+   "precision_silent": 0.0,
+   "precision_311": 0.2,
+   "n_positives": 239
+  },
+  {
+   "month": "2020-08",
+   "precision_silent": 0.0,
+   "precision_311": 0.24,
+   "n_positives": 279
+  },
+  {
+   "month": "2020-09",
+   "precision_silent": 0.0,
+   "precision_311": 0.36,
+   "n_positives": 321
+  },
+  {
+   "month": "2020-10",
+   "precision_silent": 0.0,
+   "precision_311": 0.08,
+   "n_positives": 145
+  },
+  {
+   "month": "2020-11",
+   "precision_silent": 0.0,
+   "precision_311": 0.12,
+   "n_positives": 164
+  },
+  {
+   "month": "2020-12",
+   "precision_silent": 0.0,
+   "precision_311": 0.36,
+   "n_positives": 243
+  },
+  {
+   "month": "2021-01",
+   "precision_silent": 0.02,
+   "precision_311": 0.26,
+   "n_positives": 245
+  },
+  {
+   "month": "2021-02",
+   "precision_silent": 0.02,
+   "precision_311": 0.1,
+   "n_positives": 157
+  },
+  {
+   "month": "2021-03",
+   "precision_silent": 0.0,
+   "precision_311": 0.18,
+   "n_positives": 285
+  },
+  {
+   "month": "2021-04",
+   "precision_silent": 0.0,
+   "precision_311": 0.3,
+   "n_positives": 355
+  },
+  {
+   "month": "2021-05",
+   "precision_silent": 0.02,
+   "precision_311": 0.36,
+   "n_positives": 412
+  },
+  {
+   "month": "2021-06",
+   "precision_silent": 0.0,
+   "precision_311": 0.34,
+   "n_positives": 449
+  },
+  {
+   "month": "2021-07",
+   "precision_silent": 0.0,
+   "precision_311": 0.36,
+   "n_positives": 495
+  },
+  {
+   "month": "2021-08",
+   "precision_silent": 0.0,
+   "precision_311": 0.36,
+   "n_positives": 523
+  },
+  {
+   "month": "2021-09",
+   "precision_silent": 0.0,
+   "precision_311": 0.14,
+   "n_positives": 250
+  },
+  {
+   "month": "2021-10",
+   "precision_silent": 0.02,
+   "precision_311": 0.28,
+   "n_positives": 195
+  },
+  {
+   "month": "2021-11",
+   "precision_silent": 0.0,
+   "precision_311": 0.26,
+   "n_positives": 376
+  },
+  {
+   "month": "2021-12",
+   "precision_silent": 0.02,
+   "precision_311": 0.38,
+   "n_positives": 433
+  },
+  {
+   "month": "2022-01",
+   "precision_silent": 0.0,
+   "precision_311": 0.38,
+   "n_positives": 487
+  },
+  {
+   "month": "2022-02",
+   "precision_silent": 0.02,
+   "precision_311": 0.32,
+   "n_positives": 525
+  },
+  {
+   "month": "2022-03",
+   "precision_silent": 0.02,
+   "precision_311": 0.24,
+   "n_positives": 604
+  },
+  {
+   "month": "2022-04",
+   "precision_silent": 0.04,
+   "precision_311": 0.44,
+   "n_positives": 555
+  },
+  {
+   "month": "2022-05",
+   "precision_silent": 0.02,
+   "precision_311": 0.24,
+   "n_positives": 512
+  },
+  {
+   "month": "2022-06",
+   "precision_silent": 0.0,
+   "precision_311": 0.36,
+   "n_positives": 540
+  },
+  {
+   "month": "2022-07",
+   "precision_silent": 0.0,
+   "precision_311": 0.34,
+   "n_positives": 531
+  },
+  {
+   "month": "2022-08",
+   "precision_silent": 0.0,
+   "precision_311": 0.36,
+   "n_positives": 536
+  },
+  {
+   "month": "2022-09",
+   "precision_silent": 0.0,
+   "precision_311": 0.42,
+   "n_positives": 536
+  },
+  {
+   "month": "2022-10",
+   "precision_silent": 0.0,
+   "precision_311": 0.3,
+   "n_positives": 510
+  },
+  {
+   "month": "2022-11",
+   "precision_silent": 0.02,
+   "precision_311": 0.28,
+   "n_positives": 497
+  },
+  {
+   "month": "2022-12",
+   "precision_silent": 0.04,
+   "precision_311": 0.26,
+   "n_positives": 507
+  },
+  {
+   "month": "2023-01",
+   "precision_silent": 0.0,
+   "precision_311": 0.18,
+   "n_positives": 547
+  },
+  {
+   "month": "2023-02",
+   "precision_silent": 0.02,
+   "precision_311": 0.28,
+   "n_positives": 566
+  },
+  {
+   "month": "2023-03",
+   "precision_silent": 0.06,
+   "precision_311": 0.38,
+   "n_positives": 582
+  },
+  {
+   "month": "2023-04",
+   "precision_silent": 0.02,
+   "precision_311": 0.4,
+   "n_positives": 550
+  },
+  {
+   "month": "2023-05",
+   "precision_silent": 0.02,
+   "precision_311": 0.38,
+   "n_positives": 573
+  },
+  {
+   "month": "2023-06",
+   "precision_silent": 0.02,
+   "precision_311": 0.38,
+   "n_positives": 486
+  },
+  {
+   "month": "2023-07",
+   "precision_silent": 0.0,
+   "precision_311": 0.42,
+   "n_positives": 417
+  },
+  {
+   "month": "2023-08",
+   "precision_silent": 0.0,
+   "precision_311": 0.34,
+   "n_positives": 526
+  },
+  {
+   "month": "2023-09",
+   "precision_silent": 0.0,
+   "precision_311": 0.48,
+   "n_positives": 450
+  },
+  {
+   "month": "2023-10",
+   "precision_silent": 0.02,
+   "precision_311": 0.54,
+   "n_positives": 563
+  },
+  {
+   "month": "2023-11",
+   "precision_silent": 0.02,
+   "precision_311": 0.28,
+   "n_positives": 476
+  },
+  {
+   "month": "2023-12",
+   "precision_silent": 0.02,
+   "precision_311": 0.22,
+   "n_positives": 507
+  },
+  {
+   "month": "2024-01",
+   "precision_silent": 0.02,
+   "precision_311": 0.3,
+   "n_positives": 567
+  },
+  {
+   "month": "2024-02",
+   "precision_silent": 0.02,
+   "precision_311": 0.24,
+   "n_positives": 570
+  },
+  {
+   "month": "2024-03",
+   "precision_silent": 0.04,
+   "precision_311": 0.24,
+   "n_positives": 507
+  },
+  {
+   "month": "2024-04",
+   "precision_silent": 0.02,
+   "precision_311": 0.34,
+   "n_positives": 517
+  },
+  {
+   "month": "2024-05",
+   "precision_silent": 0.04,
+   "precision_311": 0.24,
+   "n_positives": 488
+  },
+  {
+   "month": "2024-06",
+   "precision_silent": 0.02,
+   "precision_311": 0.22,
+   "n_positives": 450
+  },
+  {
+   "month": "2024-07",
+   "precision_silent": 0.0,
+   "precision_311": 0.28,
+   "n_positives": 424
+  },
+  {
+   "month": "2024-08",
+   "precision_silent": 0.02,
+   "precision_311": 0.36,
+   "n_positives": 403
+  },
+  {
+   "month": "2024-09",
+   "precision_silent": 0.02,
+   "precision_311": 0.42,
+   "n_positives": 447
+  },
+  {
+   "month": "2024-10",
+   "precision_silent": 0.0,
+   "precision_311": 0.46,
+   "n_positives": 499
+  },
+  {
+   "month": "2024-11",
+   "precision_silent": 0.0,
+   "precision_311": 0.12,
+   "n_positives": 336
+  },
+  {
+   "month": "2024-12",
+   "precision_silent": 0.02,
+   "precision_311": 0.14,
+   "n_positives": 273
+  },
+  {
+   "month": "2025-01",
+   "precision_silent": 0.0,
+   "precision_311": 0.26,
+   "n_positives": 360
+  },
+  {
+   "month": "2025-02",
+   "precision_silent": 0.0,
+   "precision_311": 0.24,
+   "n_positives": 365
+  },
+  {
+   "month": "2025-03",
+   "precision_silent": 0.02,
+   "precision_311": 0.26,
+   "n_positives": 401
+  },
+  {
+   "month": "2025-04",
+   "precision_silent": 0.0,
+   "precision_311": 0.18,
+   "n_positives": 460
+  },
+  {
+   "month": "2025-05",
+   "precision_silent": 0.02,
+   "precision_311": 0.28,
+   "n_positives": 398
+  },
+  {
+   "month": "2025-06",
+   "precision_silent": 0.0,
+   "precision_311": 0.36,
+   "n_positives": 350
+  },
+  {
+   "month": "2025-07",
+   "precision_silent": 0.04,
+   "precision_311": 0.36,
+   "n_positives": 397
+  },
+  {
+   "month": "2025-08",
+   "precision_silent": 0.0,
+   "precision_311": 0.28,
+   "n_positives": 381
+  },
+  {
+   "month": "2025-09",
+   "precision_silent": 0.0,
+   "precision_311": 0.3,
+   "n_positives": 367
+  },
+  {
+   "month": "2025-10",
+   "precision_silent": 0.0,
+   "precision_311": 0.24,
+   "n_positives": 367
+  },
+  {
+   "month": "2025-11",
+   "precision_silent": 0.0,
+   "precision_311": 0.1,
+   "n_positives": 299
+  },
+  {
+   "month": "2025-12",
+   "precision_silent": 0.0,
+   "precision_311": 0.14,
+   "n_positives": 338
+  },
+  {
+   "month": "2026-01",
+   "precision_silent": 0.0,
+   "precision_311": 0.1,
+   "n_positives": 362
+  },
+  {
+   "month": "2026-02",
+   "precision_silent": 0.0,
+   "precision_311": 0.18,
+   "n_positives": 281
+  },
+  {
+   "month": "2026-03",
+   "precision_silent": 0.0,
+   "precision_311": 0.2,
+   "n_positives": 424
+  },
+  {
+   "month": "2026-04",
+   "precision_silent": 0.0,
+   "precision_311": 0.22,
+   "n_positives": 464
+  },
+  {
+   "month": "2026-05",
+   "precision_silent": 0.02,
+   "precision_311": 0.26,
+   "n_positives": 415
+  },
+  {
+   "month": "2026-06",
+   "precision_silent": 0.0,
+   "precision_311": 0.44,
+   "n_positives": 383
+  },
+  {
+   "month": "2026-07",
+   "precision_silent": 0.0,
+   "precision_311": 0.14,
+   "n_positives": 314
+  }
+ ],
+ "summary": {
+  "mean_precision_silent": 0.012,
+  "mean_precision_311": 0.2854,
+  "lift": 0.0419
+ },
+ "synthetic": false
+}

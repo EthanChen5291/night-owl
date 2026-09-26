@@ -82,7 +82,7 @@ def percentile_rank(x: np.ndarray) -> np.ndarray:
 
 def lgb_params(objective: str, seed: int = 0, **kw) -> dict:
     p = dict(
-        objective=objective, learning_rate=0.05, num_leaves=63, min_data_in_leaf=100,
+        objective=objective, learning_rate=0.06, num_leaves=31, min_data_in_leaf=100,
         feature_fraction=0.8, bagging_fraction=0.8, bagging_freq=1, lambda_l2=1.0,
         verbose=-1, num_threads=N_THREADS, seed=seed, deterministic=False,
     )
