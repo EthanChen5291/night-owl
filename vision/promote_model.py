@@ -21,9 +21,12 @@ def main(argv=None) -> int:
     ap.add_argument("--allow-unreviewed", action="store_true",
                     help="explicit demo override when training used unreviewed auto-labels")
     args = ap.parse_args(argv)
-    train = json.loads(Path(args.training_report).read_text())
+    report_path = Path(args.training_report).resolve()
+    train = json.loads(report_path.read_text())
     events = json.loads(Path(args.event_report).read_text())
     candidate = Path(train["candidate"])
+    if not candidate.is_absolute():
+        candidate = report_path.parent / candidate
     if not candidate.is_file() or sha256(candidate) != train.get("candidate_sha256"):
         ap.error("candidate missing or changed after training report")
     if not train.get("gate_a_pass") or not train.get("onnx_parity", {}).get("pass"):

@@ -127,6 +127,9 @@ class DataTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 promote(args)
             self.assertEqual(promote(args + ["--api-min-conf", ".4"]), 0)
+            train["candidate"] = model.name
+            train_path.write_text(json.dumps(train))
+            self.assertEqual(promote(args + ["--api-min-conf", ".4"]), 0)
 
 
 if __name__ == "__main__":
