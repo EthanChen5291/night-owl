@@ -16,6 +16,8 @@ def main(argv=None) -> int:
     ap.add_argument("--training-report", required=True)
     ap.add_argument("--event-report", required=True)
     ap.add_argument("--out", default="pi/rat.onnx")
+    ap.add_argument("--api-min-conf", type=float, default=0.5,
+                    help="BARN_OWL_MIN_CONF used by the API (default 0.5)")
     ap.add_argument("--allow-unreviewed", action="store_true",
                     help="explicit demo override when training used unreviewed auto-labels")
     args = ap.parse_args(argv)
@@ -39,16 +41,21 @@ def main(argv=None) -> int:
     conf = events.get("selected_conf")
     if conf is None:
         ap.error("event report has no selected confidence threshold")
+    if conf < args.api_min_conf:
+        ap.error(f"selected detector confidence {conf} is below API minimum {args.api_min_conf}; "
+                 "set --api-min-conf and BARN_OWL_MIN_CONF to the same lower value")
     dst = Path(args.out)
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(candidate, dst)
     config = {"model_sha256": sha256(dst), "conf": conf,
               "floor_y": events["floor_y"], "min_rat_width": events["min_rat_width"],
               "max_rat_width": events["max_rat_width"], "hits": events["hits"],
-              "window": events["window"], "cooldown": events["cooldown"], "gray": True}
+              "window": events["window"], "cooldown": events["cooldown"],
+              "api_min_conf": args.api_min_conf, "gray": True}
     config_path = dst.with_name("rat_config.json")
     config_path.write_text(json.dumps(config, indent=2) + "\n")
-    print(f"deployed {dst} ({config['model_sha256']}) with {config_path}")
+    print(f"deployed {dst} ({config['model_sha256']}) with {config_path}\n"
+          f"start the API with BARN_OWL_MIN_CONF={args.api_min_conf}")
     return 0
 
 

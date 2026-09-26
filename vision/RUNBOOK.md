@@ -96,7 +96,7 @@ saw (fine, that is the point, add rig clips), or the string (Q6, more `--per-fra
 python3 eval_events.py --model runs/rat/candidate.onnx --clip clips/rig_pushes_01.mp4 --pushes pushes.csv \
     --negatives clips/rig_negatives_01.mp4 --conf 0.4,0.5,0.6 --json runs/rat/events.json
 python3 promote_model.py --training-report runs/rat/training_report.json \
-    --event-report runs/rat/events.json
+    --event-report runs/rat/events.json --api-min-conf 0.5
 ```
 
 **Gate B: ≥ 18 of 20 pushes produce an event, and < 0.5 false events per minute on the negatives
@@ -105,6 +105,30 @@ reports against the same ONNX hash and copies the model plus `rat_config.json` t
 `detect.py` reads these measured thresholds for that exact model hash. A failed or incomplete
 gate leaves `pi/rat.onnx` alone. Change `--floor-y`, `--min-rat-width`, and `--max-rat-width` on
 the eval command to tune those rules; keep `--hits 3` for the demo gate.
+If the selected confidence is below 0.5, pass that lower value to `promote_model.py --api-min-conf`
+and start the API with the same `BARN_OWL_MIN_CONF`; promotion rejects a mismatch.
+
+The current camera points straight down at a tabletop. Use `--floor-y 0` for its recordings;
+the old `0.4` side-view cutoff excludes 10 of 17 reviewed rat boxes in `zoom15_b`. The
+reviewed frames are 8 seconds apart, so replaying them at 15 fps would invent consecutive
+detections. Use the original video for timing. `zoom15_b` and `table_c` have rat-presence
+anchors, but no verified push times or separate negatives reel yet; their replay is exploratory.
+
+To show a saved clip through the actual Pi detector path and local map, start the API with the
+same minimum confidence used by the detector, then replay the original video at recorded speed:
+
+```sh
+BARN_OWL_MIN_CONF=0.5 ./api/run.sh  # terminal 1, from repository root
+vision/.venv/bin/python vision/replay_video.py --clip vision/clips/zoom15_b.mp4 \
+    --model vision/runs/modal-rat-v2/rat.onnx --floor-y 0 --conf 0.5 \
+    --api http://127.0.0.1:8000 --post --save-events vision/events/replay \
+    --json vision/events/replay_report.json  # terminal 2; use the actual candidate path
+```
+
+`replay_video.py` uses every video frame and its recorded timestamps, crops the current frame,
+and marks the report `EXPLORATORY_REPLAY`. `--no-pace` speeds up offline inspection. The API
+loads `BARN_OWL_MIN_CONF` when it starts; restart it after changing that value. An HTTP 200
+alone does not prove the event changed the score, so check the API event result and map value.
 
 ## 6. Ship to the node
 

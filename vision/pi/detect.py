@@ -59,7 +59,7 @@ IMGSZ = 416
 GRAY = True
 CONF = 0.5
 IOU = 0.45
-FLOOR_Y = 0.40
+FLOOR_Y = 0.0  # overhead tabletop view: the whole frame is a possible rat path
 MIN_RAT_WIDTH = 0.01
 MAX_RAT_WIDTH = 0.65
 PERSON_IOU = 0.3        # drop a rat box whose IoU with a person box exceeds this ...
@@ -346,6 +346,7 @@ def make_event(det: Det, n_hits: int, frame, node_id: str = NODE_ID, h3: str = D
 
 
 def post_event(api_url: str, body: dict, timeout: float = 2.0) -> tuple[bool, str]:
+    """Return whether the API changed the score, and its HTTP/acceptance detail."""
     import urllib.error
     import urllib.request
 
@@ -354,7 +355,11 @@ def post_event(api_url: str, body: dict, timeout: float = 2.0) -> tuple[bool, st
                                  headers={"Content-Type": "application/json", "User-Agent": f"barn-owl-node/{FW}"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return True, f"{resp.status}"
+            result = json.load(resp)
+            accepted = result.get("accepted")
+            if not isinstance(accepted, bool):
+                return False, f"HTTP {resp.status} missing accepted flag"
+            return accepted, f"HTTP {resp.status} accepted={str(accepted).lower()}"
     except urllib.error.HTTPError as e:
         return False, f"HTTP {e.code}"
     except Exception as e:  # noqa: BLE001 - network is best effort on stage
@@ -410,11 +415,11 @@ def apply_deployed_config(args, model: Path, argv=None) -> None:
 
 
 # ---------------------------------------------------------------- main loop
-def draw(frame_bgr, rats, persons, dropped, gate: EventGate, fps: float):
+def draw(frame_bgr, rats, persons, dropped, gate: EventGate, fps: float, floor_y: float = FLOOR_Y):
     import cv2
 
     h, w = frame_bgr.shape[:2]
-    cv2.line(frame_bgr, (0, int(FLOOR_Y * h)), (w, int(FLOOR_Y * h)), (80, 80, 80), 1)
+    cv2.line(frame_bgr, (0, int(floor_y * h)), (w, int(floor_y * h)), (80, 80, 80), 1)
     for d, col in [(d, (0, 200, 0)) for d in rats] + [(d, (255, 120, 0)) for d in persons] + [(d, (0, 0, 200)) for d in dropped]:
         x0, y0 = int(d.x * w), int(d.y * h)
         cv2.rectangle(frame_bgr, (x0, y0), (int((d.x + d.w) * w), int((d.y + d.h) * h)), col, 2)
@@ -512,8 +517,8 @@ def main(argv=None) -> int:
                 body = make_event(top, n_hits, fr.bgr if fr.has_color else fr.gray, args.node_id, args.h3, fr.ts)
                 status = "no-post"
                 if not args.no_post:
-                    ok, status = post_event(args.api, body)
-                    status = ("POST ok " if ok else "POST FAIL ") + status
+                    updated, status = post_event(args.api, body)
+                    status = ("POST score updated " if updated else "POST no score update ") + status
                 if save_dir:
                     save_event(save_dir, body, gate.n_events)
                 led.blink()
@@ -522,7 +527,8 @@ def main(argv=None) -> int:
 
             if args.show:
                 import cv2
-                view = draw(fr.bgr.copy() if fr.has_color else cv2.cvtColor(fr.gray, cv2.COLOR_GRAY2BGR), rats, persons, dropped, gate, fps)
+                view = draw(fr.bgr.copy() if fr.has_color else cv2.cvtColor(fr.gray, cv2.COLOR_GRAY2BGR),
+                            rats, persons, dropped, gate, fps, args.floor_y)
                 cv2.imshow("detect", view)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
