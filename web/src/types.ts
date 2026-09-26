@@ -76,6 +76,7 @@ export interface RatEvent {
   bbox: [number, number, number, number]
   crop_b64: string
   fw: string
+  accepted?: boolean
   received_at?: string
 }
 

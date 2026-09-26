@@ -289,9 +289,10 @@ export default function App() {
         merged.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0))
         return merged.slice(0, 500)
       })
-      // an event from a node nobody placed: give it an owl at its cell so the stage still works
-      const known = new Set(owlsRef.current.map((o) => o.nodeId))
-      const unknown = fresh.filter((e) => !known.has(e.node_id))
+      // Only real node events can create persistent owls. Fixture rows are feed examples.
+      const unknown = source === 'live'
+        ? fresh.filter((e) => !owlsRef.current.some((o) => o.nodeId === e.node_id))
+        : []
       if (unknown.length) {
         setOwls((prev) => {
           let next = prev
@@ -303,8 +304,10 @@ export default function App() {
           return next
         })
       }
-      if (flashNew) {
-        const newest = fresh.reduce((a, b) => (a.ts >= b.ts ? a : b))
+      // The queue includes rejected detections. Flash only events that pass the frozen update gate.
+      const accepted = fresh.filter((e) => e.accepted ?? (e.class === 'rat' && e.conf >= 0.5 && e.n_hits >= 3))
+      if (flashNew && accepted.length) {
+        const newest = accepted.reduce((a, b) => (a.ts >= b.ts ? a : b))
         setFlash({ h3: newest.h3, seq: ++seqRef.current })
       }
       if (source === 'live') {
@@ -317,6 +320,19 @@ export default function App() {
   const ingestRef = useRef(ingest)
   useEffect(() => { ingestRef.current = ingest }, [ingest])
 
+  const activateLiveQueue = useCallback(() => {
+    if (liveRef.current.queue) return false
+    liveRef.current.queue = true
+    seenRef.current.clear()
+    setEvents([])
+    setFlash(null)
+    setQueueSource('live')
+    void loadCells(monthRef.current)
+    void loadPlan(monthRef.current, planBudgetRef.current)
+    void fetchBacktest().then(setBacktest)
+    return true
+  }, [loadCells, loadPlan])
+
   // ---- /queue polling every 2 s (keeps trying the API so it goes live when the server appears)
   useEffect(() => {
     let alive = true
@@ -327,14 +343,8 @@ export default function App() {
         setQueueSource('stale')
         return
       }
-      const becameLive = source === 'live' && !liveRef.current.queue
-      liveRef.current.queue = source === 'live'
+      const becameLive = source === 'live' && activateLiveQueue()
       setQueueSource(source)
-      if (becameLive) {
-        void loadCells(monthRef.current)
-        void loadPlan(monthRef.current, planBudgetRef.current)
-        void fetchBacktest().then(setBacktest)
-      }
       if (source === 'live' && data.events.length === 0 && seenRef.current.size > 0) {
         seenRef.current.clear()
         setEvents([])
@@ -342,7 +352,7 @@ export default function App() {
         void loadCells(monthRef.current)
         void loadPlan(monthRef.current, planBudgetRef.current)
       }
-      ingestRef.current(data.events, source, primedRef.current)
+      ingestRef.current(data.events, source, primedRef.current && !becameLive)
       primedRef.current = true
     }
     void tick()
@@ -351,16 +361,20 @@ export default function App() {
       alive = false
       clearInterval(id)
     }
-  }, [loadCells, loadPlan])
+  }, [activateLiveQueue, loadCells, loadPlan])
 
   // ---- SSE at /api/stream: the server names its messages, so listen for `event`, not the default channel
   useEffect(() => {
     if (typeof EventSource === 'undefined') return
     const es = new EventSource('/api/stream')
-    es.onopen = () => setStreaming(true)
+    es.onopen = () => {
+      setStreaming(true)
+      activateLiveQueue()
+    }
     const onEvent = (msg: MessageEvent) => {
       try {
         const body = JSON.parse(msg.data as string) as RatEvent | { events: RatEvent[] }
+        activateLiveQueue()
         ingestRef.current('events' in body ? body.events : [body], 'live')
       } catch {
         /* not an event */
@@ -369,6 +383,7 @@ export default function App() {
     es.addEventListener('event', onEvent)
     es.onmessage = onEvent
     es.addEventListener('reset', () => {
+      activateLiveQueue()
       seenRef.current.clear()
       setEvents([])
       setFlash(null)
@@ -378,7 +393,7 @@ export default function App() {
     // EventSource reconnects by itself; polling continues while it is disconnected.
     es.onerror = () => setStreaming(false)
     return () => es.close()
-  }, [loadCells, loadPlan])
+  }, [activateLiveQueue, loadCells, loadPlan])
 
   // ---- derived
   const centre = useMemo(() => {
