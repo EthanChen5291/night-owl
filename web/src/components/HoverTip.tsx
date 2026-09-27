@@ -12,7 +12,7 @@ interface Props {
   placing: boolean
 }
 
-const MODE_UNIT: Record<Mode, string> = { a: 'city sees', b: "what's there", silence: 'silence' }
+const MODE_UNIT: Record<Mode, string> = { a: 'city sees', b: 'rat activity percentile', silence: 'silence' }
 
 /** A chip above the cursor: the address (or what would happen on click), the cell's value underneath. */
 export default function HoverTip({ info, mode, cell, node, area, placing }: Props) {

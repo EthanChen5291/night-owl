@@ -12,7 +12,7 @@ export default function Legend({ mode, lifted }: Props) {
   const [lo, hi] = rangeFor(mode)
   const stops = Array.from({ length: STEPS + 1 }, (_, i) => colourForValue(mode, lo + ((hi - lo) * i) / STEPS))
   const gradient = `linear-gradient(to right, ${stops.join(',')})`
-  const label = mode === 'a' ? 'predicted complaints, percentile' : mode === 'b' ? 'P(active signs | inspected), percentile' : "what's there − city sees"
+  const label = mode === 'a' ? 'predicted complaints, percentile' : mode === 'b' ? 'Rat activity, percentile' : "what's there − city sees"
   return (
     <div className={`legend panel ${lifted ? 'lifted' : ''}`}>
       <div className="legend-title">{label}</div>

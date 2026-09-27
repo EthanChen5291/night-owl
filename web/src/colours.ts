@@ -7,7 +7,7 @@ const DIVERGING = ['#1f5aa6', '#86b3da', '#dedbd3', '#e0964f', '#b8471a']
 
 export const MODES: { id: Mode; label: string; field: 'pct_a' | 'pct_b' | 'silence'; hint: string }[] = [
   { id: 'a', label: 'What the city sees', field: 'pct_a', hint: 'percentile of predicted 311 complaints (Model A)' },
-  { id: 'b', label: "What's there", field: 'pct_b', hint: 'percentile of P(active signs | inspected) (Model B)' },
+  { id: 'b', label: "What's there", field: 'pct_b', hint: 'Likelihood of rat activity on inspected properties' },
   { id: 'silence', label: 'Silence', field: 'silence', hint: 'pct_b - pct_a; orange = silent blocks' },
 ]
 
