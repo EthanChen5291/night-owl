@@ -1,84 +1,32 @@
-# Recording protocol
+# Night Owl recording protocol
 
-Two kinds of footage: the phone session already done (§1) and the rig clips still to record at the
-venue (§2). Only the second is in the camera's real domain (NoIR + 850 nm, top-down from a rail).
+Capture the original video from the Pi camera agent. The current detector targets a dark plush rat in a lit tabletop view. Infrared and live rats are separate, unvalidated conditions. Do not start a second camera process beside `/home/pi/barn-owl/agent.py` to collect footage; use the agent's recording workflow and preserve the original file bytes.
 
-## 1. What exists: the 09-25 Brown session
+## Set up the view
 
-**Friday 09-25, 20:36–21:56** (the DEBRIEF and the earlier RECORDING doc say "Thursday"; 09-25 was a
-Friday, README §6). 19 phone clips, `IMG_7777.MOV` … `IMG_7800.MOV`, 1080p, mostly landscape, ~30
-min total, ~3.0 GB, currently untracked in `~/divMap/` (README §8: move to `vision/clips/`, never
-commit). Prop: the Forum Novelties rat, pulled on a string. The clip-to-tag mapping was done by
-renaming/copying before extraction; keep it in `clips.csv` from now on.
+Record the camera position, lighting, table surface, and whether the whole plush can cross each frame edge. Keep those details with the clip. V5 alerted late when the plush entered partly from the lower-right edge; include that position in new *training* footage if the goal is to improve edge detection. It also fired on a dark logo cap and a partial shoe in a no-plush clip. Include those objects, people, and clothing in training negatives, with full-frame review.
 
-| Tag | Scene |
-|---|---|
-| `bed_a`, `bed_b`, `bed_c` | bedroom floor, three angles / light levels |
-| `clutter_h` | cluttered floor: bags, shoes, cables (hard negatives with the prop present) |
-| `corr_d`, `corr_f` | corridor, long run, person walks in and out (walk-in ranges pruned) |
-| `stair_e` | stairwell, prop on treads |
-| `stairtop_g` | stair landing from above (closest to the top-down rig view) |
-| `r3_a` … `r3_e` | room 3, five short takes at different distances |
-| `new_a` … `new_f` | second location, six takes, includes dark-floor takes |
+Collect whole recordings, not isolated detector crops. For each original, save its SHA256, capture start, duration, decoded frame count, and per-frame presentation timestamps. Use a distinct source tag for each take. Keep every frame from one source session in one split; adjacent frames are too similar for a random train/validation split.
 
-Result after extraction at 3 fps and pruning: 3,186 frames kept, 866 pruned, 2,176 frames with
-at least one box. The string is visible in a large share of positives (HANDOFF Q6). No frames
-from the rig; the NoIR/IR domain is only covered by grayscale training (README decision 7).
+## Record a new event test
 
-Suggested val tags from this set: `stair_e` and `new_f` (different rooms from the bulk of train).
+Freeze a test plan and reserve the whole clips before the new model sees them. Record:
 
-## 2. Once you get there: rig clips at the venue
+1. A lit positive clip with at least 20 **visibly distinct** plush entrances and exits. Aim for a few extra passes so an occluded or end-censored attempt does not leave fewer than 20 complete source appearances. Leave clear empty gaps. Vary direction and speed; include edge entries and people where relevant. Do not choose the easiest 20 afterward.
+2. A separate no-plush recording lasting at least 180 seconds. Keep the camera running through ordinary motion and clutter: cap, shoes, dark garments, bags, hands, and people. Avoid moving the plush anywhere visible in this clip. Do not assemble three minutes from gaps in the positive recording.
 
-Do this as soon as the node hangs, before training, in this order. Everything goes through
-`pi/grab_frames.py` (frames) or `rpicam-vid` (video for the event test). One tag per take.
+Before inference, reviewers inspect the original positive video and mark every observed appearance by its decoded source timestamp, including ambiguous and censored intervals. Reviewers inspect the no-plush video across its full timeline and record their sampling coverage and remaining limits. Freeze those notes and file hashes. For box AP, sample frames under a rule fixed before predictions and review every full-frame plush and person label; an empty YOLO file is a reviewed no-class frame, not a missing annotation.
 
-### Positions
+Run the locked model once on every decoded frame at its frozen confidence, NMS, person filter, and three-hit event rule. Match at most one emitted event to each complete source appearance. Audit **every** emitted crop against its native source frame before calling it a plush or false event. The formal target is at least 18 detections among at least 20 complete pushes, and fewer than 0.5 false events per minute over the separate three-minute no-plush recording. More than one alert on a parked plush is still one appearance.
 
-| Take | Tilt (sector plate) | Height | Tag |
-|---|---|---|---|
-| straight down over the "pit" | 0° | 60 cm rail (or the diorama's 25 cm) | `rig_down_a` |
-| 45° toward the far rail | 45° | same | `rig_tilt_a` |
-| the demo position, whatever you settle on | as set | as set | `rig_demo_a`, `_b` |
+The V5 formal recording had 19 complete appearances and 17 false events in 190.409 seconds, mostly on one cap. It failed. Its footage was later used to build the V6 hard-negative dataset, so another model needs a new reserved recording. See [V5 formal event results](V5_FORMAL_EVENT_RESULTS.md), [V6 results](V6_RESULTS.md), and the current [runbook](RUNBOOK.md).
 
-Rats run along the inside of the guard, so the 45° take is the one the demo will look like.
-Record each position once with the room lights on and once off.
+## Earlier phone footage
 
-### Lighting
-
-- `ir_check.py` before each take; note the verdict in the take name (`rig_demo_a_ir`, `rig_demo_a_amb`).
-- IR on, room dark: the demo condition. IR off, room lit: what the venue hall will be during setup.
-- Expect the magenta cast in colour and the prop's glass eye glinting under IR (README §4, pitch:
-  phrase the "eyeshine" line so the demo crop does not contradict it).
-
-### Negatives (no prop in frame): at least 3 minutes per position
-
-Hoodies (dark, dropped on the floor and worn while walking past), backpacks and tote bags, shoes
-(single and pairs), hands reaching into frame, feet walking through, a phone on the floor, a
-crumpled dark jacket. These are what the World fallback fires on; the trained model must not.
-Save the negatives as a *video* too (`rpicam-vid -t 180000 --codec mjpeg -o rig_negatives_01.mjpeg`)
-for `eval_events.py`.
-
-### Pushes (the positive event clip)
-
-One 3–5 minute video, 20 pushes of the prop across the floor with a 5–10 s pause between them.
-One person pushes, one person writes down the time of each push from the clip's start (or claps in
-frame so the time can be read from the video later). That list is `pushes.csv`, column `t_sec`,
-one row per push. Mix directions, speeds, and distances from the camera; include 3–4 pushes with a
-foot or hand in the frame at the same time (person suppression must not kill the event).
-
-### Naming and where it goes
-
-```
-rig/<tag>/<tag>_00000.jpg ...        grab_frames.py output on the Pi
-clips/rig_pushes_01.mp4              push clip (mjpeg → mp4 on the Mac with ffmpeg -c:v libx264)
-clips/rig_negatives_01.mp4           negatives reel
-pushes.csv                           t_sec[,label]
-```
-
-`scp` the `rig/` folders into `frames/`, run `autolabel.py`, `review.py --tag rig_demo_a` (review
-every rig frame: the auto-labels have never seen this domain), then hold out one rig tag as val.
-
-### Time budget
-
-30 minutes total at the venue: 10 for positions and IR, 10 for negatives, 10 for the push clip.
-Do not skip the negatives reel; Gate B in the RUNBOOK cannot be measured without it.
+The 09-25 Brown session had 19 phone clips named within the `IMG_7777.MOV` to
+`IMG_7800.MOV` range. The original `clips.csv` mapped those filenames to tags
+such as `bed_a`, `clutter_h`, `corr_d`, `stair_e`, `stairtop_g`, `r3_a`, and
+`new_a`. The early extraction kept 3,186 frames after pruning 866. Those
+phone clips predate the current Pi camera dataset and do not provide a fresh
+Night Owl test. The historical [training-data handoff](HANDOFF-sanjavan-training-data.md)
+records the original questions and clip groups.

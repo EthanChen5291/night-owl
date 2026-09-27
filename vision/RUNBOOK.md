@@ -1,210 +1,69 @@
-# Vision runbook: clips → `pi/rat.onnx` → a node that fires
+# Night Owl vision runbook
 
-Owner per plan: Sanjavan; per DEBRIEF: Utsav. Settle at hour 0 (README §6). Whoever it is, this is
-the order of operations, with the gates. Every script has `--help`; every gate has a number.
+The detector recognizes a dark plush rat and people in lit camera footage. It is a prototype for the Night Owl demo, not a validated live-rat alarm. Older artifact names and environment variables still use `barn-owl`; keep those names when running the code.
 
-## Current V5 candidate
+## Current result
 
-Use the [V5 evidence and bundle](V5_RESULTS.md) for the current room-lit plush candidate.
-Its model and runtime confidence **0.70** are frozen. The threshold sweeps and rule tuning
-below apply only to development footage. Do not run them on fresh V5 test recordings.
-Reserve whole new clips, review and freeze their boxes and pass intervals before predictions,
-then evaluate the fixed candidate once. Preserve a failed result; do not adjust the threshold
-or checkpoint to make that same test pass. Repeated cooldown events are not separate pushes.
-Fresh box AP, 20 distinct passes, a separate three-minute negative reel, and a positive live
-camera-to-map event remain pending. Saved-frame Pi timing and development replay do not
-complete those checks.
+- **V5 is the locked demo candidate**, at confidence 0.70. Its fresh box test measured rat AP50 0.615779, with a known reference-box quality problem. Its separate fixed event test matched 18 of 19 reviewed plush appearances but fired 17 times in 190.409 seconds of no-plush footage, or 5.357 false events per minute. The event test failed. See [V5 fresh results](V5_FRESH_RESULTS.md) and [V5 formal event results](V5_FORMAL_EVENT_RESULTS.md).
+- **The live path worked once with the plush.** The Pi camera handoff processed 1,346 frames in 89.859 seconds, saved six crops of one visible plush exposure, and relayed one event to the local API. The map recorded the accepted sighting. The worker and relay stopped afterward. See [V5 live results](V5_LIVE_RESULTS.md).
+- **V6 was rejected after training.** Its development rat AP50 was 0.964575 combined, but the floor clip and person-class regression limits failed. No consumed formal replay or Pi model switch followed. See [V6 results](V6_RESULTS.md). The V5 and V6 models have not been promoted to `pi/rat.onnx`.
 
-## 0. Environment (Mac)
+For a supervised demo, use a lit scene and keep the whole plush in view. Say that the live integration was observed once; do not present the repeated crops as six pushes or the failed formal test as a pass.
 
-```
+## Local setup
+
+From the repository root:
+
+```sh
 cd vision
 uv sync --locked --python 3.11
 . .venv/bin/activate
 ```
 
-The lock pins the CPU evaluator's observed NumPy 2.4.6, OpenCV Python 5.0.0.93,
-PyTorch 2.14.0, TorchVision 0.29.0, Ultralytics 8.4.163, and ONNX Runtime 1.22.1.
-ONNX 1.19.0 and ONNX Slim 0.1.76 match Modal's export dependencies. Python 3.11
-matches the training container; Modal trains with its own PyTorch 2.8.0 image.
-`ffmpeg` is installed (`extract_frames.py` uses it; `--backend cv2` if not).
-Working data lives here and is gitignored: `clips/`, `frames/`, `frames_pruned/`, `labels/`,
-`frames_aug/`, `labels_aug/`, `dataset/`, `runs/`, `*.pt`, `*.onnx`, `pi/wheels/`.
+The CPU evaluation lock pins NumPy 2.4.6, OpenCV Python 5.0.0.93, PyTorch 2.14.0, TorchVision 0.29.0, Ultralytics 8.4.163, and ONNX Runtime 1.22.1. Modal's training image uses PyTorch 2.8.0; [MODAL.md](MODAL.md) describes that separate environment. Training videos, labels, datasets, ONNX files, and run reports are ignored by Git. The tracked result notes link to their delivered evidence archives.
 
-## 1. Where the data is this morning
+## Inspect the locked V5 candidate
 
-The 09-25 session gave 3,186 kept frames from 19 phone clips, all auto-labelled, 2,176 with at
-least one box, 866 pruned (README §4 table). That was done in the working repo; to reproduce here:
+The selected ONNX is `vision/runs/modal-rat-v5-20260927/rat.onnx`, SHA256 `652a05e8c08aaee11a2b4d3c9ae4c737387bf8ffcac3372a4d83d0df7d80ed3d`. Its source lock is `vision/runs/modal-rat-v5-20260927/candidate_lock.json`, SHA256 `22ffcee2d241eb0c016d0a3ae5d178ef8d35e1f6541d1b20674f2c9a81237259`. The unchanged runtime uses grayscale 416, NMS 0.45, floor cutoff 0, rat width 0.01–0.65, person suppression IoU 0.3/containment 0.7, three consecutive hits in one second, and a two-second cooldown.
 
-```
-python3 extract_frames.py --clips clips --tags clips.csv --fps 3 --max-side 960
-python3 autolabel.py --conf 0.25                       # YOLO-World, classes 0 rat / 1 person
-python3 review.py --unreviewed --order conf            # fix boxes; writes labels/_reviewed.txt
-python3 prune.py --blur 60 --dhash 6 --walkin corr_d:0-24 ...
-```
-
-`clips.csv` is `filename,tag` (`IMG_7777.MOV,bed_a`); the mapping from IMG_ numbers to tags is
-with the clips, not in git. **Review status is now recorded**: `review.py --stats` prints how many
-frames are in `labels/_reviewed.txt`. Treat anything not listed there as auto-labelled only.
-
-## 2. Hour-6 gate: a node that fires with zero training
-
-This does not wait for the model. On the Pi, per `pi/README.md`: wheels, `selftest.py`,
-`ir_check.py`, then
-
-```
-python3 detect.py --model world_rat_person.onnx --color --save-events events
-```
-
-Gate: the prop pushed across the floor under IR → an `EVENT` line, a JSON + crop in `events/`, and
-(with the server up) `POST ok 200`. The World model scores ~0.80 on the prop, runs ~4× slower than
-YOLO11n and fires on hoodies/bags; none of that matters for the gate, it proves the plumbing.
-
-## 3. Rig clips at the venue
-
-Phone footage only covers the rig's domain through the grayscale conversion. Record on the actual
-node as soon as it hangs (RECORDING.md, "Once you get there"):
-
-```
-python3 grab_frames.py --out rig/hall_a --tag hall_a --seconds 90 --every 5      # on the Pi
-scp -r pi@192.168.7.10:~/pi/rig/hall_* frames/                                    # then autolabel + review
-```
-
-Also record, as *video* for `eval_events.py`: one clip with 20 pushes and a written list of the
-push times (`pushes.csv`, column `t_sec`), and one negatives-only reel (people, hoodies, bags, shoes,
-hands, no prop), 3–5 min each. `rpicam-vid -t 180000 --codec mjpeg -o rig_pushes_01.mjpeg` plus the
-same settings as `camera.py` is fine; ffmpeg turns it into mp4 on the Mac.
-
-## 4. Train
-
-```
-python3 augment_nostring.py --inpaint --per-frame 2 --photometric 1 --exclude-tags stair_e,new_f
-python3 make_dataset.py --val-tags stair_e,new_f --extra frames_aug:labels_aug
-./train.sh --device mps                     # yolo11n.pt, 416, 60 epochs, batch 32 → runs/rat/candidate.onnx
-```
-
-Rules that are not optional:
-
-- **Val is whole clips** (`--val-tags`), never a random frame split; frames within a clip are
-  near-duplicates and a random split reports a fake mAP (HANDOFF Q2/Q3). Pick val tags from
-  different rooms than train; when rig clips exist, hold out at least one rig clip.
-- **Augmented frames never touch val**: `make_dataset.py` drops any augmented frame whose rat
-  source or background is a val tag; pass the same tags to `--exclude-tags` so they are not made.
-- `GRAY=True` in `make_dataset.py` and `pi/detect.py` must agree (README decision 7).
-- Smoke test first: `./train.sh --epochs 3 --name smoke` end to end, then the real run (~20–40 min on an M-series
-  Mac with `DEVICE=mps`).
-
-`make_dataset.py` requires a recorded review decision and a label file for every selected frame.
-An empty label file is a reviewed negative. For a rushed exploratory run, both
-`make_dataset.py --allow-unreviewed` and `train.sh --allow-unreviewed` must be explicit. The
-dataset manifest records that choice. Training always exports `runs/rat/candidate.onnx` and
-`runs/rat/training_report.json`, even if Gate A fails. It checks ONNX output against PyTorch on
-five held-out frames. A failed gate gives exit status 1 and leaves the candidate for diagnosis.
-
-**Gate A: `AP50 rat > 0.9` on the held-out clips**, printed by `train.sh` as `GATE rat AP50`.
-Below 0.9: look at `runs/rat/val_batch*_pred.jpg` before touching hyper-parameters; the usual
-causes are wrong boxes (review the low-confidence frames), a val clip from a room the model never
-saw (fine, that is the point, add rig clips), or the string (Q6, more `--per-frame`).
-
-## 5. Event-level test (the gate that matters on stage)
-
-```
-python3 eval_events.py --model runs/rat/candidate.onnx --clip clips/rig_pushes_01.mp4 --pushes pushes.csv \
-    --negatives clips/rig_negatives_01.mp4 --conf 0.4,0.5,0.6 --json runs/rat/events.json
-python3 promote_model.py --training-report runs/rat/training_report.json \
-    --event-report runs/rat/events.json --api-min-conf 0.5
-```
-
-**Gate B: ≥ 18 of 20 pushes produce an event, and < 0.5 false events per minute on the negatives
-reel (at least 3 minutes).** The sweep chooses a confidence threshold. Promotion checks both
-reports against the same ONNX hash and copies the model plus `rat_config.json` to `pi/`.
-`detect.py` reads these measured thresholds for that exact model hash. A failed or incomplete
-gate leaves `pi/rat.onnx` alone. Change `--floor-y`, `--min-rat-width`, and `--max-rat-width` on
-the eval command to tune those rules; keep `--hits 3` for the demo gate.
-If the selected confidence is below 0.5, pass that lower value to `promote_model.py --api-min-conf`
-and start the API with the same `BARN_OWL_MIN_CONF`; promotion rejects a mismatch.
-
-The current camera points straight down at a tabletop. Use `--floor-y 0` for its recordings;
-the old `0.4` side-view cutoff excludes 10 of 17 reviewed rat boxes in `zoom15_b`. The
-reviewed frames are 8 seconds apart, so replaying them at 15 fps would invent consecutive
-detections. Use the original video for timing. `zoom15_b` and `table_c` have rat-presence
-anchors, but no verified push times or separate negatives reel yet; their replay is exploratory.
-`frames/_sources.csv` records nominal sample times (`index / extraction_fps`), not the decoded
-source frame timestamps. Do not turn those times into push labels or use them to judge a
-subsecond event; inspect the original video at its decoded timestamp.
-
-To show a saved clip through the actual Pi detector path and local map, start the API with the
-same minimum confidence used by the detector, then replay the original video at recorded speed:
-
-```sh
-BARN_OWL_MIN_CONF=0.5 ./api/run.sh  # terminal 1, from repository root
-vision/.venv/bin/python vision/replay_video.py --clip vision/clips/zoom15_b.mp4 \
-    --model vision/runs/modal-rat-v2/rat.onnx --floor-y 0 --conf 0.5 \
-    --api http://127.0.0.1:8000 --post --save-events vision/events/replay \
-    --json vision/events/replay_report.json  # terminal 2; use the actual candidate path
-```
-
-`replay_video.py` uses every video frame and its recorded timestamps, crops the current frame,
-and marks the report `EXPLORATORY_REPLAY`. `--no-pace` speeds up offline inspection. The API
-loads `BARN_OWL_MIN_CONF` when it starts; restart it after changing that value. An HTTP 200
-alone does not prove the event changed the score; the replay's `score_updated` field uses the
-API's `accepted` response. For a short stage segment, add `--start-sec S --duration-sec 30`
-using a segment whose rat event was observed in the full offline replay. The current plan's
-rank-11 September candidate H3 is `892a100d467ffff`; pass `--h3 892a100d467ffff` to make a
-rank change visible after an accepted event. Check `/plan` again before the demo because an
-earlier rehearsal can change its rank.
-
-To verify a candidate on the unchanged reviewed validation frames, run from the repository root:
+For a *development* check on the same whole clips used to select V5, run:
 
 ```sh
 vision/.venv/bin/python vision/verify_candidate.py \
-    --dataset vision/runs/modal-rat-v2-20260926/dataset \
-    --pt vision/runs/modal-rat-v2-20260926/best.pt \
-    --onnx vision/runs/modal-rat-v2-20260926/rat.onnx \
-    --out-dir vision/runs/modal-rat-v2-20260926/diagnostics/independent
+  --dataset vision/runs/modal-rat-v5-20260927/dataset \
+  --pt vision/runs/modal-rat-v5-20260927/best.pt \
+  --onnx vision/runs/modal-rat-v5-20260927/rat.onnx \
+  --runtime-conf 0.70 \
+  --out-dir vision/runs/modal-rat-v5-20260927/diagnostics/new-local-check
 ```
 
-Replace the run paths for each candidate, while keeping the same whole held-out clips. The
-report records CPU PT/ONNX AP50 using square 416, batch 1, `rect=False`, confidence .001,
-NMS .7, and `max_det=300`. It also checks the actual Pi `Detector` at confidence .5 and
-NMS .45, plus person suppression, and writes per-frame contact sheets. The report is
-diagnostic; sampled frame detection counts do not establish event-level push recall.
+Use a new output directory. The verifier reports square-416 CPU PT and ONNX AP50 at confidence 0.001 and NMS IoU 0.7, then checks the Pi parser separately at runtime confidence 0.70. These validation clips were used for model selection. They are not a fresh test, and sampled frames cannot measure push events.
 
-After the candidate ONNX hash is locked, the independent reserved set can be scored once
-with `--test-set vision/final_test/eval_dataset` in place of `--dataset`, plus
-`--expected-onnx-sha256` set to that locked hash and `--selection-dataset` pointing at the
-dataset snapshot used to train/select the model. The verifier checks split disjointness,
-reviewed-frame markers, exclusions, source recording hashes, and image/label fingerprints
-before scoring.
-An all-negative clip has undefined AP50; its unmatched rat detections are reported as counts.
-Use an original video replay for event counts because the sampled test frames lack continuous
-timing.
+For a full recorded-video replay without posting to the API:
 
-## 6. Ship to the node
-
-```
-scp pi/rat.onnx pi@192.168.7.10:~/pi/rat.onnx
-ssh pi@192.168.7.10 'cd ~/pi && . ~/venv/bin/activate && python3 selftest.py --only detector && python3 detect.py --no-post --max-frames 100'
+```sh
+vision/.venv/bin/python vision/replay_video.py \
+  --clip vision/clips/zoom15_b.mp4 \
+  --model vision/runs/modal-rat-v5-20260927/rat.onnx \
+  --conf 0.70 --iou 0.45 --floor-y 0 \
+  --person-iou 0.3 --person-contain 0.7 \
+  --hits 3 --window 1 --cooldown 2 --no-pace \
+  --save-events vision/events/v5-local-check \
+  --json vision/events/v5-local-check/report.json
 ```
 
-`selftest.py` prints inference time on the Pi CPU; expect 60–120 ms at 416 (5–8 fps after the
-camera). If it is over 200 ms, `--threads 4` and check nothing else is running.
+Replay reads every decoded frame and its source timestamp. A second run on the same clip is development inspection, not another independent test. Do not turn sparse `frames/_sources.csv` sample times into push ground truth; those times are nominal extraction positions.
 
-## 7. Sunday retrain rule
+## New footage and future testing
 
-Retrain on Sunday morning **only if all three hold**: (1) the venue rig clips are labelled and
-reviewed (`review.py --stats` shows them), (2) there is a held-out rig clip for val, and
-(3) there are ≥ 3 hours before the demo. The retrain is the same commands as §4 with the rig tags
-added; keep Saturday's `pi/rat.onnx` as `pi/rat_sat.onnx` and only replace it if Gate B improves
-on the same push clip and negatives reel. Never retrain on the pitch morning without Gate B.
+[RECORDING.md](RECORDING.md) gives the capture and source-review protocol. Keep whole recording sessions in one split. Freeze source hashes, visible-plush boxes, person boxes, push intervals, and a separate no-plush clip before running a new model on them. An empty label file requires visual review of the entire frame. The formal event target needs at least 20 distinct reviewed pushes, at least 18 matched events, and fewer than 0.5 false events per minute over a separate no-plush recording of at least three minutes. Review every emitted crop against its native source frame. Repeated cooldown events from one exposure count as one matched push.
 
-## Timeline of gates
+`verify_candidate.py --test-set` is for a sealed, test-only frame snapshot. It requires the exact ONNX SHA256 and `--selection-dataset` so it can check source overlap and provenance before AP scoring. A no-plush clip has undefined rat AP50; replay its complete original video for false-event counts. A new reserved session is required to assess any model adapted to the consumed V5 formal recordings.
 
-| When | Gate | Command |
-|---|---|---|
-| hour 6 | node fires with the World fallback, POST reaches the server | `detect.py --model world_rat_person.onnx --color` |
-| hour ~12 | rig clips recorded, labelled, reviewed | `review.py --stats` |
-| hour ~16 | Gate A: rat AP50 > 0.9 on held-out clips | `./train.sh` |
-| hour ~18 | Gate B: 20 pushes ≥ 18 events, < 0.5 false/min | `eval_events.py` |
-| hour 24 | freeze `pi/rat.onnx` and the constants in `detect.py` | — |
-| Sunday am | retrain only under §7 | — |
+Do not adjust the locked threshold, floor rule, region of interest, labels, or checkpoint after seeing a test result and then call the same footage fresh. The V6 recovery run kept those boundaries: its failed regression candidate was saved, with no formal replay or Pi switch.
+
+## Pi and map path
+
+The existing Pi camera agent owns the camera. [pi/LIVE_BRIDGE.md](pi/LIVE_BRIDGE.md) describes its default-off frame handoff, the separate ONNX worker, and the optional relay for saved event JSON. `live_worker.py` saves events locally; it does not post or drive an LED. `event_relay.py` is dry-run by default and needs an explicit API destination and `--post`. The accepted V5 relay event and local map update are recorded in [V5 live results](V5_LIVE_RESULTS.md). Do not start `pi/detect.py` beside the camera agent, because that program opens its own camera.
+
+The API reads `BARN_OWL_MIN_CONF` at startup. If a future approved model uses a different confidence, align that value with the detector and restart the API before posting. HTTP 200 only shows that the API handled the request; inspect its `accepted` field and the stored posterior to confirm a score update.

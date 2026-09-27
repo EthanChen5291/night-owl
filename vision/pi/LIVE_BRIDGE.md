@@ -1,39 +1,12 @@
-# Optional live detector handoff
+# Night Owl live frame handoff
 
-The Pi's existing `/home/pi/barn-owl/agent.py` owns its MJPEG camera. It has no local
-frame listener. Its `Camera._read` callback currently sends frames to the recorder
-and dashboard streamer. `agent_live.patch` adds a third callback only when
-`OWL_DETECT_SOCKET` is set. With that variable absent, the bridge is off.
+The Pi's existing `/home/pi/barn-owl/agent.py` owns the camera. The reviewed `agent_live.patch` adds a JPEG callback guarded by `OWL_DETECT_SOCKET`. `live_bridge.py` keeps only the newest frame and sends it over a Unix datagram socket. A separate `live_worker.py` process runs ONNX inference, saves event JSON and crop JPEGs, and writes `run_stats.json`. The camera callback never waits for inference. The worker has no API or LED output; `event_relay.py` handles optional delivery in another process.
 
-`live_bridge.py` runs under the agent's system Python and uses only the standard
-library. Its camera callback puts the newest JPEG in a one-frame queue without
-waiting for inference. A sender thread writes Unix datagrams to `live_worker.py`,
-which runs under the isolated detector venv. If the worker is absent, slow, or
-restarts, the camera callback keeps returning. The worker drains queued datagrams
-to the newest frame, rejects frames over one second old, and resets the three-hit
-gate whenever frame sequence numbers skip. It saves event JSON and a cropped JPEG
-locally. It does not post to the API, use GPIO, or start a camera.
+The observed V5 trial is documented in [V5 live results](../V5_LIVE_RESULTS.md). It processed 1,346 camera frames in 89.859 seconds at confidence 0.70, saved six crops from one visible plush exposure, and relayed one unchanged event to the local API. The API accepted it and the map updated. The worker, socket, and relay stopped after the trial. As observed then, the camera service kept the bridge drop-in enabled; without a worker socket, the callback drops frames without blocking the agent. This is a historical end state, so inspect the Pi before another session. V5's separate [formal event test](../V5_FORMAL_EVENT_RESULTS.md) failed.
 
-At 15 camera frames per second, three consecutive processed hits need enough CPU
-headroom to avoid dropped frames. The V4 saved-frame median was about 56 ms per
-inference, but that does not establish live throughput. `run_stats.json` records
-received and inferred fps, backlog drops, sequence gaps, frame age, inference
-time, and person suppression during a live trial.
+## Local checks
 
-## Review and offline check
-
-The patch was made against Pi agent SHA256
-`756d75843c4eff2a83fad1c563848a646f584b7df2fe2130c4c6db31f8eb7e78`.
-It changes only callback setup and shutdown. Before applying it anywhere, check
-the target file's hash and stop if it differs. The current V4 ONNX SHA256 is
-`fb557bd9c1dafa7466a45afb50ac47668550a666a44f1791af714011a0bf1b27`.
-Read-only Pi inspection on 2026-09-27 confirmed the active unit is
-`barn-owl.service` (`/etc/systemd/system/barn-owl.service`), with
-`ExecStart=/usr/bin/python3 -u /home/pi/barn-owl/agent.py`, environment file
-`/etc/barn-owl.env`, and no drop-ins at that time. Recheck those facts before
-changing the service.
-
-Run the local tests without touching the Pi:
+Run the code tests without a camera or API connection:
 
 ```sh
 vision/.venv/bin/python -m unittest vision.tests.test_live_handoff -v
@@ -41,163 +14,67 @@ python3 -m unittest vision.tests.test_event_relay -v
 api/.venv/bin/python -m unittest vision.tests.test_event_relay_api -v
 ```
 
-For a saved-frame dry run on the Pi after copying `live_bridge.py` and
-`live_worker.py` into the V4 candidate slot, run the worker in one shell:
+The existing V5 Pi model was staged at `/home/pi/barn-owl-candidates/v5-652a05e8/rat.onnx`, SHA256 `652a05e8c08aaee11a2b4d3c9ae4c737387bf8ffcac3372a4d83d0df7d80ed3d`. Its isolated ONNX Runtime venv came from the earlier `v3-3214f2a0` slot. Before using any slot, verify its model hash, worker source, and running service state. Do not infer a current deployment from the saved trial report.
+
+## Local-only worker observation
+
+The agent's dashboard viewer or recorder controls when camera JPEGs flow. A worker can observe those JPEGs without opening the camera itself. On the Pi, after checking that the reviewed bridge is installed, run the worker from the V5 slot with a **new, absent** events directory:
 
 ```sh
-scp vision/pi/{live_bridge.py,live_worker.py} barn-owl-pi:/home/pi/barn-owl-candidates/v4-fb557bd9/
-```
-
-Then, on the Pi:
-
-```sh
-cd ~/barn-owl-candidates/v4-fb557bd9
+cd ~/barn-owl-candidates/v5-652a05e8
 ../v3-3214f2a0/.venv/bin/python live_worker.py \
   --socket "$HOME/barn-owl-candidates/live-frames.sock" \
   --model "$PWD/rat.onnx" \
-  --expected-sha256 fb557bd9c1dafa7466a45afb50ac47668550a666a44f1791af714011a0bf1b27 \
-  --conf 0.70 --iou 0.45 --floor-y 0 --hits 3 --window 1 --cooldown 2 \
-  --events-dir "$PWD/saved-frame-trial-1" --max-frames 3
-```
-
-In another shell, send three copies of the saved positive JPEG. This uses no
-camera, GPIO, service, or API:
-
-```sh
-cd ~/barn-owl-candidates/v4-fb557bd9
-python3 - <<'PY'
-from pathlib import Path
-import time
-from live_bridge import FrameHandoff
-
-bridge = FrameHandoff(str(Path.home() / 'barn-owl-candidates/live-frames.sock'))
-jpeg = Path('positive.jpg').read_bytes()
-for _ in range(3):
-    bridge(jpeg)
-    time.sleep(.1)
-time.sleep(.2)
-bridge.close()
-PY
-```
-
-Inspect `saved-frame-trial-1/run_config.json`, `run_stats.json`, and the saved
-event crop. Choose a new `--events-dir` for every worker run; the CLI refuses to
-reuse an existing directory.
-
-## Agent patch and rollback, after approval
-
-Do not apply these steps during the offline check. The agent requires a restart
-to load source changes, and enabling the callback requires a service environment
-change. Stage `live_bridge.py` and `agent_live.patch` next to the existing Pi
-agent after approval:
-
-```sh
-scp vision/pi/{live_bridge.py,agent_live.patch} barn-owl-pi:/home/pi/barn-owl/
-```
-
-Then run these commands on the Pi:
-
-```sh
-cd /home/pi/barn-owl
-systemctl show barn-owl.service -p FragmentPath -p DropInPaths -p ExecStart -p EnvironmentFiles
-echo '756d75843c4eff2a83fad1c563848a646f584b7df2fe2130c4c6db31f8eb7e78  agent.py' | sha256sum -c -
-test ! -e agent.py.pre-live-756d7584
-cp -p agent.py agent.py.pre-live-756d7584
-patch --dry-run -p0 < agent_live.patch
-patch -p0 < agent_live.patch
-python3 -m py_compile agent.py live_bridge.py
-```
-
-At this point the callback remains off. To enable a reviewed trial, first start
-the V4 worker with a new events directory, then add the environment variable to
-the service and restart it:
-
-```sh
-sudo install -d /etc/systemd/system/barn-owl.service.d
-sudo sh -c 'set -C; printf "[Service]\nEnvironment=OWL_DETECT_SOCKET=/home/pi/barn-owl-candidates/live-frames.sock\n" > /etc/systemd/system/barn-owl.service.d/detector-bridge.conf'
-sudo systemctl daemon-reload
-sudo systemctl restart barn-owl.service
-```
-
-The `set -C` redirection fails if that named drop-in already exists. Leave all
-other drop-ins in place. If the source backup filename already exists, stop
-before patching and choose a new unique backup name in both apply and rollback
-commands.
-
-The dashboard viewer or recording control still decides when the existing
-camera runs. Watch `run_stats.json` after stopping the worker and inspect event
-crops. A three-hit alert should be evaluated against actual push timestamps;
-saved or sparse frames do not establish event recall.
-
-For later local-only observation with the reviewed bridge already enabled, run
-the worker in a Pi shell with a **new** events directory for each run:
-
-```sh
-cd ~/barn-owl-candidates/v4-fb557bd9
-../v3-3214f2a0/.venv/bin/python live_worker.py \
-  --socket "$HOME/barn-owl-candidates/live-frames.sock" \
-  --model "$PWD/rat.onnx" \
-  --expected-sha256 fb557bd9c1dafa7466a45afb50ac47668550a666a44f1791af714011a0bf1b27 \
-  --conf 0.70 --iou 0.45 --floor-y 0 --hits 3 --window 1 --cooldown 2 \
+  --expected-sha256 652a05e8c08aaee11a2b4d3c9ae4c737387bf8ffcac3372a4d83d0df7d80ed3d \
+  --conf 0.70 --iou 0.45 --floor-y 0 \
+  --person-iou 0.3 --person-contain 0.7 \
+  --min-rat-width 0.01 --max-rat-width 0.65 \
+  --hits 3 --window 1 --cooldown 2 \
   --events-dir "$PWD/live-observation-NEW-NAME"
 ```
 
-Press Ctrl-C in that shell to stop only the worker. It writes `run_stats.json`
-and removes its socket; the dashboard camera agent remains running. The worker
-saves crops locally and has no API or LED output. `received_fps` and
-`processed_fps` include time spent waiting for a viewer, so use a run started
-after the viewer is open for a direct live-rate measurement.
+Press Ctrl-C to stop the worker. It writes `run_stats.json` and removes its socket on clean exit; the camera service stays up. Inspect processed and received frame counts, backlog drops, stale frames, sequence gaps, inference time, and every crop. The three-hit gate resets across dropped sequences, so a saved-frame inference time alone cannot establish live event recall. The V5 trial measured 59.15 ms mean inference and one backlog drop. A worker run started before the viewer opens includes idle time in its fps statistics.
 
 ## Optional event relay
 
-`event_relay.py` is a separate standard-library process. It reads only complete
-`event_*.json` files from one worker events directory and leaves the detector and
-camera threads free of network calls. Copy it to the V4 slot from the Mac:
+`event_relay.py` reads complete `event_*.json` files from one worker events directory. It ignores worker config and stats. Dry-run inspection sends nothing:
 
 ```sh
-scp vision/pi/event_relay.py barn-owl-pi:/home/pi/barn-owl-candidates/v4-fb557bd9/
-```
-
-Then use a second Pi shell while the worker is running (or after it stops):
-
-```sh
-cd ~/barn-owl-candidates/v4-fb557bd9
+cd ~/barn-owl-candidates/v5-652a05e8
 python3 event_relay.py --events-dir "$PWD/live-observation-NEW-NAME" --once
 ```
 
-That command is a dry run and sends nothing. To relay later, use the same events
-directory and supply both `--post` and the reviewed API base URL explicitly:
+To send reviewed events, start it separately with both `--post` and the direct API URL:
 
 ```sh
 python3 event_relay.py --events-dir "$PWD/live-observation-NEW-NAME" \
   --post --api 'http://<reviewed-api-host>:8000'
 ```
 
-Press Ctrl-C to stop only the relay. Its `relay_receipts.jsonl` records each
-attempt before POST and each server receipt with an fsync. The default total
-budget is three attempts per event, including across relay restarts. Once an
-event has a server receipt, restarting does not resend it. A server
-`accepted:false` is recorded separately from a network failure; the API uses
-that response both for a duplicate and for an event below its threshold. If a
-network failure exhausts the budget, inspect the journal and raise
-`--max-attempts` explicitly for a further bounded retry. The relay resends the
-saved JSON bytes unchanged, so the API's body-based deduplication protects the
-posterior if the first request succeeded but its receipt was lost, while the API
-retains that event. An API event reset or lost server log removes that protection.
-Every attempt and receipt records the exact API destination. Starting the relay
-against a different URL with the same events directory fails before any POST;
-use the original destination or a new events directory after reviewing the
-delivery history.
-HTTP redirects are rejected without following them; supply the API's direct URL.
+The relay writes `relay_receipts.jsonl` with durable attempt and server-receipt records. Its default budget is three attempts per event, including restarts. A completed receipt prevents another delivery from that directory. `accepted:false` means the API handled the event without adding a sighting; inspect the API response and stored posterior. Redirects are rejected. The journal binds receipts to the API destination, so reusing the directory with a different URL fails before POST. The API's body-based deduplication protects the posterior if a request succeeded but its response was lost, provided the API kept its event store.
 
-To roll back, remove the service override, restore the exact backed-up agent,
-reload and restart the service, then stop the worker. `live_worker.py` removes its
-socket on clean exit:
+The V5 trial relayed only the first of six events, once, through a temporary Pi-loopback forward. That forward was canceled. Do not assume a route to the local API is still open.
+
+## Agent patch and rollback record
+
+The reviewed patch was built against agent SHA256 `756d75843c4eff2a83fad1c563848a646f584b7df2fe2130c4c6db31f8eb7e78`. The observed unit was `barn-owl.service`, with `ExecStart=/usr/bin/python3 -u /home/pi/barn-owl/agent.py` and environment file `/etc/barn-owl.env`. The bridge override was `/etc/systemd/system/barn-owl.service.d/detector-bridge.conf`, setting `OWL_DETECT_SOCKET=/home/pi/barn-owl-candidates/live-frames.sock`. The original agent backup used the unique name `agent.py.pre-live-756d7584`.
+
+These names describe the reviewed Pi at the time of the V5 trial. Before any source or service change, read the active unit, drop-ins, agent hash, and backup contents. Do not reapply `agent_live.patch` to an agent that already contains it, overwrite the backup, or remove an unrelated drop-in. A rollback needs a separate reviewed service restart: stop the worker, restore the matching backup, remove only the detector-bridge override, reload systemd, and restart `barn-owl.service`. The V5 live trial left the agent running and did not perform that rollback.
+
+For a later approved rollback, use this sequence only after the read-only
+checks show the same backup and detector-specific drop-in. It leaves other
+service overrides in place:
 
 ```sh
-sudo rm /etc/systemd/system/barn-owl.service.d/detector-bridge.conf
-sudo systemctl daemon-reload
+systemctl show barn-owl.service -p FragmentPath -p DropInPaths -p ExecStart -p EnvironmentFiles
 cd /home/pi/barn-owl
+sha256sum agent.py agent.py.pre-live-756d7584
+cat /etc/systemd/system/barn-owl.service.d/detector-bridge.conf
+# Stop the detector worker in its own shell before continuing.
+test -f agent.py.pre-live-756d7584
+sudo rm /etc/systemd/system/barn-owl.service.d/detector-bridge.conf
 cp -p agent.py.pre-live-756d7584 agent.py
+sudo systemctl daemon-reload
 sudo systemctl restart barn-owl.service
+systemctl is-active barn-owl.service
 ```
