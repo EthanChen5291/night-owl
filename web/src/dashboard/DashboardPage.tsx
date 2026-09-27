@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react'
 import { markdown } from '../agent'
+import { BackIcon, CheckIcon, ChevronIcon, CloseIcon, NewChatIcon, OwlIcon, StopIcon } from '../components/Icons'
 import ChartCard from './ChartCard'
-import { fetchCatalog, renderDashboard, streamDashboardChat } from './client'
+import { fetchCatalog, refreshDashboard, streamDashboardChat } from './client'
 import { downloadDashboard } from './export'
-import type { ChatMessage, ChartSelection, DashboardArtifact } from './types'
+import { ArrowUpIcon, DashIcon, DownloadIcon, RefreshIcon } from './icons'
+import { emptySession, forActiveRequest, forCurrentGeneration, isActiveRequest, MAX_ARTIFACTS, restoreSession, STORE_KEY, type RequestIdentity, type Turn } from './requestSession'
+import type { DashboardArtifact } from './types'
 import { resolvedKind, sortedRows, visibleSeries, type CardView } from './view'
 import './dashboard.css'
 
@@ -12,98 +15,86 @@ interface Catalog {
   max_cards: number
 }
 
-interface Session {
-  messages: ChatMessage[]
-  revisions: DashboardArtifact[]
-  revision: number
-  views: Record<string, CardView>
-  selection: ChartSelection | null
-}
-
-const STORE_KEY = 'nightowl.dashboards.v1'
 const STARTERS = [
-  'Compare rat complaints and model likelihood by borough.',
-  'Show how inspection results changed over time.',
-  'Where have recent rat camera events been reported?',
+  { title: 'Compare boroughs', prompt: 'Compare rat complaints and model likelihood by borough.' },
+  { title: 'Inspection trend', prompt: 'Show how inspection results changed over time.' },
+  { title: 'Camera activity', prompt: 'Where have recent rat camera events been reported?' },
 ]
-const emptySession: Session = { messages: [], revisions: [], revision: -1, views: {}, selection: null }
 
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
-const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
-const validQuery = (value: unknown) => record(value) && ['cells', 'backtest', 'events', 'sites'].includes(String(value.dataset))
-  && ['mean', 'sum', 'count', 'raw'].includes(String(value.aggregation)) && strings(value.metrics)
-
-function validArtifact(value: unknown): value is DashboardArtifact {
-  if (!record(value) || typeof value.id !== 'string' || !Number.isInteger(value.version) || typeof value.created_at !== 'string'
-    || !record(value.spec) || typeof value.spec.title !== 'string' || typeof value.spec.description !== 'string'
-    || !Array.isArray(value.spec.cards) || !record(value.results)) return false
-  if (!value.spec.cards.every((card: unknown) => record(card) && typeof card.id === 'string'
-    && typeof card.title === 'string' && ['bar', 'line', 'scatter', 'table', 'metric'].includes(String(card.kind))
-    && validQuery(card.query) && typeof card.x === 'string' && strings(card.y))) return false
-  if (!Object.values(value.results).every((result) => record(result) && validQuery(result.query)
-    && Array.isArray(result.rows) && result.rows.every((row: unknown) => record(row)
-      && Object.values(row).every((cell) => cell === null || typeof cell === 'string' || typeof cell === 'number'))
-    && Array.isArray(result.columns) && result.columns.every((column: unknown) => record(column)
-      && typeof column.key === 'string' && typeof column.label === 'string' && typeof column.unit === 'string')
-    && record(result.source) && typeof result.source.label === 'string' && typeof result.source.as_of === 'string'
-    && ['model', 'events', 'fixture'].includes(String(result.source.kind)) && strings(result.source.notes)
-    && typeof result.total_rows === 'number')) return false
-  return true
-}
-
-function loadSession(): Session {
-  try {
-    const saved: unknown = JSON.parse(localStorage.getItem(STORE_KEY) || 'null')
-    if (!record(saved) || !Array.isArray(saved.messages) || !Array.isArray(saved.revisions)) return emptySession
-    const selected = saved.revisions[Number.isInteger(saved.revision) ? saved.revision as number : saved.revisions.length - 1]
-    const restored = saved.revisions.filter(validArtifact).slice(-6)
-    const selectedIndex = restored.indexOf(selected)
-    const revisions = restored.map(({ id, version, created_at, spec, results }) => ({ id, version, created_at, spec, results }))
-    const views = record(saved.views) ? Object.fromEntries(Object.entries(saved.views).filter(([, view]) => record(view)
-      && (view.kind === undefined || ['bar', 'line', 'scatter', 'table', 'metric'].includes(String(view.kind)))
-      && (view.hidden === undefined || strings(view.hidden))
-      && (view.sortBy === undefined || typeof view.sortBy === 'string')
-      && (view.sortDirection === undefined || view.sortDirection === 'asc' || view.sortDirection === 'desc')
-      && (view.page === undefined || (Number.isInteger(view.page) && (view.page as number) >= 0)))) as Record<string, CardView> : {}
-    const selection = record(saved.selection) && typeof saved.selection.card_id === 'string'
-      && typeof saved.selection.field === 'string' && (typeof saved.selection.value === 'string' || typeof saved.selection.value === 'number')
-      ? saved.selection as unknown as ChartSelection : null
-    return {
-      messages: saved.messages.filter((message): message is ChatMessage => record(message)
-        && (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string').slice(-40),
-      revisions,
-      revision: revisions.length ? (selectedIndex >= 0 ? selectedIndex : revisions.length - 1) : -1,
-      views,
-      selection,
-    }
-  } catch {
-    return emptySession
-  }
-}
 
 function dashboardMarkdown(content: string): string {
   const withoutLinks = content.replace(/\[([^\]]+)\]\(https?:\/\/[^\s)]+\)/g, '$1').replace(/https?:\/\/[^\s<)]+/g, '')
   return markdown(withoutLinks).replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, '$1')
 }
 
+/** The artifact with each card's chosen view applied: what the assistant is shown and what exports. */
+function applyViews(artifact: DashboardArtifact, key: string, views: Record<string, CardView>): DashboardArtifact {
+  const view = (id: string) => views[`${key}/${id}`] ?? {}
+  const cards = artifact.spec.cards.map((card) => ({ ...card, kind: resolvedKind(card, artifact.results[card.id], view(card.id)), y: visibleSeries(card, view(card.id)) }))
+  const results = Object.fromEntries(Object.entries(artifact.results).map(([id, result]) => [id, { ...result, rows: sortedRows(result.rows, view(id)) }]))
+  return { ...artifact, spec: { ...artifact.spec, cards }, results }
+}
+
+const when = (iso: string) => {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+/** A few bars from the dashboard's first numeric series: a thumbnail, not a chart. */
+function Thumb({ artifact }: { artifact: DashboardArtifact }) {
+  const card = artifact.spec.cards.find((c) => artifact.results[c.id]?.rows.some((row) => typeof row[c.y[0]] === 'number'))
+  const values = card ? artifact.results[card.id].rows.slice(0, 7).map((row) => row[card.y[0]]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v)) : []
+  const max = Math.max(0, ...values.map(Math.abs))
+  if (!values.length || !max) return <span className="dx-thumb icon"><DashIcon size={18} /></span>
+  return <span className="dx-thumb" aria-hidden="true">{values.map((v, i) => <i key={i} style={{ height: `${Math.max(12, (Math.abs(v) / max) * 100)}%` }} />)}</span>
+}
+
+/** What the assistant did: live while it works, then folded into one line once the answer streams. */
+function Trace({ turn, live, status }: { turn: Turn; live: boolean; status: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const steps = turn.steps ?? []
+  const thinking = turn.thinking?.trim() ?? ''
+  if (!live && !steps.length && !thinking) return null
+  const working = live && !turn.content
+  const open = working || expanded
+  const summary = steps.length ? `${steps.length} step${steps.length === 1 ? '' : 's'}` : 'the question'
+  return <div className={`dx-trace${open ? ' open' : ''}`}>
+    {working
+      ? <div className="dx-trace-live"><span className="dx-shimmer">{status || 'Thinking'}</span></div>
+      : <button type="button" className="dx-trace-toggle" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
+        {live ? <span className="dx-shimmer">{status || 'Writing'}</span> : <span>Worked through {summary}</span>}
+        <ChevronIcon size={13} dir={expanded ? 'down' : 'right'} />
+      </button>}
+    {open && (thinking || steps.length > 0) && <div className="dx-trace-body">
+      {thinking && <p className={`dx-thinking${working ? ' tail' : ''}`}>{working ? thinking.slice(-360) : thinking}</p>}
+      {steps.length > 0 && <ol className="dx-steps">{steps.map((step, i) => <li key={i} className={step.error ? 'error' : ''}>
+        <span className="dx-step-dot">{step.error ? <CloseIcon size={10} /> : <CheckIcon size={10} />}</span>
+        <span>{step.text}{step.detail && <small>{step.detail}</small>}</span>
+      </li>)}</ol>}
+    </div>}
+  </div>
+}
+
 export default function DashboardPage() {
-  const [session, setSession] = useState(loadSession)
+  const [session, setSession] = useState(() => restoreSession(localStorage))
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
-  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [catalog, setCatalog] = useState<Catalog | null>(null)
-  const [catalogError, setCatalogError] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  const activeRequestRef = useRef<RequestIdentity | null>(null)
+  const generationRef = useRef(0)
   const threadRef = useRef<HTMLDivElement>(null)
-  const artifact = session.revisions[session.revision] ?? null
+  const stickRef = useRef(true)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const openKey = session.open
+  const artifact = openKey ? session.artifacts[openKey] ?? null : null
 
   useEffect(() => {
     const controller = new AbortController()
-    void fetchCatalog(controller.signal).then((data) => {
-      if (record(data) && record(data.datasets)) { setCatalog(data as unknown as Catalog); setCatalogError(false) }
-      else setCatalogError(true)
-    }, () => { if (!controller.signal.aborted) setCatalogError(true) })
+    void fetchCatalog(controller.signal).then((data) => { if (record(data) && record(data.datasets)) setCatalog(data as unknown as Catalog) }, () => {})
     return () => controller.abort()
   }, [])
 
@@ -114,129 +105,220 @@ export default function DashboardPage() {
     return () => clearTimeout(timer)
   }, [session])
 
-  useEffect(() => {
+  // Follow the stream while the reader is at the bottom; leave them alone once they scroll up.
+  useLayoutEffect(() => {
     const node = threadRef.current
-    if (node) node.scrollTop = node.scrollHeight
-  }, [session.messages, status])
+    if (node && stickRef.current) node.scrollTop = node.scrollHeight
+  }, [session.turns, status])
 
-  useEffect(() => () => abortRef.current?.abort(), [])
+  useLayoutEffect(() => {
+    const node = inputRef.current
+    if (!node) return
+    node.style.height = 'auto'
+    node.style.height = `${Math.min(node.scrollHeight, 200)}px`
+  }, [draft])
 
-  const displayedArtifact = useMemo((): DashboardArtifact | null => {
-    if (!artifact) return null
-    const cards = artifact.spec.cards.map((card) => {
-      const view = session.views[card.id] ?? {}
-      return { ...card, kind: resolvedKind(card, artifact.results[card.id], view), y: visibleSeries(card, view) }
-    })
-    const results = Object.fromEntries(Object.entries(artifact.results).map(([id, result]) => [id, { ...result, rows: sortedRows(result.rows, session.views[id] ?? {}) }]))
-    return { ...artifact, spec: { ...artifact.spec, cards }, results }
-  }, [artifact, session.views])
+  useEffect(() => () => { generationRef.current++; activeRequestRef.current = null; abortRef.current?.abort() }, [])
 
-  const addArtifact = (next: DashboardArtifact) => setSession((previous) => {
+  const displayed = useMemo(() => artifact && openKey ? applyViews(artifact, openKey, session.views) : null, [artifact, openKey, session.views])
+
+  const patchTurn = (identity: RequestIdentity, update: (turn: Turn) => Turn) => setSession((previous) =>
+    forActiveRequest(previous, identity, generationRef.current, (current, index) => {
+      const turns = [...current.turns]
+      turns[index] = update(turns[index])
+      return { ...current, turns }
+    }))
+
+  /** Attaches a new revision to the streaming turn and opens it, forgetting the oldest beyond MAX_ARTIFACTS. */
+  const addArtifact = (next: DashboardArtifact, identity: RequestIdentity) => {
+    const key = `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
     const { id, version, created_at, spec, results } = next
-    const artifact = { id, version, created_at, spec, results }
-    const revisions = [...previous.revisions.slice(0, previous.revision + 1), artifact].slice(-6)
-    const revision = revisions.length - 1
-    return { ...previous, revisions, revision, views: {}, selection: null }
-  })
+    setSession((previous) => forActiveRequest(previous, identity, generationRef.current, (current, index) => {
+      const artifacts = { ...current.artifacts, [key]: { id, version, created_at, spec, results } }
+      const keys = Object.keys(artifacts)
+      for (const stale of keys.slice(0, Math.max(0, keys.length - MAX_ARTIFACTS))) delete artifacts[stale]
+      const turns = [...current.turns]
+      turns[index] = { ...turns[index], dashboard: key }
+      return {
+        ...current, artifacts, open: key, selection: null,
+        turns: turns.map((turn) => turn.dashboard && !artifacts[turn.dashboard] ? { ...turn, dashboard: undefined } : turn),
+        views: Object.fromEntries(Object.entries(current.views).filter(([view]) => artifacts[view.split('/')[0]])),
+      }
+    }))
+  }
 
   const send = async (prompt: string) => {
     const message = prompt.trim()
-    if (!message || busy) return
-    setDraft('')
-    setError('')
-    setStatus('Starting…')
-    setBusy(true)
-    const history = session.messages.filter((entry) => entry.content.trim()).slice(-12)
-    setSession((previous) => ({ ...previous, messages: [...previous.messages, { role: 'user', content: message }, { role: 'assistant', content: '' }] }))
+    if (!message || busy || activeRequestRef.current) return
+    const identity: RequestIdentity = { requestId: crypto.randomUUID(), turnId: crypto.randomUUID(), generation: generationRef.current }
     const controller = new AbortController()
+    activeRequestRef.current = identity
     abortRef.current = controller
-    let answer = ''
+    setDraft('')
+    setNotice('')
+    setStatus('Thinking')
+    setBusy(true)
+    stickRef.current = true
+    const history = session.turns.filter((turn) => turn.content.trim()).slice(-12).map(({ role, content }) => ({ role, content }))
+    const version = Math.min(1000, Math.max(0, ...Object.values(session.artifacts).map((a) => a.version)) + 1)
+    setSession((previous) => ({ ...previous, turns: [...previous.turns, { role: 'user', content: message }, { role: 'assistant', content: '', steps: [], requestId: identity.requestId, turnId: identity.turnId }] }))
     try {
-      await streamDashboardChat({
-        message, history, dashboard: displayedArtifact?.spec, selection: session.selection ?? undefined,
-        version: (artifact?.version ?? 0) + 1,
-      }, (event) => {
+      await streamDashboardChat({ message, history, dashboard: displayed?.spec, selection: session.selection ?? undefined, version }, (event) => {
+        if (!isActiveRequest(activeRequestRef.current, identity)) return
         if (event.type === 'status') setStatus(event.text)
-        if (event.type === 'delta') {
-          answer += event.text
-          setSession((previous) => ({ ...previous, messages: [...previous.messages.slice(0, -1), { role: 'assistant', content: answer }] }))
-        }
-        if (event.type === 'dashboard') addArtifact(event.dashboard)
-        if (event.type === 'error') setError(event.text)
+        else if (event.type === 'step') patchTurn(identity, (turn) => ({ ...turn, steps: [...(turn.steps ?? []), { text: event.text, detail: event.detail, error: event.error }] }))
+        else if (event.type === 'thinking') patchTurn(identity, (turn) => ({ ...turn, thinking: ((turn.thinking ?? '') + event.text).slice(-6000) }))
+        else if (event.type === 'delta') { setStatus('Writing'); patchTurn(identity, (turn) => ({ ...turn, content: turn.content + event.text })) }
+        else if (event.type === 'dashboard') addArtifact(event.dashboard, identity)
+        else if (event.type === 'error') patchTurn(identity, (turn) => ({ ...turn, error: event.text }))
       }, controller.signal)
     } catch (cause) {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'The request failed.')
+      patchTurn(identity, (turn) => ({ ...turn, error: controller.signal.aborted ? 'Stopped.' : cause instanceof Error ? cause.message : 'The request failed.' }))
     } finally {
-      if (!answer) setSession((previous) => ({ ...previous, messages: previous.messages.slice(0, -1) }))
-      if (abortRef.current === controller) abortRef.current = null
-      setBusy(false)
-      setStatus('')
+      if (isActiveRequest(activeRequestRef.current, identity)) {
+        activeRequestRef.current = null
+        if (abortRef.current === controller) abortRef.current = null
+        setBusy(false)
+        setStatus('')
+      }
     }
   }
 
+  /** Re-runs the open dashboard's queries in place; its chart views carry over. */
   const refresh = async () => {
-    if (!artifact || busy) return
+    if (!artifact || !openKey || busy) return
     const controller = new AbortController()
+    const generation = generationRef.current
     abortRef.current = controller
     setBusy(true)
-    setError('')
-    setStatus('Refreshing from current data…')
+    setNotice('')
+    setStatus('Refreshing')
     try {
-      const next = await renderDashboard(displayedArtifact?.spec ?? artifact.spec, artifact.version + 1, controller.signal)
-      addArtifact(next)
+      const { id, version, created_at, spec, results } = await refreshDashboard(artifact, controller.signal)
+      setSession((previous) => forCurrentGeneration(previous, generation, generationRef.current, controller.signal.aborted,
+        (current) => current.artifacts[openKey]
+          ? { ...current, artifacts: { ...current.artifacts, [openKey]: { id, version, created_at, spec, results } } } : current))
     } catch (cause) {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Refresh failed.')
+      if (generationRef.current === generation && !controller.signal.aborted) setNotice(cause instanceof Error ? cause.message : 'Refresh failed.')
     } finally {
-      if (abortRef.current === controller) abortRef.current = null
-      setBusy(false)
-      setStatus('')
+      if (abortRef.current === controller) { abortRef.current = null; setBusy(false); setStatus('') }
     }
   }
 
   const submit = (event: FormEvent) => { event.preventDefault(); void send(draft) }
   const onPromptKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(draft) }
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(draft) }
   }
-  const setView = (id: string, view: CardView) => setSession((previous) => ({ ...previous, views: { ...previous.views, [id]: view } }))
-  const select = (selection: ChartSelection) => setSession((previous) => ({ ...previous, selection }))
+  const setView = (id: string, view: CardView) => setSession((previous) => ({ ...previous, views: { ...previous.views, [`${openKey}/${id}`]: view } }))
+  const openArtifact = (key: string | null) => setSession((previous) => ({ ...previous, open: key, selection: previous.open === key ? previous.selection : null }))
+  const newChat = () => {
+    generationRef.current++
+    activeRequestRef.current = null
+    abortRef.current?.abort()
+    abortRef.current = null
+    setBusy(false)
+    setStatus('')
+    setSession(emptySession())
+    setDraft('')
+    setNotice('')
+    inputRef.current?.focus()
+  }
 
-  return <div className="dash-page">
-    <header className="dash-topbar">
-      <div className="dash-brand"><span className="dash-mark" aria-hidden="true">◉</span><div><strong>Night Owl</strong><span>Data explorer</span></div></div>
-      <nav aria-label="Primary"><a href="/">Map</a><span aria-current="page">Dashboards</span></nav>
-    </header>
+  const building = busy && status === 'Building dashboard'
+  const canvas = !!artifact || building
+  const empty = session.turns.length === 0
+  const selectedCard = session.selection && artifact?.spec.cards.find((card) => card.id === session.selection?.card_id)
+  const lastIndex = session.turns.length - 1
 
-    <div className="dash-layout">
-      <section className="dash-conversation" aria-label="Dashboard conversation">
-        <div className="dash-conversation-head"><div><span className="dash-eyebrow">Explore the data</span><h1>Ask Night Owl</h1><p>Ask a question, then choose a bar, point, or row to refine it.</p></div></div>
-        <div className="dash-thread" ref={threadRef} aria-live="polite">
-          {session.messages.length === 0 && <div className="dash-starters"><p>Try one of these questions</p>{STARTERS.map((starter) => <button key={starter} type="button" onClick={() => void send(starter)} disabled={busy}>{starter}<span aria-hidden="true">↗</span></button>)}</div>}
-          {session.messages.map((message, index) => message.content && <div className={`dash-message ${message.role}`} key={index}><span>{message.role === 'user' ? 'You' : 'Night Owl'}</span>{message.role === 'assistant' ? <div className="dash-prose" dangerouslySetInnerHTML={{ __html: dashboardMarkdown(message.content) }} /> : <p>{message.content}</p>}</div>)}
-          {busy && <div className="dash-progress" role="status"><span className="dash-spinner" />{status || 'Working…'}</div>}
-          {error && <div className="dash-error" role="alert">{error}</div>}
-        </div>
-        <form className="dash-compose" onSubmit={submit}>
-          {session.selection && <div className="dash-selection"><span>Selected <b>{session.selection.value}</b> in {artifact?.spec.cards.find((card) => card.id === session.selection?.card_id)?.title ?? session.selection.card_id}</span><button type="button" onClick={() => setSession((previous) => ({ ...previous, selection: null }))} aria-label="Clear chart selection">×</button></div>}
-          <div className="dash-compose-row"><textarea aria-label="Ask about the data" placeholder="Ask a question or refine this dashboard…" value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onPromptKey} rows={3} disabled={busy} /><button type={busy ? 'button' : 'submit'} onClick={busy ? () => abortRef.current?.abort() : undefined} disabled={!busy && !draft.trim()}>{busy ? 'Stop' : 'Send'}</button></div>
-          <span className="dash-compose-hint">Enter to send · Shift+Enter for a new line</span>
-        </form>
-      </section>
-
-      <main className="dash-workspace">
-        <div className="dash-workspace-head"><div><span className="dash-eyebrow">Your dashboard</span><h2>{artifact?.spec.title ?? 'Your dashboard'}</h2><p>{artifact?.spec.description ?? 'Your charts will appear here after your first question.'}</p></div>
-          {artifact && <div className="dash-actions">
-            <div className="dash-revisions" aria-label="Dashboard revisions"><button type="button" onClick={() => setSession((previous) => ({ ...previous, revision: previous.revision - 1, views: {}, selection: null }))} disabled={busy || session.revision <= 0} aria-label="Previous revision">←</button><span>Revision {session.revision + 1} of {session.revisions.length}</span><button type="button" onClick={() => setSession((previous) => ({ ...previous, revision: previous.revision + 1, views: {}, selection: null }))} disabled={busy || session.revision >= session.revisions.length - 1} aria-label="Next revision">→</button></div>
-            <button type="button" onClick={() => void refresh()} disabled={busy}>Refresh data</button>
-            <button type="button" className="dash-export" onClick={() => displayedArtifact && downloadDashboard(displayedArtifact)} disabled={!displayedArtifact}>Download HTML</button>
-          </div>}
-        </div>
-
-        {!artifact && <div className="dash-welcome"><div className="dash-welcome-graphic" aria-hidden="true"><span /><span /><span /><span /></div><h3>Start with a question</h3><p>Night Owl will build charts from available model, inspection, and camera data. Each card shows its source and date.</p>{catalog && <div className="dash-datasets">{Object.values(catalog.datasets).map((dataset) => <span key={dataset.label}>{dataset.label}</span>)}</div>}{catalogError && <p className="dash-catalog-error">The data catalog is unavailable. You can still try a question.</p>}</div>}
-        {artifact && <div className="dash-content">
-          <div className="dash-artifact-meta"><span>Updated {artifact.created_at}</span><span>Version {artifact.version}</span></div>
-          <div className="dash-cards">{artifact.spec.cards.map((card) => <ChartCard key={card.id} card={card} result={artifact.results[card.id]} view={session.views[card.id] ?? {}} selection={session.selection} onView={(view) => setView(card.id, view)} onSelect={select} />)}</div>
-        </div>}
-      </main>
+  const composer = <form className="dx-composer" onSubmit={submit}>
+    {session.selection && <div className="dx-context">
+      <span className="dx-context-label">Selected</span>
+      <b>{String(session.selection.value)}</b>
+      {selectedCard && <span className="dx-context-src">in {selectedCard.title}</span>}
+      <button type="button" onClick={() => setSession((previous) => ({ ...previous, selection: null }))} aria-label="Clear chart selection"><CloseIcon size={12} /></button>
+    </div>}
+    <div className="dx-input">
+      <textarea ref={inputRef} aria-label="Ask about the data" rows={1} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onPromptKey}
+        placeholder={session.selection ? `Ask about ${session.selection.value}…` : artifact ? 'Refine this dashboard…' : 'Ask about rats, inspections, or cameras…'} autoFocus />
+      {busy
+        ? <button type="button" className="dx-send stop" onClick={() => abortRef.current?.abort()} aria-label="Stop"><StopIcon size={14} /></button>
+        : <button type="submit" className="dx-send" disabled={!draft.trim()} aria-label="Send"><ArrowUpIcon size={17} /></button>}
     </div>
+  </form>
+
+  return <div className={`dx${canvas ? ' has-canvas' : ''}${empty ? ' is-empty' : ''}`}>
+    <section className="dx-chat" aria-label="Conversation">
+      <header className="dx-bar">
+        <a className="dx-pill" href="/" title="Back to the map"><BackIcon size={15} /><span>Map</span></a>
+        <div className="dx-brand"><OwlIcon size={16} /><b>Night Owl</b><span>Explore</span></div>
+        {empty ? <span className="dx-bar-spacer" /> : <button type="button" className="dx-icon-btn" onClick={newChat} title="New chat" aria-label="New chat"><NewChatIcon size={17} /></button>}
+      </header>
+
+      {empty ? <div className="dx-hero">
+        <div className="dx-hero-mark" aria-hidden="true"><OwlIcon size={26} /></div>
+        <h1>What should we look into?</h1>
+        <p>Ask a question and Night Owl builds an interactive dashboard from the model, inspections, and camera events.</p>
+        {composer}
+        <div className="dx-starters">{STARTERS.map((starter, i) => <button key={starter.title} type="button" style={{ '--i': i } as CSSProperties} onClick={() => void send(starter.prompt)}>
+          <b>{starter.title}</b><span>{starter.prompt}</span>
+        </button>)}</div>
+        {catalog && <p className="dx-sources">Built on {Object.values(catalog.datasets).map((dataset) => dataset.label.toLowerCase()).join(' · ')}</p>}
+      </div> : <>
+        <div className="dx-thread" ref={threadRef} onScroll={(event) => { const node = event.currentTarget; stickRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80 }}>
+          <div className="dx-thread-inner" aria-live="polite">
+            {session.turns.map((turn, index) => {
+              if (turn.role === 'user') return <div className="dx-turn user" key={index}><p>{turn.content}</p></div>
+              const live = busy && index === lastIndex
+              const built = turn.dashboard ? session.artifacts[turn.dashboard] : undefined
+              const isOpen = !!turn.dashboard && turn.dashboard === openKey
+              return <div className="dx-turn assistant" key={index}>
+                <div className={`dx-avatar${live ? ' live' : ''}`}><OwlIcon size={15} /></div>
+                <div className="dx-turn-body">
+                  <Trace turn={turn} live={live} status={status} />
+                  {built && <button type="button" className={`dx-artifact${isOpen ? ' open' : ''}`} onClick={() => openArtifact(isOpen ? null : turn.dashboard!)} aria-pressed={isOpen}>
+                    <Thumb artifact={built} />
+                    <span className="dx-artifact-text"><b>{built.spec.title}</b>
+                      <small>{built.spec.cards.length} chart{built.spec.cards.length === 1 ? '' : 's'} · version {built.version}</small></span>
+                    <span className="dx-artifact-cta">{isOpen ? 'Viewing' : 'Open'}</span>
+                  </button>}
+                  {turn.content && <div className={`dx-prose${live ? ' streaming' : ''}`} dangerouslySetInnerHTML={{ __html: dashboardMarkdown(turn.content) }} />}
+                  {turn.error && <div className="dx-error" role="alert">{turn.error}</div>}
+                </div>
+              </div>
+            })}
+          </div>
+        </div>
+        <div className="dx-dock">{composer}<p className="dx-fineprint">Night Owl answers only from its own model and event data. Each chart names its source.</p></div>
+      </>}
+    </section>
+
+    {canvas && <section className="dx-canvas" aria-label="Dashboard">
+      <div className="dx-canvas-scroll">
+        {artifact && displayed ? <>
+          <header className="dx-canvas-head">
+            <div className="dx-canvas-title">
+              <h2>{artifact.spec.title}</h2>
+              {artifact.spec.description && <p>{artifact.spec.description}</p>}
+              <span className="dx-meta">Version {artifact.version} · {when(artifact.created_at)}</span>
+            </div>
+            <div className="dx-tools">
+              <button type="button" className="dx-icon-btn" onClick={() => void refresh()} disabled={busy} title="Refresh data" aria-label="Refresh data"><RefreshIcon size={16} className={status === 'Refreshing' ? 'dx-spin' : undefined} /></button>
+              <button type="button" className="dx-icon-btn" onClick={() => downloadDashboard(displayed)} title="Download HTML" aria-label="Download HTML"><DownloadIcon size={16} /></button>
+              <button type="button" className="dx-icon-btn" onClick={() => openArtifact(null)} title="Close dashboard" aria-label="Close dashboard"><CloseIcon size={16} /></button>
+            </div>
+          </header>
+          {notice && <div className="dx-error" role="alert">{notice}</div>}
+          {building && <div className="dx-rebuild"><span className="dx-shimmer">Building the next version</span></div>}
+          <div className={`dx-grid${building ? ' stale' : ''}`} key={`${openKey}:${artifact.created_at}`}>
+            {artifact.spec.cards.map((card, index) => <ChartCard key={card.id} card={card} index={index} result={artifact.results[card.id]}
+              view={session.views[`${openKey}/${card.id}`] ?? {}} selection={session.selection} onView={(view) => setView(card.id, view)}
+              onSelect={(selection) => setSession((previous) => ({ ...previous, selection }))} />)}
+          </div>
+        </> : <div className="dx-skeleton" role="status" aria-label="Building dashboard">
+          <div className="dx-skel-head"><i /><i /></div>
+          <div className="dx-grid">{[0, 1, 2, 3].map((i) => <div key={i} className="dx-card skel" style={{ '--i': i } as CSSProperties}><i /><i /><div /></div>)}</div>
+        </div>}
+      </div>
+    </section>}
   </div>
 }
