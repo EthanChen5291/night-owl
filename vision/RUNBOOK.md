@@ -116,6 +116,9 @@ the old `0.4` side-view cutoff excludes 10 of 17 reviewed rat boxes in `zoom15_b
 reviewed frames are 8 seconds apart, so replaying them at 15 fps would invent consecutive
 detections. Use the original video for timing. `zoom15_b` and `table_c` have rat-presence
 anchors, but no verified push times or separate negatives reel yet; their replay is exploratory.
+`frames/_sources.csv` records nominal sample times (`index / extraction_fps`), not the decoded
+source frame timestamps. Do not turn those times into push labels or use them to judge a
+subsecond event; inspect the original video at its decoded timestamp.
 
 To show a saved clip through the actual Pi detector path and local map, start the API with the
 same minimum confidence used by the detector, then replay the original video at recorded speed:
