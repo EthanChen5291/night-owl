@@ -1,0 +1,22 @@
+{
+  "packets_received": 1347,
+  "backlog_dropped": 1,
+  "frames_received": 1346,
+  "frames_inferred": 1346,
+  "invalid_frames": 0,
+  "invalid_timestamps": 0,
+  "stale_frames": 0,
+  "sequence_gaps": 1,
+  "rat_proposals": 189,
+  "rat_suppressed": 3,
+  "events": 6,
+  "inference_ms_total": 79618.83102201682,
+  "inference_ms_max": 149.6908649987745,
+  "frame_age_ms_total": 2604.514875984023,
+  "frame_age_ms_max": 35.16974299964204,
+  "elapsed_s": 89.859,
+  "received_fps": 14.99,
+  "processed_fps": 14.98,
+  "inference_ms_mean": 59.15,
+  "frame_age_ms_mean": 1.94
+}
