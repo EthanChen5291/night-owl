@@ -141,6 +141,9 @@ button { font: inherit; color: inherit; }
   display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
   transition: transform 0.25s var(--ease); /* slides left out of the search field's way (App.tsx sets --modebar-shift) */
 }
+@media (min-width: 1101px) {
+  .modebar.dropped { top: 64px; } /* no room between the toolbar and the header (App.tsx) */
+}
 .modebar > *, .modebar-row > * { pointer-events: auto; }
 .modebar-row { display: flex; gap: 8px; }
 .chip { padding: 5px 12px; border-radius: 999px; font-size: 11px; }
