@@ -75,6 +75,7 @@ export default function App() {
   const [streaming, setStreaming] = useState(false)
   const [flash, setFlash] = useState<{ h3: string; seq: number } | null>(null)
   const [focus, setFocus] = useState<{ lat: number; lon: number; distance?: number; seq: number } | null>(null)
+  const [locate, setLocate] = useState<{ h3: string; seq: number } | null>(null) // the searched hexagon, pointed out once the flight lands
   const [openRank, setOpenRank] = useState<number | null>(null) // the suggested hexagon whose spot options are open
   const [spotsByCell, setSpotsByCell] = useState<Map<string, Spot[]>>(() => new Map())
   const [backtest, setBacktest] = useState<BacktestResponse | null | undefined>(undefined)
@@ -526,7 +527,7 @@ export default function App() {
       setSelected(null)
       setPinned(cellByH3.has(h3) ? { h3, addr: p.kind === 'hexagon' ? null : p.label } : null)
       setFocus({ lat: p.lat, lon: p.lon, distance: p.kind === 'neighborhood' ? 1400 : 700, seq: ++seqRef.current })
-      if (cellByH3.has(h3)) setFlash({ h3, seq: ++seqRef.current })
+      if (cellByH3.has(h3)) setLocate({ h3, seq: ++seqRef.current })
     },
     [tileAreas, areas, area, setArea, cellByH3],
   )
@@ -560,6 +561,7 @@ export default function App() {
             index={index}
             flash={flash}
             focus={focus}
+            locate={locate}
             onHover={onHover}
             onClick={onClick}
             onView={onView}

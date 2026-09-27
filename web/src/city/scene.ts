@@ -75,6 +75,17 @@ interface AreaMarker {
   outline: [number, number][] // local metres, for which cells belong to it
 }
 
+/** The band drawn around a searched hexagon once the camera has landed on it. */
+interface Locator {
+  group: THREE.Group
+  band: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial>
+  edge: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial>
+  h3: string
+  start: number | null // null until the flight has landed
+  flashesLeft: number
+  nextFlashAt: number
+}
+
 interface Flight {
   p0: THREE.Vector3
   t0: THREE.Vector3
@@ -86,6 +97,12 @@ interface Flight {
 }
 
 const FLASH_MS = 1500
+// the search locator: a bright band lands on the hexagon after the flight, starts wide, shrinks onto it, holds, fades
+const LOCATE_GROW_MS = 1300
+const LOCATE_HOLD_MS = 1000
+const LOCATE_FADE_MS = 1500
+const LOCATE_START_SCALE = 2.8
+const LOCATE_FLASHES = 3 // the cell pulses this many times, back to back, once the camera has landed
 const WIDE_DISTANCE = 9000 // orbit distance (m) past which the view counts as citywide (tiles stop streaming)
 const NODE_RANGE = 110 // metres: the coverage disc, roughly the tree-guard rail's block face
 const NODE_RED = 0xc0271d // a deep red, like a map pin, not a warning light
@@ -133,6 +150,8 @@ interface Look {
   hexOpacity: number
   /** the citywide 2D colour field: every cell colour is pulled `mix` of the way to `neutral` so the map stays calm */
   field: { neutral: number; mix: number; opacity: number }
+  /** the search locator band and the halo either side of it: ink on paper by day, the flash's warm white on dark by night */
+  locator: { band: number; edge: number }
   area: { fill: number; rim: number; ink: string }
 }
 
@@ -154,6 +173,7 @@ const LOOKS: Record<Preset, Look> = {
     windowColour: 0xffffff,
     hexOpacity: 0.56,
     field: { neutral: 0xe6e4de, mix: 0.12, opacity: 0.9 },
+    locator: { band: 0x16202b, edge: 0xffffff },
     area: { fill: 0xffffff, rim: 0xffffff, ink: '#16202b' },
   },
   night: {
@@ -173,6 +193,7 @@ const LOOKS: Record<Preset, Look> = {
     windowColour: 0xdfe7f7, // lit windows read as a pale cool white, so the skyline stays blue-grey, not amber
     hexOpacity: 0.8,
     field: { neutral: 0x171b26, mix: 0.25, opacity: 0.84 },
+    locator: { band: 0xfff0b0, edge: 0x1b202a },
     area: { fill: 0x9fc4ff, rim: 0xbfd8ff, ink: '#e6e8ef' },
   },
 }
@@ -237,6 +258,7 @@ export class CityScene {
   private callbacks: SceneCallbacks
   private index: AddressIndex | null = null
   private flight: Flight | null = null
+  private locator: Locator | null = null
   private raf = 0
   private disposed = false
   private canvas: HTMLCanvasElement
@@ -371,6 +393,10 @@ export class CityScene {
   setPreset(preset: Preset) {
     const L = LOOKS[preset]
     this.look = L
+    if (this.locator) {
+      this.locator.band.material.color.set(L.locator.band)
+      this.locator.edge.material.color.set(L.locator.edge)
+    }
     this.scene.background = new THREE.Color(L.background)
     this.scene.fog = new THREE.Fog(L.background, L.fog[0], L.fog[1])
     ;(this.sky.material.uniforms.zenith.value as THREE.Color).set(L.zenith)
@@ -483,6 +509,59 @@ export class CityScene {
     const entry = this.hexes.get(h3)
     if (!entry) return
     entry.flashUntil = performance.now() + FLASH_MS
+  }
+
+  /**
+   * Point out a hexagon after a search: a wide bright band waits for the camera flight to land, then shrinks onto the
+   * cell's outline, holds, and fades; the cell itself flashes three times from the moment of landing, so the glow is
+   * not spent mid-flight the way a single flash at pick time was.
+   */
+  locate(h3: string) {
+    this.clearLocator()
+    const ring = cellToBoundary(h3).map(([lat, lon]) => this.projector.xy(lat, lon))
+    const [cx, cy] = this.projector.xy(...cellToLatLng(h3))
+    // a hexagonal band between two scalings of the cell outline, centred on the cell
+    const hexBand = (outerK: number, innerK: number, colour: number) => {
+      const outer = new THREE.Shape()
+      const hole = new THREE.Path()
+      ring.forEach(([x, y], i) => {
+        const px = x - cx
+        const py = y - cy
+        if (i === 0) {
+          outer.moveTo(px * outerK, py * outerK)
+          hole.moveTo(px * innerK, py * innerK)
+        } else {
+          outer.lineTo(px * outerK, py * outerK)
+          hole.lineTo(px * innerK, py * innerK)
+        }
+      })
+      outer.closePath()
+      hole.closePath()
+      outer.holes.push(hole)
+      const material = new THREE.MeshBasicMaterial({ color: colour, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false, toneMapped: false, side: THREE.DoubleSide })
+      return new THREE.Mesh(new THREE.ShapeGeometry(outer), material)
+    }
+    const edge = hexBand(1.05, 0.79, this.look.locator.edge)
+    const band = hexBand(1, 0.84, this.look.locator.band)
+    edge.renderOrder = MARKER_ORDER + 2 // over the prisms and the markers, never hidden by a building
+    band.renderOrder = MARKER_ORDER + 3
+    const group = new THREE.Group()
+    group.add(edge, band)
+    group.rotation.x = -Math.PI / 2
+    group.position.set(cx, 3, -cy)
+    group.visible = false
+    this.scene.add(group)
+    this.locator = { group, band, edge, h3, start: null, flashesLeft: LOCATE_FLASHES, nextFlashAt: 0 }
+  }
+
+  private clearLocator() {
+    if (!this.locator) return
+    this.scene.remove(this.locator.group)
+    for (const m of [this.locator.band, this.locator.edge]) {
+      m.geometry.dispose()
+      m.material.dispose()
+    }
+    this.locator = null
   }
 
   /** Glide the orbit target to a point, keeping the current distance and angle (or dolly to `distance`). */
@@ -1222,6 +1301,40 @@ export class CityScene {
       }
     }
     this.applyKeys(dt)
+    // the search locator starts when the flight lands: wide and bright, then it shrinks onto the cell, holds and fades
+    if (this.locator) {
+      const L = this.locator
+      if (L.start === null && !this.flight) L.start = now
+      if (L.start !== null) {
+        if (L.flashesLeft > 0 && now >= L.nextFlashAt) {
+          this.flash(L.h3)
+          L.flashesLeft -= 1
+          L.nextFlashAt = now + FLASH_MS
+        }
+        const t = now - L.start
+        const g = L.group
+        g.visible = true
+        let scale = 1
+        let opacity = 0
+        if (t < LOCATE_GROW_MS) {
+          const e = 1 - Math.pow(1 - t / LOCATE_GROW_MS, 3)
+          scale = LOCATE_START_SCALE - (LOCATE_START_SCALE - 1) * e
+          opacity = 0.55 + 0.4 * e
+        } else if (t < LOCATE_GROW_MS + LOCATE_HOLD_MS) {
+          scale = 1 + 0.03 * Math.sin((t - LOCATE_GROW_MS) / 90)
+          opacity = 0.95
+        } else if (t < LOCATE_GROW_MS + LOCATE_HOLD_MS + LOCATE_FADE_MS) {
+          opacity = 0.95 * (1 - (t - LOCATE_GROW_MS - LOCATE_HOLD_MS) / LOCATE_FADE_MS)
+        } else {
+          this.clearLocator()
+        }
+        if (this.locator) {
+          g.scale.setScalar(scale)
+          L.band.material.opacity = opacity
+          L.edge.material.opacity = opacity * 0.7
+        }
+      }
+    }
     const dist = this.camera.position.distanceTo(this.controls.target)
     // the sun and its shadow box follow the target so shadows exist wherever you fly
     this.key.target.position.set(this.controls.target.x, 0, this.controls.target.z)

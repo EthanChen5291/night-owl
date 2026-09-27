@@ -24,6 +24,19 @@ API=http://192.168.7.1:8000 ./api/fake_event.sh
 
 Reset between rehearsals: `curl -X DELETE -H 'X-Demo-Reset: yes' localhost:8000/events`
 
+Batches of made-up sightings so the log and the map have something to show (both restamp to "minutes ago"
+on every run; reset first or they pile up):
+
+```
+./api/fake_sightings.py        # 15 sightings: grayscale crops of the rat prop from the team's own footage
+./api/real_sightings.py        # 17 sightings: real wild rats and house mice in daylight, dusk, flash, torchlight and unlit subway track
+```
+
+`real_sightings.py` cuts openly licensed Wikimedia Commons photos to the node's crop format (grayscale by default,
+`--colour` to keep colour). The photos themselves are re-downloaded with `--fetch` into `api/fixtures/rodents/`
+(gitignored); the crops are baked into `fixtures/events.real.json`, and `fixtures/rodents.credits.json` has the
+author and licence of every photo, which the CC BY ones require if a crop appears on a slide.
+
 ## Endpoints (contract §6)
 
 | Method | Path | Notes |

@@ -61,10 +61,18 @@ def real_crop(rng: random.Random, name: str) -> tuple[str, list[float]]:
     """A grayscale thumbnail around the labelled rat in frame `name`, at a random zoom; returns (jpeg b64, bbox x y w h)."""
     raw = subprocess.run(["git", "show", f"{FRAMES_COMMIT}:string_review/rat/{name}.jpg"], cwd=HERE.parent, capture_output=True, check=True).stdout
     img = ImageOps.grayscale(Image.open(io.BytesIO(raw)))
-    w, h = img.size
     line = next(l for l in (LABELS / f"{name}.txt").read_text().splitlines() if l.startswith("0 "))
     cx, cy, bw, bh = (float(v) for v in line.split()[1:5])
     bbox = [round(cx - bw / 2, 3), round(cy - bh / 2, 3), round(bw, 3), round(bh, 3)]
+    return thumbnail(rng, img, bbox), bbox
+
+
+def thumbnail(rng: random.Random, img: Image.Image, bbox: list[float]) -> str:
+    """The node's crop format: a 240x180 JPEG around `bbox` (x y w h, 0..1) at a random zoom, autocontrast, the box drawn on.
+    `img` is grayscale for the node look (a colour image is kept in colour)."""
+    w, h = img.size
+    bw, bh = bbox[2], bbox[3]
+    cx, cy = bbox[0] + bw / 2, bbox[1] + bh / 2
     zoom = rng.uniform(1.4, 3.2)  # how much context around the box: tight close-ups to wide views
     cw, ch = min(w, max(bw * w * zoom, 160)), min(h, max(bh * h * zoom, 120))
     cw, ch = (cw, cw * 0.75) if cw * 0.75 >= ch else (ch / 0.75, ch)  # 4:3
@@ -78,7 +86,7 @@ def real_crop(rng: random.Random, name: str) -> tuple[str, list[float]]:
     d.rectangle([(bbox[0] * w - x0) * sx, (bbox[1] * h - y0) * sy, ((bbox[0] + bw) * w - x0) * sx, ((bbox[1] + bh) * h - y0) * sy], outline=(255, 80, 60), width=2)
     buf = io.BytesIO()
     crop.save(buf, "JPEG", quality=72)
-    return base64.b64encode(buf.getvalue()).decode(), bbox
+    return base64.b64encode(buf.getvalue()).decode()
 
 
 def make_events(seed: int = 26) -> list[dict]:

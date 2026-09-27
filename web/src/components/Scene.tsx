@@ -23,6 +23,7 @@ interface Props {
   index: AddressIndex | null
   flash: { h3: string; seq: number } | null
   focus: { lat: number; lon: number; distance?: number; seq: number } | null
+  locate: { h3: string; seq: number } | null
   onHover: SceneCallbacks['onHover']
   onClick: SceneCallbacks['onClick']
   onView: SceneCallbacks['onView']
@@ -30,7 +31,7 @@ interface Props {
 
 /** The only component that touches three.js. Owns one CityScene for the life of the canvas. */
 export default function Scene(props: Props) {
-  const { centre, cells, mode, preset, plan, showPlan, spots, cityLayers, areaLayers, tiles, areas, tileAreas, activeArea, nodes, selectedNode, index, flash, focus } = props
+  const { centre, cells, mode, preset, plan, showPlan, spots, cityLayers, areaLayers, tiles, areas, tileAreas, activeArea, nodes, selectedNode, index, flash, focus, locate } = props
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<CityScene | null>(null)
   const cbRef = useRef({ onHover: props.onHover, onClick: props.onClick, onView: props.onView })
@@ -104,6 +105,9 @@ export default function Scene(props: Props) {
   useEffect(() => {
     if (focus) sceneRef.current?.focusLatLon(focus.lat, focus.lon, focus.distance)
   }, [focus])
+  useEffect(() => {
+    if (locate) sceneRef.current?.locate(locate.h3)
+  }, [locate])
 
   return <canvas ref={canvasRef} className="scene" />
 }

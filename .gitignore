@@ -50,3 +50,6 @@ __pycache__/
 
 # city bake for the web app (regenerate with city/build_city.py)
 web/public/city/
+
+# real rodent photos for api/real_sightings.py (re-download with --fetch); the crops live in events.real.json
+api/fixtures/rodents/
