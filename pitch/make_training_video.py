@@ -1,4 +1,4 @@
-"""Render short Barn Owl training clips from saved, real run artifacts.
+"""Render short NightOwl training clips from saved, real run artifacts.
 
 Run with vision/.venv/bin/python. Requires ffmpeg on PATH. The video uses only
 Saved training history and the fixed zoom15_b validation clip, which was reused
@@ -182,7 +182,7 @@ def main() -> None:
     run = ROOT / "vision/runs" / run_name
     csv_path = run / "results.csv"
     model_path = run / "rat.onnx"
-    out = OUT_DIR / f"barn-owl-training-demo-{args.version}.mp4"
+    out = OUT_DIR / f"nightowl-training-demo-{args.version}.mp4"
     preview_dir = ROOT / f"pitch/.build/training-video-preview-{args.version}"
     rows = list(csv.DictReader(csv_path.open(newline="")))
     assert len(rows) == 150

@@ -49,7 +49,7 @@ export default function Scene(props: Props) {
     })
     sceneRef.current = scene
     sceneHandle.current = scene
-    if (import.meta.env.DEV) (window as unknown as { __barnowl?: CityScene }).__barnowl = scene // the screenshot scripts ask it where things are
+    if (import.meta.env.DEV) (window as unknown as { __nightowl?: CityScene }).__nightowl = scene // the screenshot scripts ask it where things are
     return () => {
       scene.dispose()
       sceneRef.current = null

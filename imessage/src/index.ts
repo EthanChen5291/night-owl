@@ -1,11 +1,11 @@
 import { attachment, markdown, Spectrum } from "spectrum-ts";
 import { imessage } from "@spectrum-ts/imessage";
 
-// Barn Owl over iMessage (Photon Spectrum): every text goes to the same Grok assistant as the web app's chat
+// NightOwl over iMessage (Photon Spectrum): every text goes to the same Grok assistant as the web app's chat
 // (POST /api/agent/chat on barn-owl.tech, api/agent.py) with channel "imessage", so it gets the server tools
 // (model, hexagons, owl sites, the Pi, its camera) but not the map ones. Pictures come back as attachments.
 // Docs: https://photon.codes/docs/spectrum-ts
-const AGENT_URL = (process.env.BARN_OWL_AGENT_URL ?? "https://barn-owl.tech/api/agent/chat").replace(/\/$/, "");
+const AGENT_URL = (process.env.NIGHT_OWL_AGENT_URL ?? "https://barn-owl.tech/api/agent/chat").replace(/\/$/, "");
 const KEEP = 30; // messages of history per conversation
 
 type Wire = { role: "user" | "assistant" | "tool"; content: string; tool_calls?: unknown[]; tool_call_id?: string };
@@ -49,7 +49,7 @@ const app = await Spectrum({
   projectSecret: process.env.PROJECT_SECRET!,
   providers: [imessage.config()],
 });
-console.log(`Barn Owl iMessage agent up -> ${AGENT_URL}`);
+console.log(`NightOwl iMessage agent up -> ${AGENT_URL}`);
 
 for await (const [space, message] of app.messages) {
   if (message.content.type !== "text") continue;
@@ -68,11 +68,11 @@ for await (const [space, message] of app.messages) {
       if (text) await space.send(markdown(text));
       for (const src of images.slice(0, 3)) {
         const [, mime = "image/jpeg", b64 = ""] = /^data:([^;]+);base64,(.*)$/s.exec(src) ?? [];
-        if (b64) await space.send(attachment(Buffer.from(b64, "base64"), { name: "barn-owl.jpg", mimeType: mime }));
+        if (b64) await space.send(attachment(Buffer.from(b64, "base64"), { name: "nightowl.jpg", mimeType: mime }));
       }
     })
     .catch(async (err: unknown) => {
       console.error("agent failed:", err);
-      await space.send("Sorry, I couldn't reach the Barn Owl assistant just now. Try again in a minute.").catch(() => {});
+      await space.send("Sorry, I couldn't reach the NightOwl assistant just now. Try again in a minute.").catch(() => {});
     });
 }

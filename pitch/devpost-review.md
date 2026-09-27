@@ -1,6 +1,6 @@
-# Night Owl Devpost review
+# NightOwl Devpost review
 
-This is a local edit proposal. I read the public [project page](https://devpost.com/software/barn-owl-vm9n3s) on September 26, when it still used the name Barn Owl. The team later chose Night Owl. I have not edited Devpost or confirmed that its current text changed.
+This is a local edit proposal. I read the public [project page](https://devpost.com/software/barn-owl-vm9n3s) on September 26, when it still used the name Barn Owl. The team later chose NightOwl. I have not edited Devpost or confirmed that its current text changed.
 
 ## Changes to make before judging
 

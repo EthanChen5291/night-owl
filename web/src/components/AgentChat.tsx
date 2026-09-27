@@ -28,7 +28,7 @@ const SUGGESTIONS = [
   'Where should we put the next owl in Brooklyn?',
   'Does this actually find more rats than 311 calls?',
 ]
-const STORE_KEY = 'barnowl.chat.v1'
+const STORE_KEY = 'nightowl.chat.v1'
 
 function load(): { items: Item[]; history: WireMessage[] } {
   try {
@@ -228,13 +228,13 @@ export default function AgentChat({ tools, month, planBudget, onShown }: { tools
 
   return (
     <>
-      <section className={`agent panel ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="Night Owl assistant">
+      <section className={`agent panel ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="NightOwl assistant">
         <header className="agent-head">
           <span className="agent-avatar">
             <SparkIcon size={16} />
           </span>
           <div className="agent-title">
-            <b>Night Owl assistant</b>
+            <b>NightOwl assistant</b>
             <span className="muted small">Grok · map, model and node tools</span>
           </div>
           <button className="icon-btn" title="New chat" onClick={reset} disabled={!items.length && !busy}>
@@ -336,7 +336,7 @@ export default function AgentChat({ tools, month, planBudget, onShown }: { tools
         className={`agent-fab panel ${open ? 'open' : ''} ${shown ? 'shown' : ''}`}
         onClick={() => setOpen((o) => !o)}
         onFocus={() => setNear(true)}
-        title={open ? 'Close assistant' : 'Ask Night Owl'}
+        title={open ? 'Close assistant' : 'Ask NightOwl'}
         aria-expanded={open}
       >
         <span className="fab-icon chat">

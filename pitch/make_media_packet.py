@@ -99,7 +99,7 @@ def main() -> None:
     height = header + 2*ph + 3*gutter + footer
     sheet = Image.new("RGB", (width, height), NAVY)
     d = ImageDraw.Draw(sheet)
-    d.text((gutter, 22), "Barn Owl  |  room-lit plush review", font=font(49, True), fill=INK)
+    d.text((gutter, 22), "NightOwl  |  room-lit plush review", font=font(49, True), fill=INK)
     d.text((gutter, 80), "Top: agent-reviewed labels    Bottom: locked V4 recorded-video event outputs", font=font(27), fill=MUTED)
 
     for idx, (path, kind, title, detail) in enumerate(panels):

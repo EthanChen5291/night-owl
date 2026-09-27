@@ -1,6 +1,6 @@
-# Night Owl vision runbook
+# NightOwl vision runbook
 
-The detector recognizes a dark plush rat and people in lit camera footage. It is a prototype for the Night Owl demo, not a validated live-rat alarm. Older artifact names and environment variables still use `barn-owl`; keep those names when running the code.
+The detector recognizes a dark plush rat and people in lit camera footage. It is a prototype for the NightOwl demo, not a validated live-rat alarm. Older artifact names and environment variables still use `nightowl`; keep those names when running the code.
 
 ## Current result
 
@@ -66,4 +66,4 @@ Do not adjust the locked threshold, floor rule, region of interest, labels, or c
 
 The existing Pi camera agent owns the camera. [pi/LIVE_BRIDGE.md](pi/LIVE_BRIDGE.md) describes its default-off frame handoff, the separate ONNX worker, and the optional relay for saved event JSON. `live_worker.py` saves events locally; it does not post or drive an LED. `event_relay.py` is dry-run by default and needs an explicit API destination and `--post`. The accepted V5 relay event and local map update are recorded in [V5 live results](V5_LIVE_RESULTS.md). Do not start `pi/detect.py` beside the camera agent, because that program opens its own camera.
 
-The API reads `BARN_OWL_MIN_CONF` at startup. If a future approved model uses a different confidence, align that value with the detector and restart the API before posting. HTTP 200 only shows that the API handled the request; inspect its `accepted` field and the stored posterior to confirm a score update.
+The API reads `NIGHT_OWL_MIN_CONF` at startup. If a future approved model uses a different confidence, align that value with the detector and restart the API before posting. HTTP 200 only shows that the API handled the request; inspect its `accepted` field and the stored posterior to confirm a score update.

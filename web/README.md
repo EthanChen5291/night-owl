@@ -1,4 +1,4 @@
-# Night Owl map
+# NightOwl map
 
 The Vite, React, TypeScript, and three.js app shows monthly H3 cells, a 5/10/20-site plan, sightings, and the inspection backtest. The colour modes show predicted 311 complaints, estimated rat signs conditional on inspection, and the difference between their percentile ranks.
 

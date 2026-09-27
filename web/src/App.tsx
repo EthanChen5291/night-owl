@@ -54,7 +54,7 @@ function modeFromHash(): Mode {
 }
 function areaFromHash(): string | null {
   try {
-    return hashParams().get('a') || localStorage.getItem('barnowl.area') || null
+    return hashParams().get('a') || localStorage.getItem('nightowl.area') || null
   } catch {
     return hashParams().get('a') || null
   }
@@ -125,8 +125,8 @@ export default function App() {
     setSelected(null)
     setOpenRank(null)
     try {
-      if (id) localStorage.setItem('barnowl.area', id)
-      else localStorage.removeItem('barnowl.area')
+      if (id) localStorage.setItem('nightowl.area', id)
+      else localStorage.removeItem('nightowl.area')
     } catch {
       /* ignore */
     }

@@ -1,6 +1,6 @@
 # Utsav delivery status
 
-The [technical report for Bruno and Devpost](../docs/utsav-technical-handoff.md) is the short account of what Utsav built, how the detector was trained, what the tests show, and what remains. This page records the handoff boundaries for the Night Owl demo.
+The [technical report for Bruno and Devpost](../docs/utsav-technical-handoff.md) is the short account of what Utsav built, how the detector was trained, what the tests show, and what remains. This page records the handoff boundaries for the NightOwl demo.
 
 ## Delivered
 

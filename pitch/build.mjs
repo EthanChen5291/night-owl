@@ -12,7 +12,7 @@ const OUT = path.join(WORKSPACE, 'out');
 const version = process.env.DECK_VERSION;
 if (!SKILL_DIR) throw new Error('Set PRESENTATIONS_SKILL_DIR to the installed presentations skill directory');
 if (!/^v\d+$/.test(version || '')) throw new Error('Set DECK_VERSION to a new version, such as v21');
-const FINAL = path.join(OUT, `night-owl-three-minute-pitch-${version}.pptx`);
+const FINAL = path.join(OUT, `nightowl-three-minute-pitch-${version}.pptx`);
 const finalExists = await fs.lstat(FINAL).then(
   () => true,
   error => {
@@ -67,7 +67,7 @@ function notes(slide,text,source='') {
   txt(slide,'A 311 complaint is a report.\nIt is not a rat count.',80,370,1040,150,45,c.white,true);
   txt(slide,'NYC inspections give us another signal: active rat signs found on swept blocks.',80,574,1080,66,27,c.mint);
   notes(slide,
-    'New York records rat complaints, but someone must choose to report. Night Owl compares those reports with inspection findings on swept blocks. Those inspections provide the outcome for training and backtesting. They cover only the places that crews swept.',
+    'New York records rat complaints, but someone must choose to report. NightOwl compares those reports with inspection findings on swept blocks. Those inspections provide the outcome for training and backtesting. They cover only the places that crews swept.',
     'model/README.md, model/05_backtest.py; plan/master-plan.md §10');
 }
 
@@ -89,7 +89,7 @@ function notes(slide,text,source='') {
   txt(slide,`${west.n_complaints_12m} complaints · ${(100*west.score_b).toFixed(1)}% modeled risk`,720,519,480,43,24,c.ink);
   txt(slide,'Prior 12 months · September 2026 export',720,603,480,37,19,c.muted);
   notes(slide,
-    `Night Owl scores each H3 cell and month two ways. Model A estimates complaints. Model B estimates the share of swept lots where an inspector would find active signs. Model B uses building and environmental features and omits complaint counts. A positive Silence Score means modeled risk ranks above reporting. In the September 2026 export, East Harlem North has zero complaints in the prior 12 months, ${(100*east.score_b).toFixed(1)}% modeled risk, and a +${east.silence.toFixed(0)} gap, rank ${east.rank_silent} of ${cells.length}. The West Village cell has ${west.n_complaints_12m} complaints, ${(100*west.score_b).toFixed(1)}% modeled risk, and a ${west.silence.toFixed(0)} gap. These are two examples of model output, not measured prevalence or a causal income result. On the live map, switch from complaints to risk, then silence.`,
+    `NightOwl scores each H3 cell and month two ways. Model A estimates complaints. Model B estimates the share of swept lots where an inspector would find active signs. Model B uses building and environmental features and omits complaint counts. A positive Silence Score means modeled risk ranks above reporting. In the September 2026 export, East Harlem North has zero complaints in the prior 12 months, ${(100*east.score_b).toFixed(1)}% modeled risk, and a +${east.silence.toFixed(0)} gap, rank ${east.rank_silent} of ${cells.length}. The West Village cell has ${west.n_complaints_12m} complaints, ${(100*west.score_b).toFixed(1)}% modeled risk, and a ${west.silence.toFixed(0)} gap. These are two examples of model output, not measured prevalence or a causal income result. On the live map, switch from complaints to risk, then silence.`,
     'model/out/cells.json; model/README.md §Key decisions; web/src');
 }
 
@@ -173,7 +173,7 @@ const result=await finalizePresentation({
   materializeLiteralChartWorkbooks:true,
   fontPolicy:{basis:'design',families:[font]},
   verifyArtifactToolImport:true,
-  receiptPath:path.join(staging,`night-owl-${version}.validation.json`),
+  receiptPath:path.join(staging,`nightowl-${version}.validation.json`),
 });
 for(let i=0;i<5;i++){
   const slide=p.slides.getItem(i);

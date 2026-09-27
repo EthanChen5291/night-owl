@@ -28,8 +28,8 @@ The V4 model bundle contains the locked V4 ONNX and PyTorch model, all reviewed 
 From the repository root:
 
 ```sh
-unzip vision/artifacts/rat-litroom-v4-candidate-20260927.zip -d /tmp/barn-owl-v4
-cd /tmp/barn-owl-v4/rat-litroom-v4-candidate-20260927
+unzip vision/artifacts/rat-litroom-v4-candidate-20260927.zip -d /tmp/nightowl-v4
+cd /tmp/nightowl-v4/rat-litroom-v4-candidate-20260927
 python3 verify_bundle.py
 ```
 

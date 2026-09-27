@@ -32,7 +32,7 @@ OUT = HERE / "fixtures" / "events.real.json"
 CREDITS = HERE / "fixtures" / "rodents.credits.json"
 PHOTOS = HERE / "fixtures" / "rodents"
 API = os.environ.get("API", "http://localhost:8000")
-UA = {"User-Agent": "BarnOwl-hackathon/0.1 (DivHacks 2026 demo)"}
+UA = {"User-Agent": "NightOwl-hackathon/0.1 (DivHacks 2026 demo)"}
 
 # Commons file title, the animal's box in the frame (x y w h, 0..1), and the light it was seen in
 PHOTOS_LIST: list[tuple[str, list[float], str]] = [

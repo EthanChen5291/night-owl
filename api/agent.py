@@ -1,4 +1,4 @@
-"""Barn Owl assistant: Grok (xAI) with tools over the model output, the Pi node and the map.
+"""NightOwl assistant: Grok (xAI) with tools over the model output, the Pi node and the map.
 
 POST /agent/chat streams Server-Sent Events back to the web app's chat panel:
     {"type": "tool", "id", "name", "label", "state": "start" | "done", "summary"?}   a tool ran on the server
@@ -14,7 +14,7 @@ the Pi node through the barn-owl dashboard on 127.0.0.1 (a read-only agent token
 (CLIENT_TOOLS) see what only the page knows: the placed owls, the camera view, a screenshot of the map.
 Standard library only, so the API keeps its three dependencies.
 
-Env: XAI_API_KEY (required), XAI_MODEL (default grok-4.7), BARN_OWL_DASH_URL (default http://127.0.0.1:8771),
+Env: XAI_API_KEY (required), XAI_MODEL (default grok-4.7), NIGHT_OWL_DASH_URL (default http://127.0.0.1:8771),
 AGENT_TOKEN (the dashboard's read token).
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ from store import Store
 XAI_URL = "https://api.x.ai/v1/chat/completions"
 MODEL = os.environ.get("XAI_MODEL", "grok-4.7")
 REASONING = os.environ.get("XAI_REASONING", "low")  # grok-4.7 thinks ~2x faster at "low" and answers as well here
-DASH = os.environ.get("BARN_OWL_DASH_URL", "http://127.0.0.1:8771").rstrip("/")
+DASH = os.environ.get("NIGHT_OWL_DASH_URL", "http://127.0.0.1:8771").rstrip("/")
 GEOSEARCH = "https://geosearch.planninglabs.nyc/v2/autocomplete"
 API_DIR = Path(__file__).resolve().parent
 
@@ -61,9 +61,9 @@ Emit = Callable[[dict], Awaitable[None]]
 
 def system_prompt() -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    return f"""You are the Barn Owl assistant, built into the Barn Owl map (DivHacks 2026, track: Hack the City). Now: {now}.
+    return f"""You are the NightOwl assistant, built into the NightOwl map (DivHacks 2026, track: Hack the City). Now: {now}.
 
-What Barn Owl is: NYC's rat map is built from 311 calls, so it is a map of who complains. Barn Owl scores every H3
+What NightOwl is: NYC's rat map is built from 311 calls, so it is a map of who complains. NightOwl scores every H3
 resolution-9 hexagon (~0.1 km²) in NYC with two models:
 - Model A, "what the city sees": predicted 311 rat complaints (complaints_pct is its citywide percentile).
 - Model B, "what's actually there": P(active rat signs | a proactive Health Dept inspection), from physical and

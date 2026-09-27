@@ -1,4 +1,4 @@
-# Night Owl Pi detector code
+# NightOwl Pi detector code
 
 The existing `/home/pi/barn-owl/agent.py` owns the Pi camera and dashboard stream. `vision/pi/detect.py` is a standalone camera program; do not start it beside that agent. The live integration uses the agent's JPEG callback, a separate ONNX worker, and an optional event relay. See [LIVE_BRIDGE.md](LIVE_BRIDGE.md) and the [observed V5 plush-to-map run](../V5_LIVE_RESULTS.md).
 
@@ -11,7 +11,7 @@ posts events only with `--post`. A bare model filename can resolve beside the
 script; an explicit path must exist at that path. The older `--no-post` flag
 still works for archived dry-run commands.
 
-Older paths, systemd names, and environment variables still say `barn-owl`. They are code and deployment identifiers, not the current team name.
+Paths and systemd names on the Pi still say `barn-owl`. They are deployment identifiers on that device, not the current team name.
 
 | File | Job |
 | --- | --- |
