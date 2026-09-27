@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as THREE from 'three'
 import { CityScene } from '../src/city/scene.ts'
+import { installBuildingTheme } from '../src/city/themeMaterials.ts'
 
 function harness() {
   const pending = new Map()
@@ -30,6 +31,7 @@ function harness() {
   scene.invalidate = scene.invalidate.bind(scene)
   scene.handleVisibility = scene.handleVisibility.bind(scene)
   scene.disposed = false
+  scene.look = { sun: { shadows: true } }
   scene.raf = 0
   scene.urgentFrame = false
   scene.animationFrameDue = 0
@@ -59,6 +61,8 @@ function harness() {
   scene.tileGroup = new THREE.Group()
   scene.applyKeys = () => {}
   scene.reportView = () => {}
+  scene.projector = { latLon: (x, z) => ({ lat: z, lon: x }) }
+  scene.callbacks = { onView() {} }
   scene.canvas = { removeEventListener() {} }
   scene.facade = { map: { dispose() {} }, emissive: { dispose() {} } }
   scene.viewReportTimer = null
@@ -207,5 +211,89 @@ test('camera motion reuses shadows until it crosses a shadow-box boundary', () =
     h.scene.invalidate()
     h.flush()
     assert.equal(h.scene.renderer.shadowMap.needsUpdate, false)
+  } finally { h.restore() }
+})
+
+test('lighting changes keep geometry and shader configuration intact', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.sky = { material: { uniforms: { zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() } } } }
+    s.ambient = new THREE.AmbientLight()
+    s.hemi = new THREE.HemisphereLight()
+    s.key = new THREE.DirectionalLight()
+    s.key.castShadow = true
+    s.ground = { material: new THREE.MeshStandardMaterial() }
+    s.roadMaterial = new THREE.MeshStandardMaterial()
+    s.treeMaterial = new THREE.MeshStandardMaterial()
+    s.wallMaterial = new THREE.MeshStandardMaterial({ vertexColors: true })
+    s.roofMaterial = new THREE.MeshStandardMaterial({ vertexColors: true })
+    s.buildingTheme = installBuildingTheme([s.wallMaterial, s.roofMaterial])
+    s.cityLayerMeshes = new Map()
+    s.areaLayerMeshes = new Map()
+    s.fieldNeutral = { value: new THREE.Color() }
+    s.fieldMix = { value: 0 }
+    const geometry = new THREE.BufferGeometry()
+    s.field = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial())
+    s.rebuildField = s.retintBuildings = s.setPlan = s.setSpots = () => assert.fail('lighting rebuilt scene data')
+    const materialVersion = s.wallMaterial.version
+    s.setPreset('night')
+    assert.equal(s.key.castShadow, true)
+    assert.equal(s.key.shadow.intensity, 0)
+    assert.equal(s.field.geometry, geometry)
+    assert.equal(s.field.material.opacity, 0.84)
+    assert.equal(s.fieldMix.value, 0.25)
+    s.setPreset('day')
+    assert.equal(s.key.shadow.intensity, 1)
+    assert.equal(s.field.geometry, geometry)
+    assert.equal(s.field.material.opacity, 0.9)
+    assert.equal(s.wallMaterial.version, materialVersion)
+  } finally { h.restore() }
+})
+
+test('a borough flight zooms inward continuously without a mid-flight climb', () => {
+  const h = harness()
+  try {
+    h.scene.camera.position.setFromSphericalCoords(36000, 0.42, 0.35)
+    const target = new THREE.Vector3(8000, 0, -5000)
+    const destination = new THREE.Vector3().setFromSphericalCoords(3600, 0.95, 0.35).add(target)
+    h.scene.pick = () => {}
+    h.scene.areas.set('brooklyn', { centre: target, label: { visible: false } })
+    h.scene.applyAreaVisibility = () => {}
+    h.scene.setActiveArea('brooklyn')
+    let radius = 36000
+    let height = h.scene.camera.position.y
+    for (let i = 0; h.scene.flight && i < 100; i++) {
+      h.flush()
+      const nextRadius = h.scene.camera.position.distanceTo(h.scene.controls.target)
+      assert.ok(nextRadius <= radius + 1e-6, 'camera zoomed outward')
+      assert.ok(h.scene.camera.position.y <= height + 1e-6, 'camera climbed')
+      radius = nextRadius
+      height = h.scene.camera.position.y
+    }
+    assert.equal(h.scene.flight, null)
+    assert.ok(h.scene.camera.position.distanceTo(destination) < 1e-6)
+    assert.ok(h.scene.controls.target.distanceTo(target) < 1e-6)
+  } finally { h.restore() }
+})
+
+
+test('flights request their destination immediately and skip intermediate tile requests', () => {
+  const h = harness()
+  try {
+    const views = []
+    h.scene.callbacks.onView = view => views.push(view)
+    h.scene.reportView = CityScene.prototype.reportView
+    h.scene.pick = () => {}
+    const first = new THREE.Vector3(8000, 0, -5000)
+    h.scene.fly(first, first.clone().add(new THREE.Vector3(0, 3000, 4000)), 1000)
+    assert.deepEqual(views, [{ lat: 5000, lon: 8000, distance: 5000 }])
+    for (let i = 0; i < 10; i++) h.flush()
+    assert.equal(views.length, 1)
+    const second = new THREE.Vector3(-2000, 0, -1000)
+    h.scene.fly(second, second.clone().add(new THREE.Vector3(0, 3000, 4000)), 1000)
+    assert.deepEqual(views[1], { lat: 1000, lon: -2000, distance: 5000 })
+    while (h.scene.flight) h.flush()
+    assert.equal(views.length, 2)
   } finally { h.restore() }
 })

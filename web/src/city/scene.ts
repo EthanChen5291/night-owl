@@ -7,6 +7,7 @@ import { makeProjector, type LatLon, type Projector } from './projection'
 import { FACADE_TILE_M, facadeTextures } from './facade'
 import { pointInRing, type AddressIndex } from './addresses'
 import { BuildingOcclusionIndex } from './occlusion'
+import { installBuildingTheme, installFieldTheme } from './themeMaterials'
 import { buildFlat, unpackGeometry, type BuildingRange, type TileGeometryReply, type TileGeometryRequest } from './tileGeometry'
 
 // No React in here. App owns the data; Scene.tsx owns the lifecycle; this class owns three.js.
@@ -82,13 +83,16 @@ interface Locator {
 }
 
 interface Flight {
-  p0: THREE.Vector3
   t0: THREE.Vector3
-  p1: THREE.Vector3
   t1: THREE.Vector3
+  radius0: number
+  radius1: number
+  polar0: number
+  polar1: number
+  azimuth0: number
+  azimuthDelta: number
   start: number
   duration: number
-  bump: number
 }
 
 const FLASH_MS = 1500
@@ -217,6 +221,10 @@ export class CityScene {
   private hexGroup = new THREE.Group()
   private field: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null // the citywide 2D colour map
   private fieldCellByFace: string[] = []
+  private fieldNeutral = { value: new THREE.Color() }
+  private fieldMix = { value: 0 }
+  private buildingTheme: ReturnType<typeof installBuildingTheme>
+  private preset: Preset | null = null
   private planGroup = new THREE.Group()
   private cityLayerGroup = new THREE.Group() // citywide land / parks / water: the map under the colour field
   private areaLayerGroup = new THREE.Group() // the active area's own ground: the only land drawn inside an area
@@ -256,7 +264,6 @@ export class CityScene {
   private hoveredNode: string | null = null
   private spotGroup = new THREE.Group()
   private sites: SiteMarker[] = []
-  private planNodes: PlanNode[] = []
   private spots: Spot[] = []
   private lastHover: HoverInfo | null = null
   private callbacks: SceneCallbacks
@@ -315,6 +322,7 @@ export class CityScene {
     // sun from the south-west so the faces the opening camera sees are lit; it follows the camera target
     this.key = new THREE.DirectionalLight(0xffb070, 1.6)
     this.key.position.set(-3200, 4600, 2800)
+    this.key.castShadow = true
     this.key.shadow.mapSize.set(4096, 4096)
     const sc = this.key.shadow.camera
     sc.left = sc.bottom = -4200
@@ -339,6 +347,7 @@ export class CityScene {
     this.treeMaterial = new THREE.MeshStandardMaterial({ color: LOOKS.day.layers.trees, roughness: 0.95 })
 
     this.scene.add(this.cityLayerGroup, this.areaLayerGroup, this.tileGroup, this.areaGroup, this.hexGroup, this.planGroup, this.spotGroup, this.nodeGroup)
+    this.buildingTheme = installBuildingTheme([this.wallMaterial, this.roofMaterial])
     this.setPreset('day')
 
     canvas.addEventListener('pointermove', this.handlePointerMove)
@@ -427,6 +436,8 @@ export class CityScene {
   }
 
   setPreset(preset: Preset) {
+    if (this.preset === preset) return
+    this.preset = preset
     const L = LOOKS[preset]
     this.look = L
     if (this.locator) {
@@ -444,7 +455,8 @@ export class CityScene {
     this.hemi.intensity = L.hemi.intensity
     this.key.color.set(L.sun.colour)
     this.key.intensity = L.sun.intensity
-    this.key.castShadow = L.sun.shadows
+    this.key.shadow.intensity = L.sun.shadows ? 1 : 0
+    this.buildingTheme.setNight(preset === 'night')
     this.renderer.shadowMap.needsUpdate = true
     this.renderer.toneMappingExposure = L.exposure
     this.ground.material.color.set(L.layers.ground)
@@ -455,9 +467,13 @@ export class CityScene {
     this.wallMaterial.emissiveIntensity = L.windows
     this.wallMaterial.emissive.set(L.windowColour)
     for (const [h3, entry] of this.hexes) entry.mesh.material.opacity = h3 === this.hovered ? Math.min(1, L.hexOpacity + 0.15) : L.hexOpacity
-    this.rebuildField()
-    this.setPlan(this.planNodes) // the chips carry the theme's ink
-    this.setSpots(this.spots)
+    this.fieldNeutral.value.setHex(L.field.neutral)
+    this.fieldMix.value = L.field.mix
+    if (this.field) this.field.material.opacity = L.field.opacity
+    for (const site of this.sites) {
+      site.chip.material.map?.dispose()
+      site.chip.material.map = textTexture(site.chip.userData.text as string, L.area.ink)
+    }
     for (const [id, a] of this.areas) {
       a.fill.material.color.set(L.area.fill)
       a.rim.material.color.set(L.area.rim)
@@ -465,14 +481,11 @@ export class CityScene {
       const tex = textTexture((a.label.userData.name as string) ?? id, L.area.ink)
       a.label.material.map = tex
       a.label.userData.aspect = tex.image.width / tex.image.height
-      a.label.material.needsUpdate = true
     }
-    this.retintBuildings()
     this.invalidate()
   }
 
   setPlan(nodes: PlanNode[]) {
-    this.planNodes = nodes
     this.disposeSites(this.planGroup)
     for (const node of nodes) {
       const m = this.makeSite(node.lat, node.lon, String(node.rank), { disc: 0xd9a441, rim: 0xffe3a3, pulse: false })
@@ -540,7 +553,7 @@ export class CityScene {
     }
     const chip = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTexture(text, this.look.area.ink), depthTest: false, transparent: true }))
     chip.renderOrder = MARKER_ORDER + 0.6
-    chip.userData = { aspect: (chip.material.map as THREE.CanvasTexture).image.width / (chip.material.map as THREE.CanvasTexture).image.height }
+    chip.userData = { text, aspect: (chip.material.map as THREE.CanvasTexture).image.width / (chip.material.map as THREE.CanvasTexture).image.height }
     group.add(disc, rim, chip)
     return { group, disc, rim, pulse, chip, phase: hashId(text) }
   }
@@ -611,6 +624,8 @@ export class CityScene {
   /** A JPEG of the current view for the assistant. Renders once more first: the drawing buffer is only
    *  guaranteed until the frame is composited, and copying it in the same task catches it. */
   screenshot(maxWidth = 1280): string {
+    // Keep the shadow shader variant stable, but skip its map pass at night.
+    if (!this.look.sun.shadows && this.key.shadow.map) this.renderer.shadowMap.needsUpdate = false
     this.renderer.render(this.scene, this.camera)
     const src = this.renderer.domElement
     const scale = Math.min(1, maxWidth / src.width)
@@ -855,7 +870,8 @@ export class CityScene {
     const target = a ? a.centre.clone() : new THREE.Vector3(0, 0, 0)
     const current = this.camera.position.clone().sub(this.controls.target)
     const azimuth = Math.atan2(current.x, current.z)
-    const p1 = a ? orbitPosition(target, AREA_DISTANCE, 0.95, azimuth) : orbitPosition(target, CITY_DISTANCE, CITY_POLAR, azimuth)
+    const distance = a ? Math.min(current.length(), AREA_DISTANCE) : CITY_DISTANCE
+    const p1 = orbitPosition(target, distance, a ? 0.95 : CITY_POLAR, azimuth)
     if (immediate) {
       this.flight = null
       this.controls.target.copy(target)
@@ -865,7 +881,7 @@ export class CityScene {
       this.invalidate()
       return
     }
-    this.fly(target, p1, a ? 2200 : 1900)
+    this.fly(target, p1, a ? 1000 : 1200)
   }
 
   /** Owl markers: red dot, white rim, three pulse rings, a steady halo when selected. */
@@ -1003,7 +1019,6 @@ export class CityScene {
     }
     if (this.cells.size === 0) return
     const L = this.look
-    const neutral = new THREE.Color(L.field.neutral)
     const cornerKey = (lat: number, lon: number) => `${lat.toFixed(6)},${lon.toFixed(6)}`
     const corners = new Map<string, { r: number; g: number; b: number; n: number }>()
     const rings: { cell: Cell; ring: [number, number][]; colour: THREE.Color }[] = []
@@ -1011,7 +1026,7 @@ export class CityScene {
     let nIdx = 0
     for (const cell of this.cells.values()) {
       const ring = cellToBoundary(cell.h3)
-      const colour = new THREE.Color(colourFor(this.mode, cell)).lerp(neutral, L.field.mix)
+      const colour = new THREE.Color(colourFor(this.mode, cell))
       rings.push({ cell, ring, colour })
       for (const [lat, lon] of ring) {
         const k = cornerKey(lat, lon)
@@ -1055,6 +1070,7 @@ export class CityScene {
     g.computeBoundingSphere()
     // no depth test: from 36 km up a metre above the land is below depth precision, so it is ordered after the ground instead
     const material = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: L.field.opacity, depthWrite: false, depthTest: false, toneMapped: false })
+    installFieldTheme(material, this.fieldNeutral, this.fieldMix)
     this.field = new THREE.Mesh(g, material)
     this.field.position.y = 0.6
     this.field.renderOrder = -8
@@ -1063,17 +1079,25 @@ export class CityScene {
   }
 
   private fly(target: THREE.Vector3, position: THREE.Vector3, duration: number) {
-    const p0 = this.camera.position.clone()
+    const from = new THREE.Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target))
+    const to = new THREE.Spherical().setFromVector3(position.clone().sub(target))
     this.flight = {
-      p0,
-      t0: this.controls.target.clone(),
-      p1: position,
-      t1: target,
-      start: performance.now(),
-      duration,
-      bump: Math.min(9000, p0.distanceTo(position) * 0.28), // climb mid-flight so it reads as flying, not sliding
+      t0: this.controls.target.clone(), t1: target,
+      radius0: from.radius, radius1: to.radius,
+      polar0: from.phi, polar1: to.phi,
+      azimuth0: from.theta,
+      azimuthDelta: Math.atan2(Math.sin(to.theta - from.theta), Math.cos(to.theta - from.theta)),
+      start: performance.now(), duration,
     }
     this.controls.enabled = false
+    // Load the destination while the camera moves, without requesting intermediate tiles.
+    if (this.viewReportTimer !== null) {
+      clearTimeout(this.viewReportTimer)
+      this.viewReportTimer = null
+    }
+    this.lastView = { x: target.x, z: target.z, wide: to.radius > WIDE_DISTANCE, t: performance.now() }
+    const { lat, lon } = this.projector.latLon(target.x, -target.z)
+    this.callbacks.onView({ lat, lon, distance: to.radius })
     this.invalidate()
   }
 
@@ -1224,19 +1248,26 @@ export class CityScene {
 
   private retintTile(t: TileMeshes) {
     if (!t.buildings) return
-    const L = this.look
-    const attr = t.buildings.geometry.getAttribute('color') as THREE.BufferAttribute
+    const geometry = t.buildings.geometry
+    const day = geometry.getAttribute('color') as THREE.BufferAttribute
+    let night = geometry.getAttribute('colorNight') as THREE.BufferAttribute | undefined
+    if (!night) {
+      night = new THREE.BufferAttribute(new Float32Array(day.count * 3), 3)
+      geometry.setAttribute('colorNight', night)
+    }
     const tmp = new THREE.Color()
     const base = new THREE.Color()
     const white = new THREE.Color(0xffffff)
-    for (const range of t.ranges) {
-      base.set(L.facades[range.band]).multiplyScalar(range.shade)
-      const cell = this.cells.get(range.h3)
-      if (cell) tmp.set(colourFor(this.mode, cell)).lerp(white, L.tintLift).lerp(base, 1 - L.buildingTint)
-      else tmp.copy(base)
-      for (let i = range.start; i < range.start + range.count; i++) attr.setXYZ(i, tmp.r, tmp.g, tmp.b)
+    for (const [look, attribute] of [[LOOKS.day, day], [LOOKS.night, night]] as const) {
+      for (const range of t.ranges) {
+        base.set(look.facades[range.band]).multiplyScalar(range.shade)
+        const cell = this.cells.get(range.h3)
+        if (cell) tmp.set(colourFor(this.mode, cell)).lerp(white, look.tintLift).lerp(base, 1 - look.buildingTint)
+        else tmp.copy(base)
+        for (let i = range.start; i < range.start + range.count; i++) attribute.setXYZ(i, tmp.r, tmp.g, tmp.b)
+      }
+      attribute.needsUpdate = true
     }
-    attr.needsUpdate = true
   }
 
   private handlePointerMove = (e: PointerEvent) => {
@@ -1412,6 +1443,7 @@ export class CityScene {
 
   /** Tell the app where the camera looks whenever it has moved enough for the tile set to change. */
   private reportView(now: number, dist: number) {
+    if (this.flight) return
     const t = this.controls.target
     const wide = dist > WIDE_DISTANCE
     const moved = Math.hypot(t.x - this.lastView.x, t.z - this.lastView.z)
@@ -1453,9 +1485,12 @@ export class CityScene {
     if (this.flight) {
       const f = this.flight
       const s = smoothstep(Math.min(1, (now - f.start) / f.duration))
-      this.camera.position.lerpVectors(f.p0, f.p1, s)
-      this.camera.position.y += Math.sin(s * Math.PI) * f.bump
       this.controls.target.lerpVectors(f.t0, f.t1, s)
+      this.camera.position.setFromSphericalCoords(
+        THREE.MathUtils.lerp(f.radius0, f.radius1, s),
+        THREE.MathUtils.lerp(f.polar0, f.polar1, s),
+        f.azimuth0 + f.azimuthDelta * s,
+      ).add(this.controls.target)
       if (s >= 1) {
         this.flight = null
         this.controls.enabled = true
@@ -1619,6 +1654,8 @@ export class CityScene {
       fog.far = this.look.fog[1] * s
     }
     this.reportView(now, dist)
+    // Keep the shadow shader variant stable, but skip its map pass at night.
+    if (!this.look.sun.shadows && this.key.shadow.map) this.renderer.shadowMap.needsUpdate = false
     this.renderer.render(this.scene, this.camera)
     if (this.flight || this.keys.size > 0 || this.locator || hexAnimating || controlsChanged || this.nodes.size > 0 || this.spots.length > 0) {
       this.scheduleFrame()
