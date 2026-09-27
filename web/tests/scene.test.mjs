@@ -38,6 +38,9 @@ function harness() {
   scene.lastFrame = performance.now()
   scene.keys = new Set()
   scene.flight = null
+  scene.flightAreas = new Set()
+  scene.areaLayerGroup = { visible: true }
+  scene.hexGroup = { visible: true }
   scene.locator = null
   scene.visibleHexes = []
   scene.sites = []
@@ -62,6 +65,7 @@ function harness() {
   scene.pendingPriorityHexes = 0
   scene.tileAreas = {}
   scene.tiles = new Map()
+  scene.requestedTiles = new Map()
   scene.tileRequests = new Map()
   scene.tileInFlight = null
   scene.tileWorkerFailures = 0
@@ -360,7 +364,7 @@ test('borough risk cells retain their coloured height and h3 pick identity', () 
   } finally { h.restore() }
 })
 
-test('citywide borough entry starts nearby and settles without a long zoom', () => {
+test('citywide borough entry telescopes from the actual pose without an outward detour', () => {
   const h = harness()
   try {
     h.scene.camera.position.setFromSphericalCoords(36000, 0.42, 0.35)
@@ -369,11 +373,13 @@ test('citywide borough entry starts nearby and settles without a long zoom', () 
     h.scene.pick = () => {}
     h.scene.areas.set('brooklyn', { centre: target, label: { visible: false } })
     h.scene.applyAreaVisibility = () => {}
+    const initial = h.scene.camera.position.clone()
     h.scene.setActiveArea('brooklyn')
-    assert.equal(h.scene.flight.duration, 360)
-    assert.ok(h.scene.controls.target.distanceTo(target) < 1e-6, 'entry begins at the borough')
+    assert.ok(h.scene.flight.duration >= 900 && h.scene.flight.duration <= 1400)
+    assert.ok(h.scene.camera.position.equals(initial), 'entry must not snap the camera')
+    assert.equal(h.scene.controls.target.length(), 0, 'entry must not snap the target')
     let radius = h.scene.camera.position.distanceTo(h.scene.controls.target)
-    assert.ok(radius < 4500, 'entry skips the 36 km overview zoom')
+    assert.ok(Math.abs(radius - 36000) < 1e-6)
     let height = h.scene.camera.position.y
     for (let i = 0; h.scene.flight && i < 100; i++) {
       h.flush()
@@ -389,7 +395,7 @@ test('citywide borough entry starts nearby and settles without a long zoom', () 
   } finally { h.restore() }
 })
 
-test('back to city starts near the overview and settles without a street-level sweep', () => {
+test('back to city expands continuously from the current street view', () => {
   const h = harness()
   try {
     const s = h.scene
@@ -400,11 +406,13 @@ test('back to city starts near the overview and settles without a street-level s
     s.pick = () => {}
     s.applyAreaVisibility = () => {}
 
+    const initial = s.camera.position.clone()
     s.setActiveArea(null)
-    assert.equal(s.flight.duration, 240)
-    assert.ok(s.controls.target.length() < 1e-6, 'return begins at the city centre')
+    assert.ok(s.flight.duration >= 1000 && s.flight.duration <= 1400)
+    assert.ok(s.camera.position.equals(initial), 'return must not snap the camera')
+    assert.ok(s.controls.target.equals(borough), 'return must not snap the target')
     let radius = s.camera.position.distanceTo(s.controls.target)
-    assert.ok(radius > 30_000, 'return skips the street-to-overview sweep')
+    assert.ok(radius < 301, 'return starts at street scale')
     while (s.flight) {
       h.flush()
       const nextRadius = s.camera.position.distanceTo(s.controls.target)
@@ -434,5 +442,155 @@ test('flights request their destination immediately and skip intermediate tile r
     assert.deepEqual(views[1], { lat: 1000, lon: -2000, distance: 5000 })
     while (h.scene.flight) h.flush()
     assert.equal(views.length, 2)
+  } finally { h.restore() }
+})
+
+
+test('mid-flight retargeting preserves the current pose and re-selection keeps progress', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.camera.position.setFromSphericalCoords(36000, 0.42, 0.35)
+    s.pick = () => {}
+    s.applyAreaVisibility = () => {}
+    s.areas.set('a', { centre: new THREE.Vector3(8000, 0, -5000), label: {} })
+    s.areas.set('b', { centre: new THREE.Vector3(-4000, 0, 5000), label: {} })
+    s.setActiveArea('a')
+    for (let i = 0; i < 20; i++) h.flush()
+    const ongoing = s.flight
+    s.setActiveArea('a')
+    assert.equal(s.flight, ongoing, 'same destination must not restart the easing')
+    const position = s.camera.position.clone()
+    const target = s.controls.target.clone()
+    s.setActiveArea('b')
+    assert.ok(s.camera.position.distanceTo(position) < 1e-8)
+    assert.ok(s.controls.target.distanceTo(target) < 1e-8)
+    let radius = position.distanceTo(target)
+    while (s.flight) {
+      h.flush()
+      const next = s.camera.position.distanceTo(s.controls.target)
+      assert.ok(next <= radius + 1e-6)
+      radius = next
+    }
+    assert.ok(s.controls.target.distanceTo(s.areas.get('b').centre) < 1e-6)
+    assert.equal(s.controls.enabled, true)
+    assert.equal(h.pending.size, 0, 'settled flight must not keep rendering')
+  } finally { h.restore() }
+})
+
+test('manual input cancels a flight at its current pose and resumes viewport requests', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.pick = () => {}
+    s.applyAreaVisibility = () => {}
+    s.fly(new THREE.Vector3(1000, 0, 0), new THREE.Vector3(1000, 100, 200))
+    h.flush()
+    const position = s.camera.position.clone()
+    s.interruptFlight()
+    assert.equal(s.flight, null)
+    assert.equal(s.controls.enabled, true)
+    assert.ok(s.camera.position.equals(position))
+    assert.ok(Number.isNaN(s.lastView.x))
+    h.flush()
+    assert.equal(h.pending.size, 0)
+  } finally { h.restore() }
+})
+
+test('outgoing coloured hexagons remain during travel and clear at landing', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.activeArea = 'source'
+    s.cellArea = new Map([['old', 'source'], ['new', 'destination']])
+    s.hexes = new Map([['old', { mesh: { visible: true } }], ['new', { mesh: { visible: false } }]])
+    s.areas.set('destination', { centre: new THREE.Vector3(1000, 0, 0), fill: {}, rim: {}, label: {} })
+    s.pick = () => {}
+    s.setActiveArea('destination')
+    assert.equal(s.hexes.get('old').mesh.visible, true)
+    assert.equal(s.hexes.get('new').mesh.visible, true)
+    // This test checks visibility, not the material animation exercised elsewhere.
+    s.visibleHexes = []
+    s.flight.start -= s.flight.duration
+    s.hexes.get('new').targetHeight = 1
+    s.hexes.get('new').mesh.scale = { z: 1 }
+    s.hexes.get('new').targetColour = new THREE.Color()
+    s.hexes.get('new').mesh.material = { color: new THREE.Color() }
+    h.flush()
+    assert.equal(s.hexes.get('old').mesh.visible, false)
+    assert.equal(s.hexes.get('new').mesh.visible, true)
+    assert.equal(s.cityLayerGroup.visible, true)
+  } finally { h.restore() }
+})
+
+test('departing tile geometry survives the flight and is disposed after landing', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    let disposed = 0
+    const group = new THREE.Group()
+    s.tileGroup.add(group)
+    s.tiles.set('old', { area: 'source', group, buildings: { geometry: { dispose() { disposed++ } } } })
+    s.activeArea = 'destination'
+    s.flightAreas.add('source')
+    s.flight = {}
+    s.setTiles(new Map())
+    assert.equal(s.tiles.size, 1)
+    assert.equal(disposed, 0)
+    s.flight = null
+    s.flightAreas.clear()
+    s.setTiles(s.requestedTiles)
+    assert.equal(s.tiles.size, 0)
+    assert.equal(disposed, 1)
+  } finally { h.restore() }
+})
+
+test('starting a flight drains control inertia without changing the starting pose', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    let residual = true
+    s.controls.enableDamping = true
+    s.controls.update = () => {
+      if (residual) {
+        s.controls.target.x += 50
+        s.camera.position.x += 50
+        residual = false
+      }
+      return false
+    }
+    const position = s.camera.position.clone()
+    const target = s.controls.target.clone()
+    s.fly(new THREE.Vector3(1000, 0, 0), new THREE.Vector3(1000, 300, 400))
+    assert.ok(s.camera.position.equals(position))
+    assert.ok(s.controls.target.equals(target))
+    assert.equal(s.controls.enableDamping, true)
+  } finally { h.restore() }
+})
+
+test('reduced motion lands on the next frame and does not retain outgoing detail', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    globalThis.window.matchMedia = () => ({ matches: true })
+    s.pick = () => {}
+    s.fly(new THREE.Vector3(1000, 0, 0), new THREE.Vector3(1000, 300, 400))
+    h.flush()
+    assert.equal(s.flight, null)
+    assert.ok(s.controls.target.equals(new THREE.Vector3(1000, 0, 0)))
+    assert.equal(h.pending.size, 0)
+  } finally { h.restore() }
+})
+
+test('late borough metadata can resolve an already selected destination', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.applyAreaVisibility = () => {}
+    s.setActiveArea('brooklyn', true)
+    const centre = new THREE.Vector3(8000, 0, -5000)
+    s.areas.set('brooklyn', { centre, label: {} })
+    s.setActiveArea('brooklyn')
+    assert.ok(s.flight.t1.equals(centre))
   } finally { h.restore() }
 })

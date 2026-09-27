@@ -238,6 +238,7 @@ export class CityScene {
   private pendingAreaLayers: CityLayers | null = null
   private tileGroup = new THREE.Group()
   private tiles = new Map<string, TileMeshes>()
+  private requestedTiles = new Map<string, Tile>()
   private tileWorker: Worker | null = null
   private tileRequestId = 0
   private tileInFlight: number | null = null
@@ -276,6 +277,7 @@ export class CityScene {
   private callbacks: SceneCallbacks
   private index: AddressIndex | null = null
   private flight: Flight | null = null
+  private flightAreas = new Set<string>()
   private locator: Locator | null = null
   private raf = 0
   private urgentFrame = false
@@ -357,6 +359,9 @@ export class CityScene {
     this.buildingTheme = installBuildingTheme([this.wallMaterial, this.roofMaterial])
     this.setPreset('day')
 
+    this.interruptFlight = this.interruptFlight.bind(this)
+    canvas.addEventListener('pointerdown', this.interruptFlight, true)
+    canvas.addEventListener('wheel', this.interruptFlight, { capture: true, passive: true })
     canvas.addEventListener('pointermove', this.handlePointerMove)
     canvas.addEventListener('pointerleave', this.handlePointerLeave)
     canvas.addEventListener('pointerdown', this.handlePointerDown)
@@ -648,8 +653,7 @@ export class CityScene {
     const azimuth = Math.atan2(current.x, current.z)
     const view = distance && distance <= 400 ? this.clearApproach(target, distance, 0.66, azimuth) : { polar: 0.95, azimuth }
     const p1 = distance ? orbitPosition(target, distance, view.polar, view.azimuth) : target.clone().add(current)
-    const travel = this.camera.position.distanceTo(p1)
-    this.fly(target, p1, THREE.MathUtils.clamp(Math.sqrt(travel) * 18, 450, 1200))
+    this.fly(target, p1)
   }
 
   /** Try nearby viewing angles until the camera-to-pin line clears the loaded buildings. */
@@ -718,7 +722,8 @@ export class CityScene {
       this.areaLayerWorker?.terminate()
       this.areaLayerWorker = null
       this.pendingAreaLayers = null
-      this.buildLayers(this.areaLayerGroup, this.areaLayerMeshes, { land: null, parks: null, water: null })
+      // Retain the last detailed ground during travel; the coast always remains underneath.
+      if (!this.flight && !this.activeArea) this.buildLayers(this.areaLayerGroup, this.areaLayerMeshes, { land: null, parks: null, water: null })
       this.updateBaseMapVisibility()
       this.invalidate()
       return
@@ -800,8 +805,10 @@ export class CityScene {
   /** Build incoming tile geometry in a worker; discard replies for tiles that left the view. */
   setTiles(tiles: Map<string, Tile>) {
     if (this.disposed) return
+    this.requestedTiles = tiles
     let changed = false
     for (const [id, t] of this.tiles) {
+      if (this.flight && t.area && this.flightAreas.has(t.area)) continue
       if (tiles.has(id) && t.area === this.activeArea) continue
       changed = true
       this.tileGroup.remove(t.group)
@@ -965,8 +972,10 @@ export class CityScene {
 
   /** Fly into an area (or out to the city with null). `immediate` snaps, for the first frame. */
   setActiveArea(id: string | null, immediate = false) {
-    const enteringFromCity = !immediate && this.activeArea === null && id !== null
-    const returningToCity = !immediate && this.activeArea !== null && id === null
+    if (!immediate && id === this.activeArea && this.flight &&
+        this.flight.t1.equals(id ? this.areas.get(id)?.centre ?? new THREE.Vector3() : new THREE.Vector3())) return
+    if (immediate) this.flightAreas.clear()
+    else if (this.activeArea) this.flightAreas.add(this.activeArea)
     this.activeArea = id
     this.prioritizePendingHexes()
     this.keysEnabled = id !== null
@@ -980,6 +989,7 @@ export class CityScene {
     const p1 = orbitPosition(target, distance, a ? 0.95 : CITY_POLAR, azimuth)
     if (immediate) {
       this.flight = null
+      this.controls.enabled = true
       this.controls.target.copy(target)
       this.camera.position.copy(p1)
       this.controls.update()
@@ -987,26 +997,7 @@ export class CityScene {
       this.invalidate()
       return
     }
-    if (enteringFromCity && a) {
-      // The overview has already shown where the borough is. Start its entry near the destination,
-      // then settle a little closer instead of animating a 36 km zoom across the whole map.
-      this.controls.target.copy(target)
-      this.camera.position.copy(orbitPosition(target, distance * 1.12, 0.95, azimuth))
-      this.controls.update()
-      this.renderer.shadowMap.needsUpdate = true
-      this.fly(target, p1, 360)
-      return
-    }
-    if (returningToCity) {
-      // Start at the overview and settle the last stretch instead of sweeping out from street level.
-      this.controls.target.copy(target)
-      this.camera.position.copy(orbitPosition(target, CITY_DISTANCE * 0.92, CITY_POLAR, azimuth))
-      this.controls.update()
-      this.renderer.shadowMap.needsUpdate = true
-      this.fly(target, p1, 240)
-      return
-    }
-    this.fly(target, p1, a ? 1000 : 1200)
+    this.fly(target, p1)
   }
 
   /** Owl markers: red dot, white rim, three pulse rings, a steady halo when selected. */
@@ -1058,6 +1049,8 @@ export class CityScene {
     this.tileRequests.clear()
     cancelAnimationFrame(this.raf)
     if (this.viewReportTimer !== null) clearTimeout(this.viewReportTimer)
+    this.canvas.removeEventListener('pointerdown', this.interruptFlight, true)
+    this.canvas.removeEventListener('wheel', this.interruptFlight, true)
     this.canvas.removeEventListener('pointermove', this.handlePointerMove)
     this.canvas.removeEventListener('pointerleave', this.handlePointerLeave)
     this.canvas.removeEventListener('pointerdown', this.handlePointerDown)
@@ -1141,7 +1134,7 @@ export class CityScene {
         const entry = this.hexes.get(h3)
         if (!entry) continue
         const area = this.areaOfCell(h3)
-        if (this.activeArea && (area === null || area === this.activeArea)) {
+        if (this.activeArea && (area === null || area === this.activeArea || this.flightAreas.has(area))) {
           entry.mesh.visible = true
           this.visibleHexes.push(entry)
           this.visibleHexMeshes.push(entry.mesh)
@@ -1168,7 +1161,7 @@ export class CityScene {
    * Inside an area: detailed ground, tiles and coloured prisms; the other boroughs keep their name tags.
    */
   private applyAreaVisibility() {
-    const inArea = !!this.activeArea
+    const inArea = !!this.activeArea || this.flightAreas.size > 0
     for (const [id, a] of this.areas) {
       a.fill.visible = !inArea
       a.rim.visible = !inArea
@@ -1181,7 +1174,7 @@ export class CityScene {
     this.pendingAreaHexes = []
     if (inArea) for (const [h3, entry] of this.hexes) {
       const area = this.cellArea.get(h3)
-      entry.mesh.visible = area !== undefined && (area === null || area === this.activeArea)
+      entry.mesh.visible = area !== undefined && (area === null || area === this.activeArea || this.flightAreas.has(area))
       if (entry.mesh.visible) {
         this.visibleHexes.push(entry)
         this.visibleHexMeshes.push(entry.mesh)
@@ -1198,11 +1191,11 @@ export class CityScene {
     this.cityLayerGroup.visible = true
   }
 
-  /** Risk cells appear only inside the active borough. */
+  /** Keep departing borough cells visible until the camera reaches its destination. */
   private hexVisible(h3: string): boolean {
-    if (!this.activeArea) return false
+    if (!this.activeArea && this.flightAreas.size === 0) return false
     const a = this.areaOfCell(h3)
-    return a === null || a === this.activeArea
+    return a === null || a === this.activeArea || this.flightAreas.has(a)
   }
 
   /** Which area an r9 cell belongs to: its centre against the borough outlines, else the area of its r7 tile. */
@@ -1222,7 +1215,30 @@ export class CityScene {
     return area
   }
 
-  private fly(target: THREE.Vector3, position: THREE.Vector3, duration: number) {
+  private interruptFlight() {
+    if (!this.flight) return
+    this.flight = null
+    this.controls.enabled = true
+    this.flightAreas.clear()
+    this.applyAreaVisibility()
+    this.setTiles(this.requestedTiles)
+    this.lastView.x = NaN // resume viewport-driven requests at the user's current position
+    this.invalidate()
+  }
+
+  private fly(target: THREE.Vector3, position: THREE.Vector3, duration?: number) {
+    // Flush OrbitControls inertia without letting a leftover pan/zoom move the starting pose.
+    const savedTarget = this.controls.target.clone()
+    const savedPosition = this.camera.position.clone()
+    const damping = this.controls.enableDamping
+    this.controls.enableDamping = false
+    this.updatingControls = true
+    this.controls.update()
+    this.controls.target.copy(savedTarget)
+    this.camera.position.copy(savedPosition)
+    this.controls.update()
+    this.updatingControls = false
+    this.controls.enableDamping = damping
     const from = new THREE.Spherical().setFromVector3(this.camera.position.clone().sub(this.controls.target))
     const to = new THREE.Spherical().setFromVector3(position.clone().sub(target))
     this.flight = {
@@ -1231,7 +1247,12 @@ export class CityScene {
       polar0: from.phi, polar1: to.phi,
       azimuth0: from.theta,
       azimuthDelta: Math.atan2(Math.sin(to.theta - from.theta), Math.cos(to.theta - from.theta)),
-      start: performance.now(), duration,
+      start: performance.now(),
+      duration: typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : duration ?? THREE.MathUtils.clamp(
+        450 + 210 * Math.abs(Math.log(to.radius / from.radius)) +
+        140 * Math.log1p(savedTarget.distanceTo(target) / Math.max(600, Math.min(from.radius, to.radius))),
+        450, 1400,
+      ),
     }
     this.controls.enabled = false
     // Load the destination while the camera moves, without requesting intermediate tiles.
@@ -1436,6 +1457,7 @@ export class CityScene {
     const t = e.target as HTMLElement | null
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
     if (e.code in KEY_MOVE || e.code in KEY_LIFT) {
+      this.interruptFlight()
       this.keys.add(e.code)
       e.preventDefault()
       this.invalidate()
@@ -1605,14 +1627,23 @@ export class CityScene {
     if (this.flight) {
       const f = this.flight
       const s = smoothstep(Math.min(1, (now - f.start) / f.duration))
-      this.controls.target.lerpVectors(f.t0, f.t1, s)
+      // Constant proportional zoom feels even across city and street scales. Couple pan to
+      // radius so an inward flight centres the destination while there is still room to see it.
+      const radius = f.radius0 * Math.pow(f.radius1 / f.radius0, s)
+      const pan = Math.abs(f.radius1 - f.radius0) > 1 ? (radius - f.radius0) / (f.radius1 - f.radius0) : s
+      this.controls.target.lerpVectors(f.t0, f.t1, pan)
       this.camera.position.setFromSphericalCoords(
-        THREE.MathUtils.lerp(f.radius0, f.radius1, s),
+        radius,
         THREE.MathUtils.lerp(f.polar0, f.polar1, s),
         f.azimuth0 + f.azimuthDelta * s,
       ).add(this.controls.target)
       if (s >= 1) {
         this.flight = null
+        if (this.flightAreas.size) {
+          this.flightAreas.clear()
+          this.applyAreaVisibility()
+          this.setTiles(this.requestedTiles)
+        }
         this.updateBaseMapVisibility()
         this.controls.enabled = true
         this.pointerDirty = true // what is under the still pointer has changed
