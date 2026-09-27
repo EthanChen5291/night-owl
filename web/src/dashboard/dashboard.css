@@ -145,12 +145,15 @@
 .dx-trace-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 2px 0; border: 0; background: none; color: var(--dx-muted); }
 .dx-trace-toggle:hover { color: var(--dx-ink); }
 .dx-trace-body { margin: 8px 0 2px 4px; padding-left: 14px; border-left: 1px solid var(--dx-line); animation: dx-fade 0.3s ease both; }
-.dx-thinking { margin: 0 0 8px; color: var(--dx-muted); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; }
+.dx-thinking { margin: 0 0 8px; color: color-mix(in srgb, var(--dx-ink) 74%, transparent); font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
 .dx-thinking:last-child { margin-bottom: 0; }
 .dx-thinking.tail {
-  max-height: 4.7em; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 45%); mask-image: linear-gradient(to bottom, transparent, #000 45%);
+  max-height: 7.75em; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
 }
+.dx-thinking.tail.clipped {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.1em); mask-image: linear-gradient(to bottom, transparent, #000 1.1em);
+}
+.dx-thinking.tail::-webkit-scrollbar { display: none; }
 .dx-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .dx-steps li { display: flex; align-items: flex-start; gap: 8px; line-height: 1.4; }
 .dx-steps small { display: block; color: var(--dx-muted); font-size: 12px; }
