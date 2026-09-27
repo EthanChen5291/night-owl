@@ -274,6 +274,8 @@ def build(last_month: str) -> dict:
         "window": [FIRST_MONTH, last_month],
         "acs_release": release,
         "periods": {"before COVID": f"{FIRST_MONTH} to 2020-02", "COVID": "2020-03 to 2021-12", "after COVID": f"2022-01 to {last_month}"},
+        "zip_periods": {"before COVID": f"{FIRST_MONTH[:4]} to 2019", "COVID": "2020 to 2021 (includes January–February 2020)",
+                        "after COVID": f"2022 to {last_year}" + (f" ({last_year} partial through {last_month})" if last_month[5:] != "12" else "")},
         "zip_windows": {"pre": f"{PRE_YEARS[0]}–{PRE_YEARS[-1]}", "post": f"{POST_YEARS[0]}–{POST_YEARS[-1]}"},
         "income_bands": bands,
         "sources": ["NYC Open Data 76ig-c548 and erm2-nwe9 (311, Complaint Type Rodent)",

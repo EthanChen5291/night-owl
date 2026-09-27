@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react'
-import { markdown } from '../agent'
 import { BackIcon, CheckIcon, ChevronIcon, CloseIcon, NewChatIcon, StopIcon } from '../components/Icons'
 import ChartCard from './ChartCard'
 import { refreshDashboard, streamDashboardChat } from './client'
@@ -7,6 +6,7 @@ import { downloadDashboard } from './export'
 import { linkClick } from '../nav'
 import { ArrowUpIcon, DashIcon, DownloadIcon, OwlMark, RefreshIcon } from './icons'
 import { emptySession, forActiveRequest, forCurrentGeneration, isActiveRequest, MAX_ARTIFACTS, restoreSession, STORE_KEY, type RequestIdentity, type Turn } from './requestSession'
+import { appendThinking, dashboardMarkdown } from './reasoning'
 import type { DashboardArtifact } from './types'
 import { resolvedKind, sortedRows, visibleSeries, type CardView } from './view'
 import './dashboard.css'
@@ -35,11 +35,6 @@ function TypedHeadline({ text }: { text: string }) {
   </h1>
 }
 
-function dashboardMarkdown(content: string): string {
-  const withoutLinks = content.replace(/\[([^\]]+)\]\(https?:\/\/[^\s)]+\)/g, '$1').replace(/https?:\/\/[^\s<)]+/g, '')
-  return markdown(withoutLinks).replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, '$1')
-}
-
 /** The artifact with each card's chosen view applied: what the assistant is shown and what exports. */
 function applyViews(artifact: DashboardArtifact, key: string, views: Record<string, CardView>): DashboardArtifact {
   const view = (id: string) => views[`${key}/${id}`] ?? {}
@@ -65,10 +60,11 @@ function Thumb({ artifact }: { artifact: DashboardArtifact }) {
 /** What the assistant did: live while it works, then folded into one line once the answer streams. */
 function Trace({ turn, live, status }: { turn: Turn; live: boolean; status: string }) {
   const [expanded, setExpanded] = useState(false)
-  const thinkingRef = useRef<HTMLParagraphElement>(null)
+  const thinkingRef = useRef<HTMLDivElement>(null)
   const steps = turn.steps ?? []
-  const thinking = turn.thinking?.trim() ?? ''
-  const working = live && !turn.content
+  const rounds = turn.thinkingRounds?.length ? turn.thinkingRounds : turn.thinking ? [{ round: 1, text: turn.thinking }] : []
+  const thinking = rounds.map((item) => item.text).join('').trim()
+  const working = live && !turn.content && !turn.error
   // While reasoning streams, keep its newest line in view; the reader can still scroll back.
   useLayoutEffect(() => {
     const node = thinkingRef.current
@@ -83,11 +79,17 @@ function Trace({ turn, live, status }: { turn: Turn; live: boolean; status: stri
     {working
       ? <div className="dx-trace-live"><span className="dx-shimmer">{status || 'Thinking'}</span></div>
       : <button type="button" className="dx-trace-toggle" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
-        {live ? <span className="dx-shimmer">{status || 'Writing'}</span> : <span>Worked through {summary}</span>}
+        {turn.error ? <span>{turn.error === 'Stopped.' ? 'Stopped' : 'Failed'}{steps.length ? ` after ${summary}` : ''}</span>
+          : live ? <span className="dx-shimmer">{status || 'Writing'}</span> : <span>Worked through {summary}</span>}
         <ChevronIcon size={13} dir={expanded ? 'down' : 'right'} />
       </button>}
     {open && (thinking || steps.length > 0) && <div className="dx-trace-body">
-      {thinking && <p ref={thinkingRef} className={`dx-thinking${working ? ' tail' : ''}`} onScroll={(event) => event.currentTarget.classList.toggle('clipped', event.currentTarget.scrollTop > 0)}>{thinking}</p>}
+      {thinking && <div ref={thinkingRef} className={`dx-thinking${working ? ' tail' : ''}`} onScroll={(event) => event.currentTarget.classList.toggle('clipped', event.currentTarget.scrollTop > 0)}>
+        {rounds.map((item, index) => <section className="dx-thinking-round" key={`${item.round}-${index}`}>
+          <span className="dx-thinking-label">Round {item.round}</span>
+          <div className="dx-thinking-content" dangerouslySetInnerHTML={{ __html: dashboardMarkdown(item.text) }} />
+        </section>)}
+      </div>}
       {steps.length > 0 && <ol className="dx-steps">{steps.map((step, i) => <li key={i} className={step.error ? 'error' : ''}>
         <span className="dx-step-dot">{step.error ? <CloseIcon size={10} /> : <CheckIcon size={10} />}</span>
         <span>{step.text}{step.detail && <small>{step.detail}</small>}</span>
@@ -180,7 +182,10 @@ export default function DashboardPage() {
         if (!isActiveRequest(activeRequestRef.current, identity)) return
         if (event.type === 'status') setStatus(event.text)
         else if (event.type === 'step') patchTurn(identity, (turn) => ({ ...turn, steps: [...(turn.steps ?? []), { text: event.text, detail: event.detail, error: event.error }] }))
-        else if (event.type === 'thinking') patchTurn(identity, (turn) => ({ ...turn, thinking: ((turn.thinking ?? '') + event.text).slice(-6000) }))
+        else if (event.type === 'thinking') patchTurn(identity, (turn) => ({ ...turn,
+          thinkingRounds: appendThinking(turn.thinkingRounds ?? (turn.thinking ? [{ round: 1, text: turn.thinking }] : []), event.text, event.round),
+          thinking: undefined,
+        }))
         else if (event.type === 'delta') { setStatus('Writing'); patchTurn(identity, (turn) => ({ ...turn, content: turn.content + event.text })) }
         else if (event.type === 'dashboard') addArtifact(event.dashboard, identity)
         else if (event.type === 'error') patchTurn(identity, (turn) => ({ ...turn, error: event.text }))

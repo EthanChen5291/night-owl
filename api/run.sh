@@ -9,11 +9,21 @@ load_env() {
   local line key value
   while IFS= read -r line || [[ -n $line ]]; do
     line=${line%$'\r'}
-    [[ $line =~ ^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || continue
+    [[ $line =~ ^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]] || continue
     key=${BASH_REMATCH[2]}
     value=${BASH_REMATCH[3]}
-    if [[ $value == \"*\" || $value == \'*\' ]]; then value=${value:1:${#value}-2}; fi
-    [[ -n ${!key:-} ]] || export "$key=$value"
+    if [[ $value == \"* ]]; then
+      [[ $value =~ ^\"([^\"]*)\"[[:space:]]*(#.*)?$ ]] || continue
+      value=${BASH_REMATCH[1]}
+    elif [[ $value == \'* ]]; then
+      [[ $value =~ ^\'([^\']*)\'[[:space:]]*(#.*)?$ ]] || continue
+      value=${BASH_REMATCH[1]}
+    else
+      [[ $value == \#* ]] && value=
+      value=${value%%[[:space:]]#*}
+      value="${value%"${value##*[![:space:]]}"}"
+    fi
+    [[ -n ${!key+x} ]] || export "$key=$value"
   done < "$1"
 }
 [[ -f ../.env ]] && load_env ../.env

@@ -65,6 +65,17 @@ test('an existing v2 session takes precedence and restored turns cannot accept o
   assert.equal(restoreSession(store({ ...entries, [STORE_KEY]: '{bad json' })).turns.length, 0)
 })
 
+test('restored reasoning keeps its round boundaries and rejects malformed rounds', () => {
+  const current = { ...emptySession(), turns: [{ role: 'assistant', content: 'Answer', thinkingRounds: [
+    { round: 1, text: '### First' }, { round: 2, text: '- Second' },
+    { round: '3', text: 'bad' }, { round: 4, text: { html: '<script>' } },
+  ] }] }
+  const restored = restoreSession(store({ [STORE_KEY]: JSON.stringify(current) }))
+  assert.deepEqual(restored.turns[0].thinkingRounds, [
+    { round: 1, text: '### First' }, { round: 2, text: '- Second' },
+  ])
+})
+
 test('queued refresh applies after completion but cannot restore a cleared chat or aborted result', () => {
   const before = { ...emptySession(), artifacts: { a: artifact(1) }, open: 'a' }
   const update = (session) => ({ ...session, artifacts: { ...session.artifacts, a: artifact(2) } })

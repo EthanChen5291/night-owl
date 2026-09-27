@@ -1,5 +1,6 @@
 import type { AgentStep, ChartSelection, DashboardArtifact } from './types'
 import type { CardView } from './view'
+import type { ThinkingRound } from './reasoning'
 
 export interface Turn {
   role: 'user' | 'assistant'
@@ -8,6 +9,7 @@ export interface Turn {
   turnId?: string
   steps?: AgentStep[]
   thinking?: string
+  thinkingRounds?: ThinkingRound[]
   dashboard?: string
   error?: string
 }
@@ -89,6 +91,10 @@ function parseCurrent(saved: unknown): Session {
     steps: Array.isArray(turn.steps) ? turn.steps.filter((step): step is AgentStep => record(step) && typeof step.text === 'string')
       .map((step) => ({ text: step.text, detail: typeof step.detail === 'string' ? step.detail : undefined, error: step.error === true })) : undefined,
     thinking: typeof turn.thinking === 'string' ? turn.thinking : undefined,
+    thinkingRounds: Array.isArray(turn.thinkingRounds) ? turn.thinkingRounds
+      .filter((item): item is ThinkingRound => record(item) && Number.isSafeInteger(item.round)
+        && (item.round as number) > 0 && typeof item.text === 'string')
+      .map((item) => ({ round: item.round, text: item.text })).slice(-20) : undefined,
     dashboard: typeof turn.dashboard === 'string' && artifacts[turn.dashboard] ? turn.dashboard : undefined,
     error: typeof turn.error === 'string' ? turn.error : undefined,
   }))
