@@ -36,7 +36,6 @@ class Store:
         self.events: deque[dict] = deque(maxlen=RING_SIZE)  # oldest -> newest
         self.posteriors: dict[tuple[str, str], Posterior] = {}
         self.last_event_at: dict[tuple[str, str], str] = {}
-        self.unknown_h3: set[tuple[str, str]] = set()
         self.event_ids: set[str] = set()
         self._lock = threading.Lock()
         self._subscribers: set[asyncio.Queue] = set()
@@ -258,16 +257,14 @@ class Store:
         known = True
         with self._lock:
             if event_id in self.event_ids:
-                post = self.posteriors.get(key)
-                if post is None:
-                    post = self.prior_for(h3, month) or Posterior.from_score_b(PRIOR_SCORE_B)
-                return stored, post, False, self.prior_for(h3, month) is not None
+                prior = self.prior_for(h3, month)
+                post = self.posteriors.get(key) or prior or Posterior.from_score_b(PRIOR_SCORE_B)
+                return stored, post, False, prior is not None
             post = self.posteriors.get(key)
             if post is None:
                 post = self.prior_for(h3, month)
                 if post is None:
                     known = False
-                    self.unknown_h3.add(key)
                     post = Posterior.from_score_b(PRIOR_SCORE_B)
             accepted = stored["class"] == "rat" and accepts(float(stored["conf"]), int(stored["n_hits"]))
             if accepted:
@@ -313,7 +310,6 @@ class Store:
             self.events.clear()
             self.posteriors.clear()
             self.last_event_at.clear()
-            self.unknown_h3.clear()
             self.event_ids.clear()
             try:
                 if self.events_file.exists():

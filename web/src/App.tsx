@@ -4,6 +4,7 @@ import { fetchBacktest, fetchCells, fetchPlacements, fetchPlan, fetchPublic, fet
 import { AddressIndex, offBuilding, pointInRing } from './city/addresses'
 import { centroid, makeProjector } from './city/projection'
 import { TileCache, wantedTiles } from './city/tiles'
+import { sceneHandle } from './city/sceneHandle'
 import AgentChat, { type ClientTools } from './components/AgentChat'
 import AreaPicker from './components/AreaPicker'
 import BacktestChart from './components/BacktestChart'
@@ -15,7 +16,7 @@ import Legend from './components/Legend'
 import LogsDrawer from './components/LogsDrawer'
 import ModeBar from './components/ModeBar'
 import NodesPanel from './components/NodesPanel'
-import Scene, { sceneHandle } from './components/Scene'
+import Scene from './components/Scene'
 import Toolbar from './components/Toolbar'
 import { activityRate, eventKey, loadOwls, newOwl, saveOwls } from './owls'
 import type {
@@ -87,7 +88,7 @@ export default function App() {
   const [backtest, setBacktest] = useState<BacktestResponse | null | undefined>(undefined)
   const [meta, setMeta] = useState<CityMeta | null | undefined>(undefined)
   const [cityLayers, setCityLayers] = useState<CityLayers | null>(null)
-  const [areaLayers, setAreaLayers] = useState<CityLayers | null>(null)
+  const [loadedAreaLayers, setLoadedAreaLayers] = useState<{ area: string; layers: CityLayers } | null>(null)
   const [areasManifest, setAreasManifest] = useState<AreasManifest | null | undefined>(undefined)
   const [tilesManifest, setTilesManifest] = useState<TilesManifest | null | undefined>(undefined)
   const [area, setAreaState] = useState<string | null>(areaFromHash)
@@ -248,21 +249,19 @@ export default function App() {
 
   // ---- inside an area only that borough's ground is drawn (the citywide layers hide), so it is fetched on entry
   useEffect(() => {
-    if (!area) {
-      setAreaLayers(null)
-      return
-    }
+    if (!area) return
     let alive = true
     const base = `/city/areas/${area}`
     void Promise.all([fetchPublic<Poly[]>(`${base}/land.json`), fetchPublic<Poly[]>(`${base}/parks.json`), fetchPublic<Poly[]>(`${base}/water.json`)]).then(
       ([land, parks, water]) => {
-        if (alive) setAreaLayers({ land, parks, water })
+        if (alive) setLoadedAreaLayers({ area, layers: { land, parks, water } })
       },
     )
     return () => {
       alive = false
     }
   }, [area])
+  const areaLayers = loadedAreaLayers?.area === area ? loadedAreaLayers.layers : null
 
   // ---- tiles stream around the camera target, only the active area's: the wanted set changes as the view moves, the cache fills it
   useEffect(() => {

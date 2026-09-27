@@ -19,7 +19,8 @@ Sanjavan owns the city models. Model A predicts complaints; Model B estimates ac
 | --- | --- | --- |
 | V5 fresh box test, 369 held-out frames | As-run rat AP50 0.616. A later source-only audit found flawed reference boxes; no corrected score was adopted. | The 0.90 target is unestablished. |
 | V5 fixed event test, two new whole recordings | 18 of 19 plush appearances alerted. The 190.409-second no-plush video produced 17 false alerts, mostly on a cap. | Failed the false-alert gate; [all 60 event crops were reviewed](../vision/V5_FORMAL_EVENT_RESULTS.md). |
-| V6 development validation after adding 42 reviewed no-plush frames | Table-floor rat AP50 0.892 below its 0.936 floor; table-floor person 0.801 below 0.820; old-clip combined person 0.742 below 0.808. | Rejected at preset floors. No formal replay, Pi promotion, or fresh V6 claim. |
+| V6 development validation after adding 42 reviewed no-plush frames | Table-floor rat AP50 0.891727 below its 0.935526 floor; table-floor person 0.800513 below 0.819889; old-clip combined person 0.741646 below 0.807739. | Rejected at preset floors. |
+| [V6 warmup comparison](../vision/V6_WARMUP_RESULTS.md), changing only `warmup_bias_lr` from 0.1 to 0 | Table-floor rat rose to 0.915 but still missed its floor. Table-floor person rose to 0.837729 and passed; old-clip combined person rose to 0.797100 but still missed. | PyTorch/ONNX parity passed, but the guards still failed. No formal replay or Pi promotion. |
 
 The V5 formal source clips were used to build V6's hard negatives. They are development material for V6 and cannot supply an independent V6 test. The [V5 fresh report](../vision/V5_FRESH_RESULTS.md) and [formal report](../vision/V5_FORMAL_EVENT_RESULTS.md) retain the failed results. The [live rehearsal](../vision/V5_LIVE_RESULTS.md) confirms wiring only.
 

@@ -97,6 +97,7 @@ interface Flight {
 }
 
 const FLASH_MS = 1500
+const MAX_PIXEL_RATIO = 1.5
 // the search locator: a bright band lands on the hexagon after the flight, starts wide, shrinks onto it, holds, fades
 const LOCATE_GROW_MS = 1300
 const LOCATE_HOLD_MS = 1000
@@ -269,7 +270,7 @@ export class CityScene {
     this.callbacks = callbacks
     this.projector = makeProjector(centre)
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO))
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -335,8 +336,9 @@ export class CityScene {
     window.addEventListener('keyup', this.handleKeyUp)
     window.addEventListener('blur', this.handleBlur)
     window.addEventListener('resize', this.resize)
+    document.addEventListener('visibilitychange', this.handleVisibility)
     this.resize()
-    this.loop()
+    if (!document.hidden) this.loop()
   }
 
   // ---------------------------------------------------------------- public API
@@ -829,6 +831,7 @@ export class CityScene {
     window.removeEventListener('keyup', this.handleKeyUp)
     window.removeEventListener('blur', this.handleBlur)
     window.removeEventListener('resize', this.resize)
+    document.removeEventListener('visibilitychange', this.handleVisibility)
     this.controls.dispose()
     this.scene.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Line || o instanceof THREE.Sprite) {
@@ -1187,6 +1190,17 @@ export class CityScene {
     this.keys.clear()
   }
 
+  private handleVisibility = () => {
+    if (document.hidden) {
+      cancelAnimationFrame(this.raf)
+      this.raf = 0
+      this.keys.clear()
+    } else if (!this.disposed && !this.raf) {
+      this.lastFrame = performance.now()
+      this.raf = requestAnimationFrame(this.loop)
+    }
+  }
+
   private resize = () => {
     const w = this.canvas.clientWidth || 1
     const h = this.canvas.clientHeight || 1
@@ -1302,7 +1316,10 @@ export class CityScene {
   }
 
   private loop = () => {
-    if (this.disposed) return
+    if (this.disposed || document.hidden) {
+      this.raf = 0
+      return
+    }
     this.raf = requestAnimationFrame(this.loop)
     const now = performance.now()
     const dt = Math.min(0.05, (now - this.lastFrame) / 1000)

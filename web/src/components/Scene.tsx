@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { CityScene, type SceneCallbacks } from '../city/scene'
+import { sceneHandle } from '../city/sceneHandle'
 import type { AddressIndex } from '../city/addresses'
 import type { Area, Cell, CityLayers, Mode, OwlNode, PlanNode, Preset, Spot, Tile } from '../types'
 import type { LatLon } from '../city/projection'
@@ -28,9 +29,6 @@ interface Props {
   onClick: SceneCallbacks['onClick']
   onView: SceneCallbacks['onView']
 }
-
-/** Exposes the mounted scene to the assistant's screenshot tool. */
-export const sceneHandle: { current: CityScene | null } = { current: null }
 
 /** The only component that touches three.js. Owns one CityScene for the life of the canvas. */
 export default function Scene(props: Props) {

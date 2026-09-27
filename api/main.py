@@ -1,4 +1,4 @@
-"""Barn Owl API: the hub between the Pi node (POST /event), the model output (model/out/*.json) and the web app.
+"""Night Owl API: the hub between the Pi node, model output, and web app.
 
 Run:  api/run.sh   or   uv run --project api uvicorn main:app --app-dir api --host 0.0.0.0 --port 8000
 Contract: plan/master-plan.md §6 (frozen). Stage fallback: api/fake_event.sh (plan §9).
@@ -8,10 +8,9 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
-
-from datetime import datetime, timezone
 
 import h3
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
@@ -69,11 +68,11 @@ class Event(BaseModel):
 
 def create_app(data_dir: Path | None = None, events_file: Path | None = None) -> FastAPI:
     store = Store(data_dir=data_dir, events_file=events_file)
-    app = FastAPI(title="Barn Owl API", version="0.1.0")
+    app = FastAPI(title="Night Owl API", version="0.1.0")
     app.state.store = store
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*", "http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -170,10 +169,7 @@ def create_app(data_dir: Path | None = None, events_file: Path | None = None) ->
                         yield ": keepalive\n\n"
                         continue
                     kind = "reset" if payload.get("reset") else "event"
-                    slim = {k: v for k, v in payload.items() if k != "crop_b64"}
-                    if "crop_b64" in payload:
-                        slim["crop_b64"] = payload["crop_b64"]  # the web app wants the thumbnail
-                    yield f"event: {kind}\ndata: {json.dumps(slim)}\n\n"
+                    yield f"event: {kind}\ndata: {json.dumps(payload)}\n\n"
                     sent += 1
             finally:
                 s.unsubscribe(q)
