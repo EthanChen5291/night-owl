@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from agent import mount_agent
+from dashboard_agent import mount_dashboards
 from store import Store
 
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -178,6 +179,7 @@ def create_app(data_dir: Path | None = None, events_file: Path | None = None) ->
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     mount_agent(app, store)  # POST /agent/chat: the Grok assistant (api/agent.py)
+    mount_dashboards(app, store)
 
     @app.exception_handler(json.JSONDecodeError)
     async def _bad_json(_: Request, exc: Exception):

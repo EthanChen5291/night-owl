@@ -94,6 +94,8 @@ button { font: inherit; color: inherit; }
 
 /* Header: search, month, plan budget, and source. */
 .header { position: absolute; top: 12px; right: 12px; z-index: 6; display: flex; align-items: flex-start; gap: 8px; }
+.header-dashboard { display: inline-flex; align-items: center; height: 40px; padding: 0 13px; color: var(--ink); text-decoration: none; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.header-dashboard:hover { background: var(--glass-strong); }
 .status { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: 999px; height: 40px; }
 .month input { background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font: inherit; }
 .budget { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; white-space: nowrap; }
