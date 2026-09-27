@@ -385,3 +385,8 @@ button { font: inherit; color: inherit; }
 @media (max-width: 560px) {
   .agent { right: 8px; left: 8px; width: auto; bottom: 76px; height: calc(100% - 150px); }
 }
+
+/* panels the assistant (or a click) pulls up slide in rather than pop */
+.logs { animation: panel-in-left 0.35s var(--ease); }
+.cellcard { animation: panel-in-left 0.3s var(--ease); }
+@keyframes panel-in-left { from { opacity: 0; transform: translateX(-14px); } }

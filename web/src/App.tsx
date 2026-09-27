@@ -559,8 +559,109 @@ export default function App() {
       suggested_sites_in_view: planHere.length,
     })
   })
+  // ---- the assistant drives the map: each action returns once its camera flight has landed, so a screenshot
+  // taken right after shows where it went
+  const agentActions = useRef<Record<string, (a: Record<string, unknown>) => Promise<unknown>>>({})
+  useEffect(() => {
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+    const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN)
+    const DIST: Record<string, number> = { street: 320, block: 700, neighborhood: 1400, borough: 6000 }
+    const findArea = (name: string) => {
+      const q = name.toLowerCase().replace(/^the\s+/, '').trim()
+      return areas.find((a) => a.name.toLowerCase() === q || a.id.toLowerCase() === q) ?? areas.find((a) => a.name.toLowerCase().includes(q) || q.includes(a.name.toLowerCase()))
+    }
+    agentActions.current = {
+      fly_to: async (a) => {
+        const lat = num(a.lat)
+        const lon = num(a.lon)
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return { error: 'fly_to needs lat and lon' }
+        const h3 = typeof a.h3 === 'string' && cellByH3.has(a.h3) ? a.h3 : latLngToCell(lat, lon, 9)
+        const zoom = typeof a.zoom === 'string' && a.zoom in DIST ? a.zoom : 'block'
+        const areaId = tileAreas[cellToParent(h3, 7)] ?? (typeof a.borough === 'string' ? findArea(a.borough)?.id : null) ?? null
+        const moved = !!areaId && areaId !== area
+        if (moved) setArea(areaId)
+        setPlacing(false)
+        setOpenRank(null)
+        setSelected(null)
+        const pin = a.pin !== false && cellByH3.has(h3) && zoom !== 'borough'
+        setPinned(pin ? { h3, addr: typeof a.label === 'string' ? a.label : null } : null)
+        setFocus({ lat, lon, distance: DIST[zoom], seq: ++seqRef.current })
+        if (cellByH3.has(h3)) setFlash({ h3, seq: ++seqRef.current })
+        await wait(moved ? 2400 : 1900)
+        return { ok: true, at: { lat, lon }, zoom, hexagon_pinned: pin ? h3 : null, entered_borough: moved ? areaId : null }
+      },
+      set_map_mode: async (a) => {
+        const m = a.mode
+        if (m !== 'a' && m !== 'b' && m !== 'silence') return { error: 'mode must be a, b or silence' }
+        setMode(m)
+        await wait(700)
+        return { ok: true, mode: m }
+      },
+      enter_borough: async (a) => {
+        const name = typeof a.borough === 'string' ? a.borough : ''
+        if (!name || /^(city|citywide|all|nyc|new york)/i.test(name)) {
+          setArea(null)
+          await wait(2000)
+          return { ok: true, view: 'citywide' }
+        }
+        const hit = findArea(name)
+        if (hit) {
+          setArea(hit.id)
+          await wait(2300)
+          return { ok: true, borough: hit.name }
+        }
+        // no borough outlines on this site yet: fly over it instead
+        const C: Record<string, [number, number]> = { manhattan: [40.7831, -73.9712], brooklyn: [40.6782, -73.9442], queens: [40.7282, -73.7949], bronx: [40.8448, -73.8648], 'staten island': [40.5795, -74.1502] }
+        const key = Object.keys(C).find((k) => name.toLowerCase().includes(k))
+        if (!key) return { error: `unknown borough ${name}` }
+        setFocus({ lat: C[key][0], lon: C[key][1], distance: DIST.borough, seq: ++seqRef.current })
+        await wait(1900)
+        return { ok: true, borough: key, note: 'flew over it (borough outlines are not loaded on this site)' }
+      },
+      show_panel: async (a) => {
+        const open = a.open !== false
+        if (a.panel === 'owls') setOwlsOpen(open)
+        else if (a.panel === 'logs') setLogsOpen(open)
+        else if (a.panel === 'backtest') setChartOpen(open)
+        else return { error: 'panel must be owls, logs or backtest' }
+        await wait(500)
+        return { ok: true, panel: a.panel, open }
+      },
+      select_owl: async (a) => {
+        const o = owlsRef.current.find((x) => x.id === a.owl_id || x.nodeId === a.owl_id)
+        if (!o) return { error: 'no owl with that id (see get_app_state.owls_placed)' }
+        setOwlsOpen(true)
+        selectOwl(o.id, true)
+        await wait(1900)
+        return { ok: true, owl: o.id, address: o.addr }
+      },
+      show_suggested_site: async (a) => {
+        const rank = num(a.rank)
+        const p = plan.find((x) => x.rank === rank)
+        if (!p) return { error: `no suggested site ranked ${a.rank}` }
+        const areaId = tileAreas[cellToParent(p.h3, 7)] ?? null
+        if (areaId && areaId !== area) setArea(areaId)
+        setShowPlan(true)
+        setOwlsOpen(true)
+        setOpenRank(rank)
+        setFocus({ lat: p.lat, lon: p.lon, distance: DIST.block, seq: ++seqRef.current })
+        await wait(areaId && areaId !== area ? 2400 : 1900)
+        return { ok: true, rank, lat: p.lat, lon: p.lon, spot_options_open: true }
+      },
+      set_lighting: async (a) => {
+        if (a.preset !== 'day' && a.preset !== 'night') return { error: 'preset must be day or night' }
+        setPreset(a.preset)
+        await wait(600)
+        return { ok: true, preset: a.preset }
+      },
+    }
+  })
   const agentTools = useMemo<ClientTools>(
-    () => ({ get_app_state: () => agentState.current(), screenshot_map: () => sceneHandle.current?.screenshot() ?? null }),
+    () => ({
+      get_app_state: () => agentState.current(),
+      screenshot_map: () => sceneHandle.current?.screenshot() ?? null,
+      act: (name, args) => (agentActions.current[name] ? agentActions.current[name](args) : Promise.resolve({ error: `unknown action ${name}` })),
+    }),
     [],
   )
 

@@ -6,6 +6,8 @@ import { ChatIcon, CheckIcon, CloseIcon, NewChatIcon, SendIcon, SparkIcon, StopI
 export interface ClientTools {
   get_app_state: () => unknown
   screenshot_map: () => string | null
+  /** Map actions (fly_to, set_map_mode, show_panel, …): resolve once the animation has landed. */
+  act: (name: string, args: Record<string, unknown>) => Promise<unknown>
 }
 
 interface Step {
@@ -53,7 +55,9 @@ export default function AgentChat({ tools }: { tools: ClientTools }) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const thinkSeq = useRef(0)
   const toolsRef = useRef(tools)
-  toolsRef.current = tools
+  useEffect(() => {
+    toolsRef.current = tools
+  }, [tools])
 
   useEffect(() => {
     try {
@@ -100,7 +104,7 @@ export default function AgentChat({ tools }: { tools: ClientTools }) {
         return { id: c.id, content: JSON.stringify({ ok: true, note: 'screenshot attached below' }), image: src }
       }
       if (c.name === 'get_app_state') return { id: c.id, content: JSON.stringify(toolsRef.current.get_app_state()) }
-      return { id: c.id, content: JSON.stringify({ error: `unknown client tool ${c.name}` }) }
+      return { id: c.id, content: JSON.stringify(await toolsRef.current.act(c.name, c.args ?? {})) }
     } catch (e) {
       return { id: c.id, content: JSON.stringify({ error: String(e) }) }
     }

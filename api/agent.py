@@ -81,6 +81,11 @@ How to work:
 - Show the map when it helps (screenshot_map), and camera frames when asked about the node (camera_image).
 - Be brief: a sentence or two, then a short list or small table. Markdown is rendered. Round sensibly.
 - The map screenshot shows the user's current view; get_app_state says which borough and mode that is.
+- You can drive the user's map: fly_to a place (after geocode or a hexagon lookup), set_map_mode, enter_borough,
+  show_panel (owls / logs / backtest), select_owl, show_suggested_site, set_lighting. When you talk about a specific
+  place, take the user there (one fly_to to the most relevant spot) unless they said not to. Pick the mode that
+  matches the question (silent blocks -> silence, rat risk -> b, complaints -> a). Don't bounce the camera around:
+  one or two moves per answer. Say briefly what you did ("I've flown you to ...").
 """
 
 
@@ -388,6 +393,28 @@ CLIENT_TOOLS: dict[str, tuple[str, dict]] = {
         "get_app_state", "What the user's app shows right now: borough, map mode, camera position, pinned hexagon, and the owls they placed (with sightings).")),
     "screenshot_map": ("Taking a screenshot", _fn(
         "screenshot_map", "Screenshot of the user's current 3D map view. The user sees it in the chat too; you get the image.")),
+    # driving the map: each returns once the camera has landed (smooth flights), so screenshot_map right after works
+    "fly_to": ("Flying there", _fn(
+        "fly_to", "Move the user's map camera to a point (smooth flight). Enters the right borough and pins + flashes the hexagon there. "
+        "zoom: street (~300 m), block (default), neighborhood, borough. label: the address or name to show on the pinned card.",
+        {"lat": NUM, "lon": NUM, "zoom": {"type": "string", "enum": ["street", "block", "neighborhood", "borough"]}, "label": STR, "h3": STR,
+         "borough": STR, "pin": BOOL}, ["lat", "lon"])),
+    "set_map_mode": ("Switching the map", _fn(
+        "set_map_mode", "Change what the hexagons show: a = what the city sees (311 complaints), b = what's there (rat risk), silence = B minus A (silent blocks).",
+        {"mode": {"type": "string", "enum": ["a", "b", "silence"]}}, ["mode"])),
+    "enter_borough": ("Changing borough", _fn(
+        "enter_borough", "Enter a borough (Manhattan, Brooklyn, Queens, Bronx, Staten Island) with its 3D buildings, or 'citywide' to zoom back out.",
+        {"borough": STR}, ["borough"])),
+    "show_panel": ("Opening a panel", _fn(
+        "show_panel", "Open or close a panel: owls (placed nodes and suggested sites, right), logs (the sightings log with detection crops, left), backtest (the chart, bottom).",
+        {"panel": {"type": "string", "enum": ["owls", "logs", "backtest"]}, "open": BOOL}, ["panel"])),
+    "select_owl": ("Pulling up the owl", _fn(
+        "select_owl", "Select one of the user's placed owls (id from get_app_state) and fly in close to it.", {"owl_id": STR}, ["owl_id"])),
+    "show_suggested_site": ("Pulling up the site", _fn(
+        "show_suggested_site", "Fly to a suggested owl site by rank (from node_sites) and open its mount-spot options in the Owls panel.",
+        {"rank": NUM}, ["rank"])),
+    "set_lighting": ("Changing the lighting", _fn(
+        "set_lighting", "Day or night lighting for the map (night is the stage look).", {"preset": {"type": "string", "enum": ["day", "night"]}}, ["preset"])),
 }
 TOOL_SPECS = [t[2] for t in SERVER_TOOLS.values()] + [t[1] for t in CLIENT_TOOLS.values()]
 
