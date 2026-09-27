@@ -3,6 +3,18 @@
 Owner per plan: Sanjavan; per DEBRIEF: Utsav. Settle at hour 0 (README §6). Whoever it is, this is
 the order of operations, with the gates. Every script has `--help`; every gate has a number.
 
+## Current V5 candidate
+
+Use the [V5 evidence and bundle](V5_RESULTS.md) for the current room-lit plush candidate.
+Its model and runtime confidence **0.70** are frozen. The threshold sweeps and rule tuning
+below apply only to development footage. Do not run them on fresh V5 test recordings.
+Reserve whole new clips, review and freeze their boxes and pass intervals before predictions,
+then evaluate the fixed candidate once. Preserve a failed result; do not adjust the threshold
+or checkpoint to make that same test pass. Repeated cooldown events are not separate pushes.
+Fresh box AP, 20 distinct passes, a separate three-minute negative reel, and a positive live
+camera-to-map event remain pending. Saved-frame Pi timing and development replay do not
+complete those checks.
+
 ## 0. Environment (Mac)
 
 ```
