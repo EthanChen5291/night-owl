@@ -4,23 +4,24 @@ import { imessage } from "@spectrum-ts/imessage";
 // NightOwl over iMessage (Photon Spectrum): every text goes to the same Grok assistant as the web app's chat
 // (POST /api/agent/chat on barn-owl.tech, api/agent.py) with channel "imessage", so it gets the server tools
 // (model, hexagons, owl sites, the Pi, its camera) but not the map ones. Pictures come back as attachments.
+// The server keeps each conversation as a thread in its SQLite chat store (api/chat_store.py), keyed by the Spectrum
+// space id, so history survives restarts of this bot. That only works from the same machine as the API (it refuses
+// imessage threads that came through the proxy), so on the droplet this points at http://127.0.0.1:8772/agent/chat.
 // Docs: https://photon.codes/docs/spectrum-ts
 const AGENT_URL = (process.env.NIGHT_OWL_AGENT_URL ?? process.env.BARN_OWL_AGENT_URL ?? "https://barn-owl.tech/api/agent/chat").replace(/\/$/, "");
-const KEEP = 30; // messages of history per conversation
+// conversations that texted "reset": their next question starts a new thread
+const fresh = new Set<string>();
 
-type Wire = { role: "user" | "assistant" | "tool"; content: string; tool_calls?: unknown[]; tool_call_id?: string };
-const histories = new Map<string, Wire[]>();
-
-/** One question through the agent: the answer text, any pictures, and the history to keep. */
-async function ask(history: Wire[], text: string): Promise<{ text: string; images: string[]; history: Wire[] }> {
+/** One question through the agent: the answer text and any pictures. The server loads and saves the history. */
+async function ask(space: string, text: string): Promise<{ text: string; images: string[] }> {
+  const newThread = fresh.delete(space);
   const res = await fetch(AGENT_URL, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "text/event-stream" },
-    body: JSON.stringify({ channel: "imessage", messages: [...history, { role: "user", content: text }] }),
+    body: JSON.stringify({ channel: "imessage", imessage_space: space, text, ...(newThread && { new_thread: true }) }),
   });
   if (!res.ok || !res.body) throw new Error(`agent ${res.status}: ${await res.text().catch(() => "")}`);
   let answer = "";
-  let next = history;
   const images: string[] = [];
   let error = "";
   const dec = new TextDecoder();
@@ -36,12 +37,11 @@ async function ask(history: Wire[], text: string): Promise<{ text: string; image
       if (e.type === "delta") answer += e.text;
       else if (e.type === "tool" && e.state === "start" && answer && !answer.endsWith("\n\n")) answer += "\n\n";
       else if (e.type === "image" && typeof e.src === "string") images.push(e.src);
-      else if (e.type === "messages") next = e.messages;
       else if (e.type === "error") error = e.text;
     }
   }
   if (!answer && error) answer = `Sorry, something went wrong: ${error}`;
-  return { text: answer.trim(), images, history: next.slice(-KEEP) };
+  return { text: answer.trim(), images };
 }
 
 const app = await Spectrum({
@@ -56,15 +56,14 @@ for await (const [space, message] of app.messages) {
   const q = message.content.text.trim();
   if (!q) continue;
   if (/^(reset|new chat|start over)$/i.test(q)) {
-    histories.delete(space.id);
+    fresh.add(space.id);
     await space.send("Fresh start. Ask me about rats, blocks, owls or the Pi.");
     continue;
   }
   // one conversation's questions run in order; different conversations don't wait on each other
   void space
     .responding(async () => {
-      const { text, images, history } = await ask(histories.get(space.id) ?? [], q);
-      histories.set(space.id, history);
+      const { text, images } = await ask(space.id, q);
       if (text) await space.send(markdown(text));
       for (const src of images.slice(0, 3)) {
         const [, mime = "image/jpeg", b64 = ""] = /^data:([^;]+);base64,(.*)$/s.exec(src) ?? [];

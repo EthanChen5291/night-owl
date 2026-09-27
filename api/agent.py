@@ -38,6 +38,7 @@ from typing import Any, Awaitable, Callable
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from chat_store import ChatStore
 from store import Store
 
 XAI_URL = "https://api.x.ai/v1/chat/completions"
@@ -678,11 +679,109 @@ def _rate_ok(ip: str) -> bool:
     return True
 
 
-def mount_agent(app: FastAPI, store: Store) -> None:
+class _Answer:
+    """The answer being built for a stored thread, mirrored from the events the browser sees, so a reload (or
+    another device) shows the same text, steps and pictures."""
+
+    def __init__(self, turn: dict | None = None):
+        t = turn or {}
+        self.text: str = t.get("text", "")
+        self.steps: list[dict] = list(t.get("steps") or [])
+        self.images: list[dict] = list(t.get("images") or [])
+        self.error: str | None = t.get("error")
+        self.waiting = False  # ended on browser tools: their steps stay open for the next request
+
+    def _para(self) -> None:
+        if self.text and not self.text.endswith("\n\n"):
+            self.text += "\n\n"
+
+    def step(self, sid: str, label: str, state: str) -> None:
+        for s in self.steps:
+            if s["id"] == sid:
+                s["state"] = state
+                return
+        self._para()  # text before a tool call and the answer after it are separate paragraphs
+        self.steps.append({"id": sid, "label": label, "state": state})
+
+    def record(self, ev: dict) -> None:
+        kind = ev.get("type")
+        if kind == "delta":
+            self.text += ev.get("text", "")
+        elif kind == "tool":
+            self.step(ev["id"], ev.get("label", ev.get("name", "")), ev["state"])
+        elif kind == "image":
+            self.images.append({"src": ev["src"], "caption": ev.get("caption")})
+        elif kind == "client_tools":
+            for c in ev.get("calls", []):
+                self.step(c["id"], c.get("label", c.get("name", "")), "start")
+            self.waiting = True
+        elif kind == "error":
+            self.error = ev.get("text")
+
+    def close(self) -> None:
+        if not self.waiting:  # anything still running when the answer ended did not finish
+            for s in self.steps:
+                if s["state"] == "start":
+                    s["state"] = "error"
+
+
+def _owner(request: Request, body: dict | None = None) -> str:
+    """Whose threads these are. iMessage conversations come from the bot on this machine only (anything that came
+    through Caddy carries X-Forwarded-For); the map chat sends an anonymous per-browser id, not a login."""
+    space = (body or {}).get("imessage_space")
+    if space:
+        if request.headers.get("x-forwarded-for"):
+            raise HTTPException(403, "imessage threads are only for the bot on this server")
+        return "imessage:" + str(space)[:200]
+    cid = request.headers.get("x-chat-client", "")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", cid):
+        raise HTTPException(400, "missing or malformed x-chat-client header")
+    return "web:" + cid
+
+
+def mount_agent(app: FastAPI, store: Store, chats: ChatStore | None = None) -> None:
+    # next to the events log unless NIGHT_OWL_CHAT_DB says otherwise (on the droplet: writable /var/lib/poc)
+    chats = chats or ChatStore(os.environ.get("NIGHT_OWL_CHAT_DB") or Path(store.events_file).parent / "chat.db")
+    app.state.chats = chats
+
     @app.get("/agent/health")
     async def agent_health():
         return {"ok": bool(os.environ.get("XAI_API_KEY")), "model": MODEL, "node_connected": bool(os.environ.get("AGENT_TOKEN")),
-                "tools": [t["function"]["name"] for t in TOOL_SPECS]}
+                "threads": True, "tools": [t["function"]["name"] for t in TOOL_SPECS]}
+
+    # ---- threads: the map chat's history, per browser
+    @app.get("/agent/threads")
+    async def list_threads(request: Request):
+        return {"threads": await asyncio.to_thread(chats.list, _owner(request))}
+
+    @app.post("/agent/threads")
+    async def new_thread(request: Request):
+        th = await asyncio.to_thread(chats.create, _owner(request))
+        return {k: th[k] for k in ("id", "title", "created_at", "updated_at")}
+
+    @app.get("/agent/threads/{tid}")
+    async def get_thread(tid: str, request: Request):
+        th = await asyncio.to_thread(chats.get, tid, _owner(request))
+        if not th:
+            raise HTTPException(404, "no such thread")
+        turns = await asyncio.to_thread(chats.turns, tid)
+        return {"thread": {k: th[k] for k in ("id", "title", "channel", "created_at", "updated_at")}, "turns": turns}
+
+    @app.patch("/agent/threads/{tid}")
+    async def rename_thread(tid: str, request: Request):
+        body = await request.json()
+        title = body.get("title") if isinstance(body, dict) else None
+        if not isinstance(title, str):
+            raise HTTPException(400, "title must be a string")
+        if not await asyncio.to_thread(chats.rename, tid, _owner(request), title):
+            raise HTTPException(404, "no such thread")
+        return {"ok": True}
+
+    @app.delete("/agent/threads/{tid}")
+    async def delete_thread(tid: str, request: Request):
+        if not await asyncio.to_thread(chats.delete, tid, _owner(request)):
+            raise HTTPException(404, "no such thread")
+        return {"ok": True}
 
     @app.post("/agent/chat")
     async def agent_chat(request: Request):
@@ -700,17 +799,55 @@ def mount_agent(app: FastAPI, store: Store) -> None:
         if plan_k is not None and (type(plan_k) is not int or not 0 <= plan_k <= 10_000):
             raise HTTPException(400, "plan_k must be an integer from 0 to 10000")
         data = Data(store, month, plan_k)
-        messages = _clean_history(body.get("messages"))
+        channel = "imessage" if body.get("channel") == "imessage" or body.get("imessage_space") else "web"
+
+        # Stored thread (thread_id, or imessage_space for the bot): the server loads and saves the history, and the
+        # client sends only the new question as `text`, or the page's tool results to continue an answer.
+        # Without either, the older stateless protocol still works: the client sends the whole `messages` list.
+        thread: dict | None = None
+        answer: _Answer | None = None
+        turn_id = 0
+        if "thread_id" in body or body.get("imessage_space"):
+            owner = _owner(request, body)
+            if owner.startswith("imessage:"):
+                thread = None if body.get("new_thread") else await asyncio.to_thread(chats.latest, owner)
+                thread = thread or await asyncio.to_thread(chats.create, owner, "imessage")
+            elif body.get("thread_id"):
+                thread = await asyncio.to_thread(chats.get, str(body["thread_id"]), owner)
+                if not thread:
+                    raise HTTPException(404, "no such thread")
+            else:
+                thread = await asyncio.to_thread(chats.create, owner, "web")
+            messages = _clean_history(await asyncio.to_thread(chats.history, thread["id"]))
+            text = body.get("text")
+            if isinstance(text, str) and text.strip():
+                question = text.strip()[:4000]
+                messages.append({"role": "user", "content": question})
+                turn_id = await asyncio.to_thread(chats.add_question, thread["id"], question)
+                answer = _Answer()
+                thread = await asyncio.to_thread(chats.get, thread["id"], owner) or thread  # it may have just been titled
+            else:
+                last = await asyncio.to_thread(chats.last_answer, thread["id"])
+                if not last:
+                    raise HTTPException(400, "nothing to continue: send text")
+                turn_id, answer = last["id"], _Answer(last)
+        else:
+            messages = _clean_history(body.get("messages"))
         # results of browser tools from the previous round
         results = body.get("client_results") or []
         images = [i for i in body.get("pending_images") or [] if isinstance(i, dict) and str(i.get("src", "")).startswith("data:image/")][:4]
         for r in results[:8]:
             if not isinstance(r, dict):
                 continue
-            messages.append({"role": "tool", "tool_call_id": str(r.get("id")), "content": str(r.get("content", ""))[:MAX_MSG_CHARS]})
+            content = str(r.get("content", ""))[:MAX_MSG_CHARS]
+            messages.append({"role": "tool", "tool_call_id": str(r.get("id")), "content": content})
             img = r.get("image")
             if isinstance(img, str) and img.startswith("data:image/") and len(img) <= MAX_IMAGE_B64:
                 images.append({"src": img, "caption": "map"})
+                if answer:
+                    answer.images.append({"src": img, "caption": "Your map view"})
+            if answer:
+                answer.step(str(r.get("id")), "", "error" if '"error"' in content else "done")
         if images:
             messages.append(_image_message(images))
         if not messages or messages[-1]["role"] not in ("user", "tool"):
@@ -719,13 +856,26 @@ def mount_agent(app: FastAPI, store: Store) -> None:
         q: asyncio.Queue = asyncio.Queue()
 
         async def emit(ev: dict) -> None:
+            if answer:
+                answer.record(ev)
+                if ev.get("type") == "messages":
+                    await asyncio.to_thread(chats.save_history, thread["id"], ev["messages"])
             await q.put(ev)
+
+        def save_answer() -> None:
+            answer.close()
+            chats.save_answer(turn_id, answer.text, answer.steps, answer.images, answer.error)
 
         async def work():
             try:
-                await run_agent(data, messages, emit, "imessage" if body.get("channel") == "imessage" else "web")
+                if thread:
+                    await emit({"type": "thread", "id": thread["id"], "title": thread["title"]})
+                await run_agent(data, messages, emit, channel)
             except Exception as e:  # noqa: BLE001
                 await emit({"type": "error", "text": f"assistant error: {e}"})
+            finally:
+                if answer:  # also when the reader hung up mid-answer: keep what was said so far
+                    save_answer()
             await q.put({"type": "done"})
 
         task = asyncio.create_task(work())

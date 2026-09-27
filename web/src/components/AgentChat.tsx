@@ -1,7 +1,6 @@
-import { readSavedValue } from '../storage'
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { markdown, streamAgent, type AgentEvent, type ClientCall, type ClientResult, type WireMessage } from '../agent'
-import { ChatIcon, CheckIcon, CloseIcon, NewChatIcon, SendIcon, SparkIcon, StopIcon } from './Icons'
+import { deleteThread, getThread, listThreads, markdown, streamAgent, type AgentEvent, type ClientCall, type ClientResult, type StoredTurn, type ThreadSummary } from '../agent'
+import { ChatIcon, CheckIcon, CloseIcon, ListIcon, NewChatIcon, SendIcon, SparkIcon, StopIcon, TrashIcon } from './Icons'
 
 /** What the page can do for the assistant between rounds (things the server can't see). */
 export interface ClientTools {
@@ -29,19 +28,28 @@ const SUGGESTIONS = [
   'Where should we put the next owl in Brooklyn?',
   'Does this actually find more rats than 311 calls?',
 ]
-const STORE_KEY = 'nightowl.chat.v1'
-
-function load(): { items: Item[]; history: WireMessage[] } {
+// Conversations live on the server (SQLite, api/chat_store.py); the page only remembers which one is open.
+const THREAD_KEY = 'nightowl.chat.thread'
+const savedThread = (): string | null => {
   try {
-    const raw = JSON.parse(readSavedValue(STORE_KEY, 'barnowl.chat.v1') || 'null') as { items: Item[]; history: WireMessage[] } | null
-    if (raw && Array.isArray(raw.items) && Array.isArray(raw.history)) {
-      // pictures are large: keep the conversation, drop them from storage
-      return { items: raw.items.map((it) => (it.kind === 'bot' ? { ...it, busy: false, images: [] } : it)), history: raw.history }
-    }
+    return localStorage.getItem(THREAD_KEY)
   } catch {
-    /* private mode or bad JSON */
+    return null
   }
-  return { items: [], history: [] }
+}
+const rememberThread = (id: string | null) => {
+  try {
+    if (id) localStorage.setItem(THREAD_KEY, id)
+    else localStorage.removeItem(THREAD_KEY)
+  } catch {
+    /* private mode */
+  }
+}
+const toItems = (turns: StoredTurn[]): Item[] =>
+  turns.map((t) => (t.role === 'user' ? { kind: 'user', text: t.text } : { kind: 'bot', text: t.text, steps: t.steps, images: t.images, error: t.error ?? undefined, busy: false }))
+const since = (t: number) => {
+  const s = Math.max(0, Date.now() / 1000 - t)
+  return s < 60 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : new Date(t * 1000).toLocaleDateString()
 }
 
 const CORNER = 150 // px from the bottom-right corner that wakes the button
@@ -51,9 +59,11 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
   const [near, setNear] = useState(false)
   // no hover on touch screens: there the button just stays out
   const [touch] = useState(() => typeof matchMedia !== 'undefined' && matchMedia('(hover: none)').matches)
-  const [initial] = useState(load)
-  const [items, setItems] = useState<Item[]>(initial.items)
-  const historyRef = useRef<WireMessage[]>(initial.history)
+  const [items, setItems] = useState<Item[]>([])
+  const threadRef = useRef<string | null>(savedThread())
+  const [current, setCurrent] = useState<string | null>(savedThread) // the same id, for rendering the list
+  const [threads, setThreads] = useState<ThreadSummary[] | null>(null) // the History list, loaded when opened
+  const [showList, setShowList] = useState(false)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [zoom, setZoom] = useState<Img | null>(null)
@@ -66,13 +76,44 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
     toolsRef.current = tools
   }, [tools])
 
+  // reopen the conversation this browser had open last
   useEffect(() => {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify({ items: items.map((it) => (it.kind === 'bot' ? { ...it, images: [] } : it)).slice(-60), history: historyRef.current.slice(-40) }))
-    } catch {
-      /* quota or private mode */
+    const id = threadRef.current
+    if (!id) return
+    getThread(id)
+      .then((t) => setItems((cur) => (cur.length ? cur : toItems(t.turns))))
+      .catch(() => {
+        threadRef.current = null // deleted, or saved under another browser
+        rememberThread(null)
+        setCurrent(null)
+      })
+  }, [])
+
+  const refreshThreads = useCallback(() => {
+    listThreads().then(setThreads).catch(() => setThreads([]))
+  }, [])
+
+  const openThread = useCallback(async (id: string) => {
+    if (busy) return
+    const t = await getThread(id).catch(() => null)
+    setShowList(false)
+    if (!t) return refreshThreads()
+    threadRef.current = id
+    rememberThread(id)
+    setCurrent(id)
+    setItems(toItems(t.turns))
+  }, [busy, refreshThreads])
+
+  const removeThread = useCallback(async (id: string) => {
+    await deleteThread(id).catch(() => {})
+    if (threadRef.current === id) {
+      threadRef.current = null
+      rememberThread(null)
+      setCurrent(null)
+      setItems([])
     }
-  }, [items])
+    refreshThreads()
+  }, [refreshThreads])
 
   // stick to the bottom while the answer streams
   useLayoutEffect(() => {
@@ -157,7 +198,8 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
       setItems((prev) => [...prev, { kind: 'user', text: q }, { kind: 'bot', text: '', steps: [], images: [], busy: true }])
       const ctl = new AbortController()
       abortRef.current = ctl
-      let body: Parameters<typeof streamAgent>[0] = { messages: [...historyRef.current, { role: 'user', content: q }], month, plan_k: planBudget }
+      setShowList(false)
+      let body: Parameters<typeof streamAgent>[0] = { thread_id: threadRef.current, text: q, month, plan_k: planBudget }
       try {
         for (let round = 0; round < 6; round++) {
           let next: ClientCall[] = []
@@ -185,8 +227,11 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
               else if (e.type === 'client_tools') {
                 next = e.calls
                 pending = e.pending_images ?? []
-              } else if (e.type === 'messages') historyRef.current = e.messages
-              else if (e.type === 'error') patchBot((b) => ({ ...b, error: e.text }))
+              } else if (e.type === 'thread') {
+                threadRef.current = e.id // a new conversation gets its id with the first answer
+                rememberThread(e.id)
+                setCurrent(e.id)
+              } else if (e.type === 'error') patchBot((b) => ({ ...b, error: e.text }))
             },
             ctl.signal,
           )
@@ -204,7 +249,7 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
             }
             patchBot((b) => ({ ...b, steps: b.steps.map((s) => (s.id === c.id ? { ...s, state: r.content.includes('"error"') ? 'error' : 'done' } : s)) }))
           }
-          body = { messages: historyRef.current, month, plan_k: planBudget, client_results: results, pending_images: pending }
+          body = { thread_id: threadRef.current, month, plan_k: planBudget, client_results: results, pending_images: pending }
         }
       } catch (e) {
         if ((e as Error).name !== 'AbortError') patchBot((b) => ({ ...b, error: `Couldn’t reach the assistant (${(e as Error).message}).` }))
@@ -219,7 +264,10 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
 
   const reset = () => {
     abortRef.current?.abort()
-    historyRef.current = []
+    threadRef.current = null // the next question starts a new saved thread
+    rememberThread(null)
+    setCurrent(null)
+    setShowList(false)
     setItems([])
     setInput('')
     inputRef.current?.focus()
@@ -246,6 +294,17 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
             <b>NightOwl assistant</b>
             <span className="muted small">Grok · map, model and node tools</span>
           </div>
+          <button
+            className={`icon-btn ${showList ? 'on' : ''}`}
+            title="History"
+            aria-pressed={showList}
+            onClick={() => {
+              if (!showList) refreshThreads()
+              setShowList((v) => !v)
+            }}
+          >
+            <ListIcon size={16} />
+          </button>
           <button className="icon-btn" title="New chat" onClick={reset} disabled={!items.length && !busy}>
             <NewChatIcon size={16} />
           </button>
@@ -253,6 +312,31 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
             <CloseIcon size={16} />
           </button>
         </header>
+
+        {showList && (
+          <div className="agent-threads">
+            <div className="agent-threads-head muted small">Saved chats on this browser</div>
+            {threads === null ? (
+              <div className="muted small">Loading…</div>
+            ) : !threads.length ? (
+              <div className="muted small">No saved chats yet. Ask something and it is saved here.</div>
+            ) : (
+              threads.map((t) => (
+                <div key={t.id} className={`agent-thread ${t.id === current ? 'current' : ''}`}>
+                  <button className="agent-thread-open" onClick={() => void openThread(t.id)} disabled={busy}>
+                    <b>{t.title}</b>
+                    <span className="muted small">
+                      {since(t.updated_at)} · {t.questions} question{t.questions === 1 ? '' : 's'}
+                    </span>
+                  </button>
+                  <button className="icon-btn" title="Delete chat" onClick={() => void removeThread(t.id)} disabled={busy && t.id === current}>
+                    <TrashIcon size={14} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
         <div className="agent-body" ref={listRef}>
           {!items.length && (

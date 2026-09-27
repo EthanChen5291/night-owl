@@ -1,5 +1,6 @@
 // Assistant chat streams responses from POST /api/agent/chat using Server-Sent Events.
-// The browser keeps the history and runs the "client tools" (things only the page knows) between rounds.
+// The server keeps each thread's history in SQLite (api/chat_store.py); the browser sends the new question and runs
+// the "client tools" (things only the page knows) between rounds.
 
 export type AgentEvent =
   | { type: 'tool'; id: string; name: string; label: string; state: 'start' | 'done' | 'error' }
@@ -8,6 +9,7 @@ export type AgentEvent =
   | { type: 'delta'; text: string }
   | { type: 'client_tools'; calls: ClientCall[]; pending_images: { src: string; caption?: string }[] }
   | { type: 'messages'; messages: WireMessage[] }
+  | { type: 'thread'; id: string; title: string }
   | { type: 'error'; text: string }
   | { type: 'done' }
 
@@ -25,14 +27,58 @@ export interface ClientResult {
 /** OpenAI-style chat message, as the server hands it back. */
 export type WireMessage = { role: 'user' | 'assistant' | 'tool'; content: string; tool_calls?: unknown[]; tool_call_id?: string }
 
+// ---------------------------------------------------------------- stored threads (api/chat_store.py, SQLite)
+
+/** This browser's anonymous id: its threads are the ones saved under it. Not a login; clearing site data starts afresh. */
+let memoryId: string | undefined // private mode: this tab only
+function clientId(): string {
+  const KEY = 'nightowl.chat.client'
+  try {
+    const saved = localStorage.getItem(KEY)
+    if (saved) return saved
+    const id = crypto.randomUUID()
+    localStorage.setItem(KEY, id)
+    return id
+  } catch {
+    return (memoryId ??= crypto.randomUUID())
+  }
+}
+const headers = (extra: Record<string, string> = {}) => ({ 'x-chat-client': clientId(), ...extra })
+
+export interface ThreadSummary {
+  id: string
+  title: string
+  updated_at: number
+  questions: number
+}
+export interface StoredTurn {
+  id: number
+  role: 'user' | 'bot'
+  text: string
+  steps: { id: string; label: string; state: 'start' | 'done' | 'error' }[]
+  images: { src: string; caption?: string }[]
+  error: string | null
+}
+
+async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch('/api/agent/threads' + path, { ...init, headers: headers(init.body ? { 'content-type': 'application/json' } : {}) })
+  if (!res.ok) throw Object.assign(new Error(`${res.status}`), { status: res.status })
+  return (await res.json()) as T
+}
+export const listThreads = () => api<{ threads: ThreadSummary[] }>('').then((r) => r.threads)
+export const getThread = (id: string) => api<{ thread: ThreadSummary; turns: StoredTurn[] }>('/' + encodeURIComponent(id))
+export const deleteThread = (id: string) => api<{ ok: boolean }>('/' + encodeURIComponent(id), { method: 'DELETE' })
+
+/** One request of an answer. A stored thread sends `text` (a new question) or `client_results` (the page's tool
+ * results, to continue); the server keeps the history. */
 export async function streamAgent(
-  body: { messages: WireMessage[]; month: string; plan_k: number; client_results?: ClientResult[]; pending_images?: { src: string }[] },
+  body: { thread_id: string | null; text?: string; month: string; plan_k: number; client_results?: ClientResult[]; pending_images?: { src: string }[] },
   onEvent: (e: AgentEvent) => void,
   signal: AbortSignal,
 ): Promise<void> {
   const res = await fetch('/api/agent/chat', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+    headers: headers({ 'content-type': 'application/json', accept: 'text/event-stream' }),
     body: JSON.stringify(body),
     signal,
   })
