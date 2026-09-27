@@ -24,16 +24,16 @@ export default function Toolbar({ area, noBake, placing, showPlan, logsOpen, onB
         </button>
       )}
       {(area || noBake) && (
-        <button className={`tool panel ${placing ? 'active' : ''}`} aria-pressed={placing} title={placing ? 'Placing an owl: click the map (Esc to cancel)' : 'Place an owl'} onClick={onPlace}>
+        <button className={`tool panel ${placing ? 'active' : ''}`} aria-pressed={placing} title={placing ? 'Click the map to place the owl (Esc cancels)' : 'Place an owl (rat camera)'} onClick={onPlace}>
           <PinPlusIcon size={20} />
         </button>
       )}
       {(area || noBake) && (
-        <button className={`tool panel ${showPlan ? 'active' : ''}`} aria-pressed={showPlan} title="Suggested sites from the model (click a pin to place an owl there)" onClick={onShowPlan}>
+        <button className={`tool panel ${showPlan ? 'active' : ''}`} aria-pressed={showPlan} title="Suggested owl sites" onClick={onShowPlan}>
           <SparkIcon size={20} />
         </button>
       )}
-      <button className={`tool panel ${logsOpen ? 'active' : ''}`} aria-pressed={logsOpen} aria-label="Event log" title="Event log" onClick={onLogs}>
+      <button className={`tool panel ${logsOpen ? 'active' : ''}`} aria-pressed={logsOpen} aria-label="Sightings" title="Sightings" onClick={onLogs}>
         <ListIcon size={20} />
       </button>
     </div>

@@ -10,71 +10,62 @@ interface Props {
   wide: boolean // the owls panel is collapsed, so the strip can use the full width
 }
 
-// The historical JSON calls the Model B risk line `precision_silent`.
-const MODEL_B = '#c8731e'
-const BASELINE = '#3a7dbd'
-const PRIOR_SIGNS = '#2a9180'
+// The JSON calls the model's line `precision_silent` and the complaints line `precision_311`.
+const OURS = '#c8731e'
+const COMPLAINTS = '#3a7dbd'
+const PRIOR = '#2a9180'
 const RANDOM = '#8f95a6'
 const COVID: [string, string] = ['2020-03', '2021-06']
 
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
-/** Bottom strip: KPI tiles, then precision per month for the two rankings. Slides away on its tab. */
+/** Bottom strip: inspection results for each way of picking blocks, month by month. */
 function BacktestChart({ data, open, onToggle, wide }: Props) {
   const summary = data?.summary ?? {}
-  const lift = num(summary.lift ?? summary.lift_vs_311 ?? summary.mean_lift ?? summary.precision_lift)
-  const meanSilent = num(summary.mean_precision_silent)
-  const mean311 = num(summary.mean_precision_311)
+  const ours = num(summary.mean_precision_silent)
+  const complaints = num(summary.mean_precision_311)
   const beating = num(summary.months_beating_311)
   const months = num(summary.n_months) ?? data?.series.length ?? null
+  const years = data?.window.length === 2 ? `${data.window[0].slice(0, 4)}–${data.window[1].slice(0, 4)}` : ''
   const ticks = useMemo(() => (data ? data.series.filter((p) => p.month.endsWith('-01')).map((p) => p.month) : []), [data])
-  const last = data?.series[data.series.length - 1]
-  const hasPriorSigns = data?.series.some((point) => typeof point.precision_positives === 'number') ?? false
+  const hasPrior = data?.series.some((point) => typeof point.precision_positives === 'number') ?? false
   const hasRandom = data?.series.some((point) => typeof point.precision_random === 'number') ?? false
   return (
     <section className={`backtest panel ${open ? '' : 'collapsed'} ${wide ? 'wide' : ''}`}>
-      <button className="tab tab-top" onClick={onToggle} title={open ? 'Hide backtest' : 'Show backtest'} aria-expanded={open}>
+      <button className="tab tab-top" onClick={onToggle} title={open ? 'Hide' : 'Does it work? Ten years of real inspections'} aria-expanded={open}>
         <ChevronIcon size={16} dir={open ? 'down' : 'up'} />
-        <span>Backtest</span>
+        <span>Track record</span>
       </button>
       <div className="backtest-body">
         <div className="kpis">
           <div className="kpi">
-            <span className="kpi-label">lift vs 311</span>
-            <span className="kpi-value">{lift !== null ? `${lift.toFixed(2)}×` : '—'}</span>
+            <span className="kpi-label">
+              <i className="dot" style={{ background: OURS }} /> Rats found, our picks
+            </span>
+            <span className="kpi-value">{ours !== null ? fmtPct(ours) : '—'}</span>
           </div>
           <div className="kpi">
             <span className="kpi-label">
-              <i className="dot" style={{ background: MODEL_B }} /> Model B risk
+              <i className="dot" style={{ background: COMPLAINTS }} /> Rats found, by complaints
             </span>
-            <span className="kpi-value">{meanSilent !== null ? fmtPct(meanSilent) : '—'}</span>
+            <span className="kpi-value">{complaints !== null ? fmtPct(complaints) : '—'}</span>
           </div>
           <div className="kpi">
-            <span className="kpi-label">
-              <i className="dot" style={{ background: BASELINE }} /> 311 baseline
-            </span>
-            <span className="kpi-value">{mean311 !== null ? fmtPct(mean311) : '—'}</span>
-          </div>
-          <div className="kpi">
-            <span className="kpi-label">months above 311</span>
-            <span className="kpi-value">{beating !== null && months !== null ? `${beating} / ${months}` : '—'}</span>
+            <span className="kpi-label">Months we did better</span>
+            <span className="kpi-value">{beating !== null && months !== null ? `${beating} of ${months}` : '—'}</span>
           </div>
           <div className="kpi grow">
-            <span className="kpi-label">precision@{data?.k ?? '?'} on proactive inspections the following month</span>
-            <span className="kpi-sub muted">
-              {data?.window.length === 2 ? `${data.window[0]} → ${data.window[1]}` : ''}
-              {data?.synthetic && <span className="badge synthetic">synthetic</span>}
-              {data && <span className="backtest-note">Only k={data.k} is available in this result.</span>}
-            </span>
+            <span className="kpi-label">Each month, pick the 50 likeliest blocks, then check what city inspectors actually found there{years ? `, ${years}` : ''}.</span>
+            {data?.synthetic && <span className="kpi-sub"><span className="badge synthetic">sample data</span></span>}
           </div>
         </div>
-        {data === undefined && <div className="muted">loading...</div>}
-        {data === null && <div className="muted">backtest not available (no /api/backtest)</div>}
+        {data === undefined && <div className="muted">loading…</div>}
+        {data === null && <div className="muted">Track record not available right now.</div>}
         {data && (
           <div className="chart">
             <ResponsiveContainer width="100%" height={150}>
-              <LineChart data={data.series} margin={{ top: 10, right: 115, bottom: 0, left: 0 }}>
+              <LineChart data={data.series} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke="rgba(128, 140, 155, 0.22)" vertical={false} />
                 <ReferenceArea x1={COVID[0]} x2={COVID[1]} fill="rgba(128, 140, 155, 0.12)" strokeOpacity={0} label={{ value: 'COVID', position: 'insideTop', fontSize: 11, fill: '#7c8794' }} />
                 <XAxis dataKey="month" ticks={ticks} tickFormatter={(m: string) => m.slice(0, 4)} tick={{ fontSize: 12, fill: '#7c8794' }} axisLine={false} tickLine={false} />
@@ -85,20 +76,12 @@ function BacktestChart({ data, open, onToggle, wide }: Props) {
                   labelStyle={{ fontWeight: 600, marginBottom: 4 }}
                   formatter={(v: unknown, name: unknown) => [typeof v === 'number' ? fmtPct(v) : String(v), String(name)]}
                 />
-                <Line type="monotone" dataKey="precision_silent" name="Model B risk" stroke={MODEL_B} dot={false} strokeWidth={2.2} isAnimationActive={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--glass-strong)' }} />
-                <Line type="monotone" dataKey="precision_311" name="311 baseline" stroke={BASELINE} dot={false} strokeWidth={2.2} isAnimationActive={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--glass-strong)' }} />
-                {hasPriorSigns && <Line type="monotone" dataKey="precision_positives" name="Prior rat signs" stroke={PRIOR_SIGNS} dot={false} strokeWidth={1.6} isAnimationActive={false} />}
+                <Line type="monotone" dataKey="precision_silent" name="Our picks" stroke={OURS} dot={false} strokeWidth={2.2} isAnimationActive={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--glass-strong)' }} />
+                <Line type="monotone" dataKey="precision_311" name="By complaints" stroke={COMPLAINTS} dot={false} strokeWidth={2.2} isAnimationActive={false} activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--glass-strong)' }} />
+                {hasPrior && <Line type="monotone" dataKey="precision_positives" name="By past findings" stroke={PRIOR} dot={false} strokeWidth={1.6} isAnimationActive={false} />}
                 {hasRandom && <Line type="monotone" dataKey="precision_random" name="Random" stroke={RANDOM} dot={false} strokeWidth={1.4} strokeDasharray="4 3" isAnimationActive={false} />}
               </LineChart>
             </ResponsiveContainer>
-            {last && (
-              <div className="chart-labels" aria-hidden>
-                <span style={{ color: MODEL_B }}>Model B risk {fmtPct(last.precision_silent)}</span>
-                <span style={{ color: BASELINE }}>311 baseline {fmtPct(last.precision_311)}</span>
-                {hasPriorSigns && typeof last.precision_positives === 'number' && <span style={{ color: PRIOR_SIGNS }}>prior signs {fmtPct(last.precision_positives)}</span>}
-                {hasRandom && typeof last.precision_random === 'number' && <span style={{ color: RANDOM }}>random {fmtPct(last.precision_random)}</span>}
-              </div>
-            )}
           </div>
         )}
       </div>

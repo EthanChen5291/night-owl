@@ -6,9 +6,9 @@ const SEQUENTIAL = ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725']
 const DIVERGING = ['#1f5aa6', '#86b3da', '#dedbd3', '#e0964f', '#b8471a']
 
 export const MODES: { id: Mode; label: string; field: 'pct_a' | 'pct_b' | 'silence'; hint: string }[] = [
-  { id: 'a', label: 'What the city sees', field: 'pct_a', hint: 'percentile of predicted 311 complaints (Model A)' },
-  { id: 'b', label: "What's there", field: 'pct_b', hint: 'Likelihood of rat activity on inspected properties' },
-  { id: 'silence', label: 'Silence', field: 'silence', hint: 'pct_b - pct_a; orange = silent blocks' },
+  { id: 'a', label: 'Complaints', field: 'pct_a', hint: 'where people call 311 about rats' },
+  { id: 'b', label: 'Likelihood of rats', field: 'pct_b', hint: 'from buildings, trash and street conditions' },
+  { id: 'silence', label: 'Silent blocks', field: 'silence', hint: 'rats likely, few complaints' },
 ]
 
 function hexToRgb(hex: string): [number, number, number] {
