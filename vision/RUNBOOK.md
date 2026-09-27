@@ -11,9 +11,10 @@ uv sync --locked --python 3.11
 . .venv/bin/activate
 ```
 
-The lock pins Ultralytics 8.4.163, ONNX Runtime 1.22.1, ONNX 1.19.0, and ONNX Slim
-0.1.76, matching the local CPU validation protocol and Modal export. Python 3.11
-matches the training container.
+The lock pins the CPU evaluator's observed NumPy 2.4.6, OpenCV Python 5.0.0.93,
+PyTorch 2.14.0, TorchVision 0.29.0, Ultralytics 8.4.163, and ONNX Runtime 1.22.1.
+ONNX 1.19.0 and ONNX Slim 0.1.76 match Modal's export dependencies. Python 3.11
+matches the training container; Modal trains with its own PyTorch 2.8.0 image.
 `ffmpeg` is installed (`extract_frames.py` uses it; `--backend cv2` if not).
 Working data lives here and is gitignored: `clips/`, `frames/`, `frames_pruned/`, `labels/`,
 `frames_aug/`, `labels_aug/`, `dataset/`, `runs/`, `*.pt`, `*.onnx`, `pi/wheels/`.

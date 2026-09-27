@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata
 import json
 import shutil
 import tempfile
@@ -26,6 +27,9 @@ IOU_NMS = 0.7
 MAX_DET = 300
 RUNTIME_CONF = 0.5
 FLOOR_Y = 0.0
+EXPECTED_PACKAGES = {"numpy": "2.4.6", "opencv-python": "5.0.0.93",
+                     "torch": "2.14.0", "torchvision": "0.29.0",
+                     "ultralytics": "8.4.163", "onnxruntime": "1.22.1"}
 
 
 def sha256(path: Path) -> str:
@@ -351,11 +355,14 @@ def main() -> None:
     manifest, by_tag = inventory(dataset, test_only=test_only)
     provenance = verify_test_provenance(dataset, manifest) if test_only else None
     disjoint = verify_selection_disjoint(manifest, args.selection_dataset.resolve()) if test_only else None
-    import ultralytics
-    import onnxruntime
+    packages = {name: importlib.metadata.version(name) for name in EXPECTED_PACKAGES}
+    mismatches = {name: {"expected": expected, "found": packages[name]}
+                  for name, expected in EXPECTED_PACKAGES.items() if packages[name] != expected}
+    if mismatches:
+        raise RuntimeError(f"CPU evaluator package mismatch: {mismatches}")
+    import cv2
 
-    if ultralytics.__version__ != "8.4.163":
-        raise RuntimeError(f"expected Modal Ultralytics 8.4.163, found {ultralytics.__version__}")
+    packages["cv2_import"] = cv2.__version__
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="poc-rat-verify-") as tmp:
         scores = score_models(dataset, by_tag, pt, onnx, Path(tmp))
@@ -367,7 +374,7 @@ def main() -> None:
         "status": "INDEPENDENT_TEST" if test_only else "DIAGNOSTIC_ONLY",
         "protocol": {"imgsz": IMGSZ, "batch": 1, "rect": False,
                      "conf": CONF_AP, "iou": IOU_NMS, "max_det": MAX_DET, "device": "cpu"},
-        "packages": {"ultralytics": ultralytics.__version__, "onnxruntime": onnxruntime.__version__},
+        "packages": packages,
         "dataset_manifest_sha256": sha256(dataset / "manifest.json"),
         "image_label_fingerprint": file_pair_fingerprint(dataset, set(manifest["frames"]["val"]),
                                                          "images/val", "labels/val"),

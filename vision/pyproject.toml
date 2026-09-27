@@ -3,8 +3,10 @@ name = "barn-owl-vision"
 version = "0.1.0"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-  "numpy>=1.26,<3",
-  "opencv-python>=4.8,<5",
+  "numpy==2.4.6",
+  "opencv-python==5.0.0.93",
+  "torch==2.14.0",
+  "torchvision==0.29.0",
   "ultralytics==8.4.163",
   "onnxruntime==1.22.1",
   "onnx==1.19.0",
