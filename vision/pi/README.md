@@ -12,6 +12,7 @@ Wi-Fi), so the wheels travel with the code and the camera is driven through `rpi
 | `selftest.py` | system / camera / stream / PIR / detector, PASS/FAIL each |
 | `ir_check.py` | is the 850 nm illuminator on (mean luminance + centre hotspot) |
 | `bundle_wheels.sh` | `pip download` aarch64 wheels for a given Python version into `wheels/` |
+| `live_bridge.py`, `live_worker.py` | optional frame handoff from the existing Owl agent to a separate detector process; see [LIVE_BRIDGE.md](LIVE_BRIDGE.md) |
 | `rat.onnx` | our detector (from `../train.sh`); **gitignored**, copy it here |
 | `world_rat_person.onnx` | YOLO-World zero-training fallback ("stuffed animal", "person"); not in git, ~50 MB |
 | `wheels/` | offline wheels; **gitignored** |
