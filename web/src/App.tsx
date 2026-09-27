@@ -8,6 +8,7 @@ import AreaPicker from './components/AreaPicker'
 import BacktestChart from './components/BacktestChart'
 import CellPopup from './components/CellPopup'
 import Header from './components/Header'
+import type { Place } from './components/SearchBar'
 import HoverTip from './components/HoverTip'
 import Legend from './components/Legend'
 import LogsDrawer from './components/LogsDrawer'
@@ -134,6 +135,33 @@ export default function App() {
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  // ---- the mode bar is centred, the header hugs the right: when the header grows (the search field opening) or the
+  // window narrows, the mode bar slides left by exactly the overlap so the two never touch
+  useEffect(() => {
+    const header = document.querySelector<HTMLElement>('.header')
+    const bar = document.querySelector<HTMLElement>('.modebar')
+    if (!header || !bar) return
+    const GAP = 12
+    const update = () => {
+      const h = header.getBoundingClientRect()
+      const b = bar.getBoundingClientRect()
+      // the bar's natural right edge (its transform is centre-based, so offsetWidth is the untransformed width)
+      const naturalRight = window.innerWidth / 2 + bar.offsetWidth / 2
+      const sameRow = b.top < h.bottom && b.bottom > h.top
+      const shift = sameRow ? Math.max(0, naturalRight + GAP - h.left) : 0
+      bar.style.setProperty('--modebar-shift', `${Math.round(shift)}px`)
+    }
+    const ro = new ResizeObserver(update)
+    ro.observe(header)
+    ro.observe(bar)
+    window.addEventListener('resize', update)
+    update()
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+    }
   }, [])
 
   // ---- the UI theme follows the lighting preset (index.css tokens)
@@ -583,6 +611,22 @@ export default function App() {
     },
     [area, noBake, placing, placeOwl, cellByH3, setArea, selectOwl, openSpots, placeSpot],
   )
+  /** A search pick: fly into its borough if needed, glide to the point and pin its hexagon. */
+  const goToPlace = useCallback(
+    (p: Place) => {
+      const h3 = p.h3 ?? latLngToCell(p.lat, p.lon, 9)
+      const areaId =
+        tileAreas[cellToParent(h3, 7)] ?? (p.borough ? areas.find((a) => a.name.toLowerCase().includes(p.borough!.toLowerCase()))?.id : null) ?? null
+      if (areaId && areaId !== area) setArea(areaId)
+      setPlacing(false)
+      setOpenRank(null)
+      setSelected(null)
+      setPinned(cellByH3.has(h3) ? { h3, addr: p.kind === 'hexagon' ? null : p.label } : null)
+      setFocus({ lat: p.lat, lon: p.lon, distance: p.kind === 'neighborhood' ? 1400 : 700, seq: ++seqRef.current })
+      if (cellByH3.has(h3)) setFlash({ h3, seq: ++seqRef.current })
+    },
+    [tileAreas, areas, area, setArea, cellByH3],
+  )
   const onHover = useCallback((info: HoverInfo | null) => setHover(info), [])
   const onView = useCallback((v: ViewInfo) => setView(v), [])
 
@@ -633,7 +677,7 @@ export default function App() {
           noBake={noBake}
         />
         <ModeBar mode={mode} onMode={setMode} preset={preset} onPreset={setPreset} />
-        <Header month={month} servedMonth={servedMonth} cellCount={cells.length} source={cellsSource} planBudget={planBudget} onMonth={selectMonth} onPlanBudget={(k) => { planBudgetRef.current = k; setPlan([]); setPlanMonth(null); setPlanBudget(k) }} onDemo={() => {
+        <Header month={month} servedMonth={servedMonth} cellCount={cells.length} source={cellsSource} planBudget={planBudget} onMonth={selectMonth} cells={cells} onPick={goToPlace} onPlanBudget={(k) => { planBudgetRef.current = k; setPlan([]); setPlanMonth(null); setPlanBudget(k) }} onDemo={() => {
           if (!cellByH3.has(DEMO_H3)) return
           const [lat, lon] = cellToLatLng(DEMO_H3)
           setFocus({ lat, lon, distance: 800, seq: ++seqRef.current })
@@ -674,7 +718,7 @@ export default function App() {
           }}
           onStartPlacing={() => setPlacing(true)}
         />
-        {logsOpen && <LogsDrawer events={events} nodes={owlsHere} selected={selectedOwl?.id ?? null} onClose={() => setLogsOpen(false)} onSelect={selectOwl} />}
+        {logsOpen && <LogsDrawer events={events} nodes={owlsHere} cells={cellByH3} selected={selectedOwl?.id ?? null} onClose={() => setLogsOpen(false)} onSelect={selectOwl} />}
         <BacktestChart data={backtest} open={chartOpen} onToggle={() => setChartOpen((o) => !o)} wide={!owlsOpen} />
       </main>
     </div>

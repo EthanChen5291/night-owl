@@ -24,6 +24,8 @@ API=http://192.168.7.1:8000 ./api/fake_event.sh
 
 Reset between rehearsals: `curl -X DELETE -H 'X-Demo-Reset: yes' localhost:8000/events`
 
+`fake_sightings.py` and `fixtures/events.fake.json` contain invented demo sightings. Running the script posts them to the live event endpoint and changes its persisted queue and posterior. Use it only against an isolated rehearsal API, reset afterward, and never treat those events as Pi detections or evaluation evidence.
+
 ## Endpoints (contract §6)
 
 | Method | Path | Notes |

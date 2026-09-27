@@ -25,6 +25,8 @@ export interface Cell {
   rmz: string | null
   n_inspections: number
   last_event_at: string | null
+  neighborhood?: string // live data only (model/export.py); the fixture has neither
+  borough?: string
 }
 
 export interface CellsResponse {

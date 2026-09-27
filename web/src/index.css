@@ -94,7 +94,7 @@ button { font: inherit; color: inherit; }
 .count { margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: var(--row-hot); font-size: 11px; font-weight: 600; }
 
 /* ---------- header (top right): month, cells, live ---------- */
-.header { position: absolute; top: 12px; right: 12px; z-index: 6; }
+.header { position: absolute; top: 12px; right: 12px; z-index: 6; display: flex; align-items: flex-start; gap: 8px; }
 .status { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: 999px; height: 40px; }
 .month input { background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font: inherit; }
 .budget { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; white-space: nowrap; }
@@ -102,6 +102,21 @@ button { font: inherit; color: inherit; }
 .month-note { margin-top: 5px; padding: 6px 10px; border-radius: 8px; color: var(--warn); font-size: 11px; text-align: right; }
 .demo-link, .plan-place { border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); cursor: pointer; padding: 3px 7px; font-size: 11px; white-space: nowrap; }
 .demo-link:hover, .plan-place:hover { background: var(--row-hot); }
+
+/* ---------- address search (top right, left of the month) ---------- */
+.search { position: relative; }
+.search-field { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 14px; border-radius: 999px; color: var(--muted); width: 260px; transition: width 0.25s var(--ease); }
+.search-field:focus-within { width: 320px; color: var(--ink); }
+.search-field input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; font: inherit; color: var(--ink); }
+.search-field input::placeholder { color: var(--muted); }
+.search-field input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.search-busy { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite; flex: 0 0 auto; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.search-list { position: absolute; top: 46px; left: 0; right: 0; margin: 0; padding: 6px; list-style: none; background: var(--glass-strong); max-height: 360px; overflow-y: auto; }
+.search-item { display: flex; flex-direction: column; gap: 1px; padding: 7px 10px; border-radius: var(--r-sm); cursor: pointer; }
+.search-item.active { background: var(--row-hot); }
+.search-label { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-empty { padding: 8px 10px; }
 
 /* ---------- toolbar (top left): icon buttons ---------- */
 .toolbar { position: absolute; top: 12px; left: 12px; z-index: 6; display: flex; gap: 8px; }
@@ -123,8 +138,9 @@ button { font: inherit; color: inherit; }
 .segmented button.active { background: var(--active); color: var(--active-ink); font-weight: 600; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14); }
 .segmented.icons button { width: 44px; height: 34px; padding: 0; }
 .modebar {
-  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5;
+  position: absolute; top: 12px; left: 50%; transform: translateX(calc(-50% - var(--modebar-shift, 0px))); z-index: 5;
   display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+  transition: transform 0.25s var(--ease); /* slides left out of the search field's way (App.tsx sets --modebar-shift) */
 }
 .modebar > *, .modebar-row > * { pointer-events: auto; }
 .modebar-row { display: flex; gap: 8px; }
@@ -275,4 +291,11 @@ button { font: inherit; color: inherit; }
   .kpis { flex-wrap: wrap; }
   .kpi { min-width: 100px; }
   .legend.lifted { bottom: min(48vh, 380px); }
+}
+@media (max-width: 600px) {
+  .header { right: 12px; flex-wrap: wrap; }
+  .search, .header-status { width: 100%; }
+  .search-field, .search-field:focus-within { width: 100%; }
+  .status { max-width: 100%; }
+  .nodes, .cellcard, .picker, .logs { top: 190px; }
 }
