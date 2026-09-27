@@ -817,7 +817,9 @@ export default function App() {
           noBake={noBake}
         />
         <ModeBar mode={mode} onMode={setMode} preset={preset} onPreset={setPreset} />
-        <Header source={cellsSource} cells={cells} onPick={goToPlace} />
+        <Header source={cellsSource} cells={cells} onPick={goToPlace}>
+          <a className="header-dashboard panel" href="/dashboards">Dashboards</a>
+        </Header>
         {area && <Legend mode={mode} lifted={chartOpen} />}
 
         {!activeArea && areas.length > 0 && <AreaPicker areas={areas} hovered={hover?.areaId ?? null} onPick={setArea} />}

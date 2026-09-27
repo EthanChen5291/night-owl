@@ -109,3 +109,38 @@ fixtures/event.demo.json     the canned stage event (fake_event.sh)
 fixtures/backtest.json       synthetic backtest (make_backtest.py regenerates it)
 tests/test_api.py    pytest + httpx TestClient
 ```
+
+## Dashboard assistant
+
+The `/dashboards` page turns a question into interactive charts using the same
+model exports and event store as the map. Follow-up questions include the current
+dashboard and selected chart value. It queries only Night Owl data.
+
+Set `XAI_API_KEY` on the API server. `XAI_DASHBOARD_MODEL` defaults to `grok-4.7`.
+Keep credentials out of frontend environment variables and exported files.
+For a local session, put the key in the ignored root `.env`, then run:
+
+```sh
+uv run --project api uvicorn main:app --app-dir api --env-file .env --host 127.0.0.1 --port 8000
+pnpm --dir web dev
+```
+
+For a separate local API port, set `API_TARGET` when starting Vite.
+The dashboard has its own page bundle; loading it does not start the 3D map.
+
+Available data:
+
+- `cells`: the exported model month, including scores, borough/neighborhood,
+  complaint counts, inspection counts, and accepted sensor updates.
+- `sites`: the current ranked camera-placement plan.
+- `backtest`: monthly citywide inspection validation, not per-block history.
+- `events`: the recent event ring, not the full historical archive. Images are excluded.
+
+The data catalog describes supported fields and calculations. Queries are
+validated against those fields and capped before returning chart data. The model
+does not execute code or SQL. Charts show the source month and any data limits;
+empty results remain empty.
+
+HTML export includes the chart data and offline controls in one file. It is a
+snapshot: agent chat and data refresh require the app. Refresh data before
+exporting when a current snapshot is needed.
