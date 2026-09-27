@@ -1,10 +1,10 @@
-# Night Owl: three-minute pitch
+# NightOwl: three-minute pitch
 
 Use the map on slide 2 and the live Pi event screenshot on slide 4. The spoken script is about 325 words.
 
 ## 1. Reporting gap, 0:00–0:25
 
-311 shows where people reported rats. It cannot show every place with active rat signs. Night Owl compares complaints with signs that inspectors found on swept blocks.
+311 shows where people reported rats. It cannot show every place with active rat signs. NightOwl compares complaints with signs that inspectors found on swept blocks.
 
 ## 2. Two signals, 0:25–1:00
 

@@ -1,7 +1,7 @@
 # Training-data questions for Sanjavan (historical)
 
 This 09-25 handoff records early phone-footage choices. Its defaults are no
-longer the current Night Owl detector recipe. The model now uses YOLO11n on
+longer the current NightOwl detector recipe. The model now uses YOLO11n on
 grayscale full frames with rat and person classes. Use the [runbook](RUNBOOK.md)
 for current commands and the [V5 formal event result](V5_FORMAL_EVENT_RESULTS.md)
 for the failed no-plush test. Keep the questions below as a record, not a plan

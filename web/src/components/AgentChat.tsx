@@ -1,3 +1,4 @@
+import { readSavedValue } from '../storage'
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { markdown, streamAgent, type AgentEvent, type ClientCall, type ClientResult, type WireMessage } from '../agent'
 import { ChatIcon, CheckIcon, CloseIcon, NewChatIcon, SendIcon, SparkIcon, StopIcon } from './Icons'
@@ -28,11 +29,11 @@ const SUGGESTIONS = [
   'Where should we put the next owl in Brooklyn?',
   'Does this actually find more rats than 311 calls?',
 ]
-const STORE_KEY = 'barnowl.chat.v1'
+const STORE_KEY = 'nightowl.chat.v1'
 
 function load(): { items: Item[]; history: WireMessage[] } {
   try {
-    const raw = JSON.parse(localStorage.getItem(STORE_KEY) || 'null') as { items: Item[]; history: WireMessage[] } | null
+    const raw = JSON.parse(readSavedValue(STORE_KEY, 'barnowl.chat.v1') || 'null') as { items: Item[]; history: WireMessage[] } | null
     if (raw && Array.isArray(raw.items) && Array.isArray(raw.history)) {
       // pictures are large: keep the conversation, drop them from storage
       return { items: raw.items.map((it) => (it.kind === 'bot' ? { ...it, busy: false, images: [] } : it)), history: raw.history }
@@ -236,13 +237,13 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
 
   return (
     <>
-      <section className={`agent panel ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="Night Owl assistant">
+      <section className={`agent panel ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="NightOwl assistant">
         <header className="agent-head">
           <span className="agent-avatar">
             <SparkIcon size={16} />
           </span>
           <div className="agent-title">
-            <b>Night Owl assistant</b>
+            <b>NightOwl assistant</b>
             <span className="muted small">Grok · map, model and node tools</span>
           </div>
           <button className="icon-btn" title="New chat" onClick={reset} disabled={!items.length && !busy}>
@@ -344,7 +345,7 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
         className={`agent-fab panel ${open ? 'open' : ''} ${shown ? 'shown' : ''}`}
         onClick={() => setOpen((o) => !o)}
         onFocus={() => setNear(true)}
-        title={open ? 'Close assistant' : 'Ask Night Owl'}
+        title={open ? 'Close assistant' : 'Ask NightOwl'}
         aria-expanded={open}
       >
         <span className="fab-icon chat">

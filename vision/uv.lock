@@ -27,7 +27,7 @@ wheels = [
 ]
 
 [[package]]
-name = "barn-owl-vision"
+name = "nightowl-vision"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

@@ -10,7 +10,7 @@ It was **Friday 09-25** (20:36–21:56 at Brown). Same session, wrong weekday; n
 
 ## 1. What the project is
 
-**Barn Owl** (called "Silent Blocks" until Friday evening; "silent block" is still the name of the thing
+**NightOwl** (called "Silent Blocks" until Friday evening, then Barn Owl; "silent block" is still the name of the thing
 the model finds). Domain: ratst.at.
 
 NYC's public rat map is built from 311 complaints. That is a map of *who complains*, not of where rats

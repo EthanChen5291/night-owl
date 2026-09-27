@@ -7,9 +7,9 @@ The source frames, labels, audit images, and reports are in the [V4 new-room eva
 To verify the ZIP and regenerate the sheet from those sources, run from the repository root with Python and Pillow installed:
 
 ```sh
-unzip -q vision/artifacts/rat-litroom-v4-new-room-evaluation-20260927.zip -d /tmp/barn-owl-v4-eval
-python3 /tmp/barn-owl-v4-eval/rat-litroom-v4-new-room-evaluation-20260927/verify_bundle.py
-python3 pitch/make_media_packet.py --source-root /tmp/barn-owl-v4-eval/rat-litroom-v4-new-room-evaluation-20260927
+unzip -q vision/artifacts/rat-litroom-v4-new-room-evaluation-20260927.zip -d /tmp/nightowl-v4-eval
+python3 /tmp/nightowl-v4-eval/rat-litroom-v4-new-room-evaluation-20260927/verify_bundle.py
+python3 pitch/make_media_packet.py --source-root /tmp/nightowl-v4-eval/rat-litroom-v4-new-room-evaluation-20260927
 ```
 
 | File in this folder | What it shows | Path inside extracted ZIP |

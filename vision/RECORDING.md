@@ -1,4 +1,4 @@
-# Night Owl recording protocol
+# NightOwl recording protocol
 
 Capture the original video from the Pi camera agent. The current detector targets a dark plush rat in a lit tabletop view. Infrared and live rats are separate, unvalidated conditions. Do not start a second camera process beside `/home/pi/barn-owl/agent.py` to collect footage; use the agent's recording workflow and preserve the original file bytes.
 
@@ -28,5 +28,5 @@ The 09-25 Brown session had 19 phone clips named within the `IMG_7777.MOV` to
 such as `bed_a`, `clutter_h`, `corr_d`, `stair_e`, `stairtop_g`, `r3_a`, and
 `new_a`. The early extraction kept 3,186 frames after pruning 866. Those
 phone clips predate the current Pi camera dataset and do not provide a fresh
-Night Owl test. The historical [training-data handoff](HANDOFF-sanjavan-training-data.md)
+NightOwl test. The historical [training-data handoff](HANDOFF-sanjavan-training-data.md)
 records the original questions and clip groups.

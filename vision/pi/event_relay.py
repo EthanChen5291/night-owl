@@ -113,7 +113,7 @@ def ready_event(path: Path, settle_seconds: float) -> tuple[bytes, dict, str] | 
 
 def send(url: str, raw: bytes, timeout: float) -> dict:
     request = urllib.request.Request(url, data=raw, method="POST",
-                                     headers={"Content-Type": "application/json", "User-Agent": "barn-owl-event-relay/1"})
+                                     headers={"Content-Type": "application/json", "User-Agent": "nightowl-event-relay/1"})
     try:
         with open_no_redirect(request, timeout) as response:
             status = response.status

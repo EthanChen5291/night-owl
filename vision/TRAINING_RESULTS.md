@@ -1,6 +1,6 @@
 # Detector training results
 
-These V1–V4 experiments used a dark plush rat in lit footage from the Night Owl camera. Codex agents reviewed source frames and boxed the visible plush; no separate human annotation audit was done. Infrared clips were left out because reviewers could not identify the object reliably. These runs do not measure live-rat or dark-room detection. [V5 results](V5_RESULTS.md) and [V6 results](V6_RESULTS.md) follow this record.
+These V1–V4 experiments used a dark plush rat in lit footage from the NightOwl camera. Codex agents reviewed source frames and boxed the visible plush; no separate human annotation audit was done. Infrared clips were left out because reviewers could not identify the object reliably. These runs do not measure live-rat or dark-room detection. [V5 results](V5_RESULTS.md) and [V6 results](V6_RESULTS.md) follow this record.
 
 | Run | Physical training clips | Whole held-out clips | Train frames / rat / person / empty | Validation frames / rat / person / empty | Dataset SHA-256 | Result |
 | --- | --- | --- | --- | --- | --- | --- |

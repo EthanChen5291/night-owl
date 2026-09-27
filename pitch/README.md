@@ -1,6 +1,6 @@
-# Night Owl pitch
+# NightOwl pitch
 
-The current deck is [V20](out/night-owl-three-minute-pitch-v20.pptx), with a [three-minute script](script.md). The project was previously called Barn Owl. Earlier decks and videos keep their original names.
+The current deck is [V20](out/nightowl-three-minute-pitch-v20.pptx), with a [three-minute script](script.md). The project was previously called Barn Owl. Earlier decks and videos keep their original names.
 
 Slide 4 shows one verified event from a live physical Pi camera to the local API and map. During 89.859 seconds of room-lit plush footage, V5 processed 1,346 frames and saved six event crops. Reviewers saw the plush in each crop. The team sent one event; the API accepted it. The map changed from one sighting to two, moved the site from rank 2 to 1, and raised its served score from .1297 to .1618. See the [map screenshot](assets/live-pi-map-20260927.png), [API receipt](evidence/v5-live-integration-result.json), and [Pi run stats](evidence/v5-live-run-stats.json).
 

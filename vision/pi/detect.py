@@ -68,7 +68,7 @@ HIT_WINDOW_S = 1.0
 EVENT_COOLDOWN_S = 2.0
 NODE_ID = "demo-01"
 DEMO_H3 = "892a100d2c3ffff"
-API_URL = os.environ.get("BARN_OWL_API", "http://192.168.7.1:8000")
+API_URL = os.environ.get("NIGHT_OWL_API", os.environ.get("BARN_OWL_API", "http://192.168.7.1:8000"))
 LED_PIN = 17
 FW = "0.1.0"
 CROP_MAX_SIDE = 160
@@ -351,7 +351,7 @@ def post_event(api_url: str, body: dict, timeout: float = 2.0) -> tuple[bool, st
 
     data = json.dumps(body).encode()
     req = urllib.request.Request(api_url.rstrip("/") + "/event", data=data, method="POST",
-                                 headers={"Content-Type": "application/json", "User-Agent": f"barn-owl-node/{FW}"})
+                                 headers={"Content-Type": "application/json", "User-Agent": f"nightowl-node/{FW}"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             result = json.load(resp)
@@ -447,7 +447,7 @@ def main(argv=None) -> int:
     ap.add_argument("--cooldown", type=float, default=EVENT_COOLDOWN_S)
     ap.add_argument("--gray", dest="gray", action="store_true", default=GRAY)
     ap.add_argument("--color", dest="gray", action="store_false", help="feed colour (use with the World fallback)")
-    ap.add_argument("--api", default=API_URL, help="server base URL (env BARN_OWL_API)")
+    ap.add_argument("--api", default=API_URL, help="server base URL (env NIGHT_OWL_API)")
     ap.add_argument("--node-id", default=NODE_ID)
     ap.add_argument("--h3", default=DEMO_H3)
     posting = ap.add_mutually_exclusive_group()

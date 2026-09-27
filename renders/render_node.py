@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run --with google-genai --with pillow python
-"""render_node.py: product renders of the Barn Owl node (SB-01) with Gemini, from the OpenSCAD previews.
+"""render_node.py: product renders of the NightOwl node (SB-01) with Gemini, from the OpenSCAD previews.
 
     ./renders/render_node.py --shot hero
     ./renders/render_node.py --shot situ --n 2
@@ -31,7 +31,7 @@ DEFAULT_PREVIEW_DIR = os.path.expanduser("~/div-hacks-26/enclosure/preview")
 # Everything Gemini needs to know that the preview PNGs do not show (materials, scale, context).
 
 BODY_D3 = (
-    "Barn Owl node SB-01: a small face-down sensor box, 95 x 99 x 49 mm, matte light-grey PETG. "
+    "NightOwl node SB-01: a small face-down sensor box, 95 x 99 x 49 mm, matte light-grey PETG. "
     "The bottom face is a frosted translucent tray holding a camera lens, a small PIR dome and an IR "
     "LED window, all flush; the lower 12 mm of the box is a frosted band that runs all the way round. "
     "The top is a 1 mm clear lid through which a Raspberry Pi 5 board is faintly visible. An L-shaped "
@@ -41,7 +41,7 @@ BODY_D3 = (
 )
 
 BODY_V2 = (
-    "Barn Owl node prototype: a side-facing sensor box, 107 x 96 x 45 mm, matte light-grey PETG, "
+    "NightOwl node prototype: a side-facing sensor box, 107 x 96 x 45 mm, matte light-grey PETG, "
     "standing on a wedge stand tilted 20 degrees back. The front faceplate carries a camera lens, a PIR "
     "dome and an IR LED window. Consumer-hardware finish, a tiny 'SB-01' label."
 )
@@ -249,7 +249,7 @@ def generate(client, model, prompt, refs, aspect, out_path, timeout_s=180):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(
-        description="Gemini product renders of the Barn Owl node from OpenSCAD previews.",
+        description="Gemini product renders of the NightOwl node from OpenSCAD previews.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         epilog="shots: " + ", ".join(SHOTS),
     )

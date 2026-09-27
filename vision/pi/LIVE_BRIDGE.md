@@ -1,4 +1,4 @@
-# Night Owl live frame handoff
+# NightOwl live frame handoff
 
 The Pi's existing `/home/pi/barn-owl/agent.py` owns the camera. The reviewed `agent_live.patch` adds a JPEG callback guarded by `OWL_DETECT_SOCKET`. `live_bridge.py` keeps only the newest frame and sends it over a Unix datagram socket. A separate `live_worker.py` process runs ONNX inference, saves event JSON and crop JPEGs, and writes `run_stats.json`. The camera callback never waits for inference. The worker has no API or LED output; `event_relay.py` handles optional delivery in another process.
 
@@ -57,7 +57,7 @@ The V5 trial relayed only the first of six events, once, through a temporary Pi-
 
 ## Agent patch and rollback record
 
-The reviewed patch was built against agent SHA256 `756d75843c4eff2a83fad1c563848a646f584b7df2fe2130c4c6db31f8eb7e78`. The observed unit was `barn-owl.service`, with `ExecStart=/usr/bin/python3 -u /home/pi/barn-owl/agent.py` and environment file `/etc/barn-owl.env`. The bridge override was `/etc/systemd/system/barn-owl.service.d/detector-bridge.conf`, setting `OWL_DETECT_SOCKET=/home/pi/barn-owl-candidates/live-frames.sock`. The original agent backup used the unique name `agent.py.pre-live-756d7584`.
+The reviewed patch was built against agent SHA256 `756d75843c4eff2a83fad1c563848a646f584b7df2fe2130c4c6db31f8eb7e78`. The observed unit was `barn-owl.service`, with `ExecStart=/usr/bin/python3 -u /home/pi/barn-owl/agent.py` and environment file `/etc/nightowl.env`. The bridge override was `/etc/systemd/system/barn-owl.service.d/detector-bridge.conf`, setting `OWL_DETECT_SOCKET=/home/pi/barn-owl-candidates/live-frames.sock`. The original agent backup used the unique name `agent.py.pre-live-756d7584`.
 
 These names describe the reviewed Pi at the time of the V5 trial. Before any source or service change, read the active unit, drop-ins, agent hash, and backup contents. Do not reapply `agent_live.patch` to an agent that already contains it, overwrite the backup, or remove an unrelated drop-in. A rollback needs a separate reviewed service restart: stop the worker, restore the matching backup, remove only the detector-bridge override, reload systemd, and restart `barn-owl.service`. The V5 live trial left the agent running and did not perform that rollback.
 

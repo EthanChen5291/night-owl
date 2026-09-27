@@ -1,4 +1,4 @@
-# Night Owl API
+# NightOwl API
 
 This FastAPI server connects the Pi detector, Sanjavan's city-model exports, and the web app. It accepts
 the event contract in [the master plan](../plan/master-plan.md), keeps a separate probability estimate
@@ -74,7 +74,7 @@ Otherwise `alpha0 = score_b·n0`, `beta0 = (1−score_b)·n0`, `n0 = 10`; unknow
 Each accepted rat event adds
 `alpha += conf`, `n_events += 1`; `score_b_updated = alpha/(alpha+beta)`. Events with `conf < 0.5` or
 `n_hits < 3` and person events are queued without an update. Exact duplicate deliveries are ignored and do not move
-the posterior (env `BARN_OWL_MIN_CONF`, `BARN_OWL_MIN_HITS` to change). The August fixture has an
+the posterior (env `NIGHT_OWL_MIN_CONF`, `NIGHT_OWL_MIN_HITS` to change). The August fixture has an
 inconsistent old `posterior`, so the server uses the `score_b` fallback for that cell.
 
 ## State
@@ -88,11 +88,15 @@ EVENT node=demo-01 h3=892a100d2c3ffff class=rat conf=0.91 n_hits=3 -> posterior 
 
 ## Env
 
+`NIGHT_OWL_*` settings take precedence. The matching legacy `BARN_OWL_*` names
+remain supported as fallbacks, including data paths, posterior gates, ring size,
+and the agent dashboard URL. Existing services do not need their configuration renamed.
+
 | Var | Default | |
 |---|---|---|
-| `BARN_OWL_DATA_DIR` | repo root | where `model/out/` and `city/` are looked up |
-| `BARN_OWL_EVENTS_FILE` | `api/events.jsonl` | persistence file |
-| `BARN_OWL_MIN_CONF` / `BARN_OWL_MIN_HITS` | 0.5 / 3 | posterior gate |
+| `NIGHT_OWL_DATA_DIR` | repo root | where `model/out/` and `city/` are looked up |
+| `NIGHT_OWL_EVENTS_FILE` | `api/events.jsonl` | persistence file |
+| `NIGHT_OWL_MIN_CONF` / `NIGHT_OWL_MIN_HITS` | 0.5 / 3 | posterior gate |
 | `HOST` / `PORT` | 0.0.0.0 / 8000 | `run.sh` |
 
 ## Files

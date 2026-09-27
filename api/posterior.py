@@ -11,10 +11,10 @@ import os
 import math
 from dataclasses import dataclass
 
-N0 = float(os.environ.get("BARN_OWL_N0", "10"))
-PRIOR_SCORE_B = float(os.environ.get("BARN_OWL_PRIOR_SCORE_B", "0.2"))  # unknown h3
-MIN_CONF = float(os.environ.get("BARN_OWL_MIN_CONF", "0.5"))
-MIN_HITS = int(os.environ.get("BARN_OWL_MIN_HITS", "3"))
+N0 = float(os.environ.get("NIGHT_OWL_N0", os.environ.get("BARN_OWL_N0", "10")))
+PRIOR_SCORE_B = float(os.environ.get("NIGHT_OWL_PRIOR_SCORE_B", os.environ.get("BARN_OWL_PRIOR_SCORE_B", "0.2")))  # unknown h3
+MIN_CONF = float(os.environ.get("NIGHT_OWL_MIN_CONF", os.environ.get("BARN_OWL_MIN_CONF", "0.5")))
+MIN_HITS = int(os.environ.get("NIGHT_OWL_MIN_HITS", os.environ.get("BARN_OWL_MIN_HITS", "3")))
 
 
 def accepts(conf: float, n_hits: int) -> bool:

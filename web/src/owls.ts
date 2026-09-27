@@ -1,17 +1,18 @@
+import { readSavedValue } from './storage'
 import { latLngToCell } from 'h3-js'
 import type { OwlNode, RatEvent } from './types'
 
 // Owls are the placed sensor nodes. They live in localStorage for now: the contract has no
 // endpoint for placements yet, and the stage demo only needs one.
 
-const KEY = 'barnowl.owls'
+const KEY = 'nightowl.owls'
 export const STAGE_NODE_ID = 'demo-01' // what vision/pi/detect.py posts
 
 export const eventKey = (e: RatEvent) => `${e.node_id}|${e.ts}`
 
 export function loadOwls(): OwlNode[] {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = readSavedValue(KEY, 'barnowl.owls')
     const list = raw ? (JSON.parse(raw) as OwlNode[]) : []
     return Array.isArray(list) ? list.filter((n) => n && typeof n.id === 'string') : []
   } catch {

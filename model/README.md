@@ -1,6 +1,6 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 23:31** (plain-language accuracy for Models A and B).
+Sanjavan's node-location pipeline for NightOwl. Written on 2026-09-26 (event day). Last updated **Sat 23:31** (plain-language accuracy for Models A and B).
 
 **Contents:** [In one minute](#in-one-minute) · [The models](#the-models) · [Architecture](#architecture) ·
 [For teammates](#for-teammates-start-here) · [Headline results](#headline-results) · [Accuracy](#model-accuracy-plain-language) · [Honest limits](#honest-limits-say-these-before-a-judge-does) ·

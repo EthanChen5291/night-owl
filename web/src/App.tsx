@@ -1,3 +1,4 @@
+import { readSavedValue } from './storage'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cellToLatLng, cellToParent, latLngToCell } from 'h3-js'
 import { fetchBacktest, fetchCells, fetchPlacements, fetchPlan, fetchPublic, fetchQueue } from './api'
@@ -55,7 +56,7 @@ function modeFromHash(): Mode {
 }
 function areaFromHash(): string | null {
   try {
-    return hashParams().get('a') || localStorage.getItem('barnowl.area') || null
+    return hashParams().get('a') || readSavedValue('nightowl.area', 'barnowl.area') || null
   } catch {
     return hashParams().get('a') || null
   }
@@ -127,8 +128,11 @@ export default function App() {
     setSelected(null)
     setOpenRank(null)
     try {
-      if (id) localStorage.setItem('barnowl.area', id)
-      else localStorage.removeItem('barnowl.area')
+      if (id) localStorage.setItem('nightowl.area', id)
+      else {
+        localStorage.removeItem('nightowl.area')
+        localStorage.removeItem('barnowl.area')
+      }
     } catch {
       /* ignore */
     }
@@ -813,7 +817,9 @@ export default function App() {
           noBake={noBake}
         />
         <ModeBar mode={mode} onMode={setMode} preset={preset} onPreset={setPreset} />
-        <Header source={cellsSource} cells={cells} onPick={goToPlace}><a className="header-dashboard panel" href="/dashboards">Dashboards</a></Header>
+        <Header source={cellsSource} cells={cells} onPick={goToPlace}>
+          <a className="header-dashboard panel" href="/dashboards">Dashboards</a>
+        </Header>
         {area && <Legend mode={mode} lifted={chartOpen} />}
 
         {!activeArea && areas.length > 0 && <AreaPicker areas={areas} hovered={hover?.areaId ?? null} onPick={setArea} />}
