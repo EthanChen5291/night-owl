@@ -202,7 +202,7 @@ const LOOKS: Record<Preset, Look> = {
 const smoothstep = (t: number) => t * t * (3 - 2 * t)
 
 /** Development-only CPU and renderer counters, enabled with ?perf=1. */
-class PerfOverlay {
+export class PerfOverlay {
   private element = document.createElement('pre')
   private frameMs = new Float32Array(120)
   private renderMs = new Float32Array(120)
@@ -339,6 +339,9 @@ export class CityScene {
   private perf: PerfOverlay | null = null
 
   constructor(canvas: HTMLCanvasElement, centre: LatLon, callbacks: SceneCallbacks) {
+    this.loop = this.loop.bind(this)
+    this.invalidate = this.invalidate.bind(this)
+    this.handleVisibility = this.handleVisibility.bind(this)
     this.canvas = canvas
     this.callbacks = callbacks
     this.projector = makeProjector(centre)
@@ -420,13 +423,13 @@ export class CityScene {
 
   // ---------------------------------------------------------------- public API
 
-  private scheduleFrame = () => {
+  private scheduleFrame() {
     if (this.disposed || document.hidden || this.raf) return
     this.perf?.resume()
     this.raf = requestAnimationFrame(this.loop)
   }
 
-  private invalidate = () => {
+  private invalidate() {
     this.urgentFrame = true
     this.scheduleFrame()
   }
@@ -1327,7 +1330,7 @@ export class CityScene {
     this.invalidate()
   }
 
-  private handleVisibility = () => {
+  private handleVisibility() {
     if (document.hidden) {
       cancelAnimationFrame(this.raf)
       this.raf = 0
@@ -1464,7 +1467,7 @@ export class CityScene {
     this.callbacks.onView({ lat, lon, distance: dist })
   }
 
-  private loop = () => {
+  private loop() {
     if (this.disposed || document.hidden) {
       this.raf = 0
       return

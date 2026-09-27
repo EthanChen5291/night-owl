@@ -54,6 +54,8 @@ The optional assistant can inspect the current map, take a screenshot, and drive
 
 Run `pnpm dlx react-doctor@latest . --verbose` from `web/` for static React diagnostics. Check each finding against the code; the score is not a frame-rate benchmark.
 
+From the repository root, run `pnpm dlx --allow-build esbuild tsx@4.23.15 --test web/tests/scene.test.mjs` for render-loop regression tests. They cover idle rendering, visibility and disposal, animation scheduling, and the performance meter without creating a WebGL context.
+
 In development, open `http://localhost:5173/?perf=1` to show render counts, CPU frame times, draw calls, and triangles. Compare the same borough, camera, lighting, and viewport after tiles finish loading. CPU timings exclude GPU execution and browser compositing. The meter is excluded from production builds.
 
 The rendering changes follow the Three.js guides on [rendering on demand](https://threejs.org/manual/en/rendering-on-demand.html) and [shadow-map updates](https://threejs.org/docs/pages/WebGLRenderer.html). Building geometry is already merged by tile and trees use instancing, as described in [optimizing many objects](https://threejs.org/manual/en/optimize-lots-of-objects.html).
