@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import hmac
 import json
 import math
@@ -84,9 +85,9 @@ How to work:
 - Use the tools for every number; never invent data. Say which borough and neighbourhood a hexagon is in.
 - Find places with geocode, then search_cells near the point. Rank with search_cells.
 - Show the map when it helps (screenshot_map), and camera frames when asked about the node (camera_image).
-- Rats the Pi itself saw (its on-device model) are rat_sightings, not recent_sightings (that is the map's event log).
-  When asked for a rat picture, use rat_sightings: give the time, confidence and whether Solana verifies it
-  (Tiger row, picture and on-chain hash all match), with the explorer link. Never say a hash was "decoded".
+- Detections the Pi labelled rat are rat_sightings, not recent_sightings (the map's event log).
+  When asked for a picture, use rat_sightings: give the time, confidence and data-integrity checks, with the
+  explorer link. A matching hash does not prove the animal in the picture is a rat. Never say a hash was "decoded".
 - Be brief: a sentence or two, then a short list or small table. Markdown is rendered. Round sensibly.
 - The map screenshot shows the user's current view; get_app_state says which borough and mode that is.
 - You can drive the user's map: fly_to a place (after geocode or a hexagon lookup), set_map_mode, enter_borough,
@@ -337,41 +338,98 @@ def t_pi_activity(d: Data, a: dict) -> tuple[Any, list]:
     return act, []
 
 
+class _TransactionFailed(RuntimeError):
+    pass
+
+
+class _TransactionUnavailable(RuntimeError):
+    pass
+
+
 def _chain_memos(rpc: str, sig: str) -> tuple[list[str], str | None, int | None]:
     """The memos a Solana transaction carries (from its logs), its signer and its block time, read from the chain."""
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "getTransaction",
                        "params": [sig, {"encoding": "json", "commitment": "confirmed", "maxSupportedTransactionVersion": 0}]}).encode()
     req = urllib.request.Request(rpc, data=body, headers={"content-type": "application/json"})
     with urllib.request.urlopen(req, timeout=10) as r:
-        t = json.loads(r.read()).get("result")
-    if not t:
-        return [], None, None
-    memos = [m.group(1) for line in t["meta"].get("logMessages") or [] for m in [re.search(r'Memo \(len \d+\): "(.*)"$', line)] if m]
-    return memos, t["transaction"]["message"]["accountKeys"][0], t.get("blockTime")
+        response = json.loads(r.read())
+    t = response.get("result")
+    if not isinstance(t, dict):
+        raise _TransactionUnavailable("transaction is unavailable from RPC")
+    meta = t.get("meta")
+    if not isinstance(meta, dict) or "err" not in meta:
+        raise _TransactionUnavailable("transaction metadata is unavailable from RPC")
+    if meta["err"] is not None:
+        raise _TransactionFailed("transaction failed on chain")
+    try:
+        signer = t["transaction"]["message"]["accountKeys"][0]
+    except (KeyError, IndexError, TypeError) as e:
+        raise _TransactionUnavailable("transaction signer is unavailable from RPC") from e
+    if not isinstance(signer, str) or not signer:
+        raise _TransactionUnavailable("transaction signer is unavailable from RPC")
+    logs = meta.get("logMessages")
+    if not isinstance(logs, list):
+        raise _TransactionUnavailable("transaction logs are unavailable from RPC")
+    memos = [m.group(1) for line in logs for m in [re.search(r'Memo \(len \d+\): "(.*)"$', line)] if m]
+    return memos, signer, t.get("blockTime")
 
 
-def _verify_sighting(sol: dict) -> dict:
-    """Three checks, none of which trusts the dashboard's own word: the Tiger Data row still hashes to the anchored
-    hash, the stored picture still hashes to the hash inside that row, and the Solana transaction (read from the
-    chain) carries that hash, signed by the node's key."""
+def _finish_sighting_verification(out: dict, has_picture: bool) -> None:
+    row_ok = out.get("tiger_row_unchanged") is True
+    chain_ok = out.get("on_chain") is True
+    picture_ok = out.get("picture_unchanged") is True and out.get("image_bytes_match") is True
+    out["verified"] = bool(has_picture and row_ok and chain_ok and picture_ok)
+    out["row_only_verified"] = bool(not has_picture and row_ok and chain_ok)
+    if out["verified"]:
+        out["verification_status"] = "verified"
+    elif out["row_only_verified"]:
+        out["verification_status"] = "row_only_verified"
+    elif (out.get("row_status") == "failed" or out.get("picture_status") == "failed"
+          or out.get("chain_status") in ("failed", "mismatch") or out.get("image_bytes_match") is False):
+        out["verification_status"] = "failed"
+    elif out.get("chain_status") == "pending":
+        out["verification_status"] = "pending"
+    else:
+        out["verification_status"] = "unavailable"
+
+
+def _verify_sighting(sol: dict, image_sha256: str | None = None) -> dict:
+    """Combine the dashboard's row/picture checks with an RPC transaction check. The caller separately hashes
+    the exact JPEG it downloads. The dashboard verifier's row canonicalization is outside this repository."""
     v = _dash("/api/solana?verify=" + urllib.parse.quote(sol["id"]))
     now = v.get("now") or {}
-    out = {"tiger_row_unchanged": now.get("hash") == sol["hash"] if now.get("ok") else False}
-    if now.get("picture"):
-        out["picture_unchanged"] = bool(now["picture"].get("ok"))
+    row_status = ("verified" if now.get("hash") == sol["hash"] else "failed") if now.get("ok") is True else (
+        "failed" if now.get("ok") is False else "unavailable")
+    out = {"row_status": row_status, "tiger_row_unchanged": row_status == "verified"}
+    if image_sha256:
+        picture = now.get("picture")
+        picture_ok = picture.get("ok") if isinstance(picture, dict) else None
+        out["picture_status"] = "verified" if picture_ok is True else "failed" if picture_ok is False else "unavailable"
+        out["picture_unchanged"] = picture_ok if isinstance(picture_ok, bool) else None
+        out["image_bytes_match"] = None
     if sol.get("sig") and v.get("rpc"):
         try:
             memos, signer, block_time = _chain_memos(v["rpc"], sol["sig"])
-            out["on_chain"] = f"owl1 det {sol['hash']}" in memos and signer == v.get("address")
+            address = v.get("address")
+            if not isinstance(address, str) or not address:
+                raise _TransactionUnavailable("verifier address is unavailable")
+            out["on_chain"] = f"owl1 det {sol['hash']}" in memos and signer == address
+            out["chain_status"] = "verified" if out["on_chain"] else "mismatch"
             if block_time:
                 out["anchored_at"] = datetime.fromtimestamp(block_time, timezone.utc).strftime("%b %d %H:%M:%S UTC")
+        except _TransactionFailed as e:
+            out["on_chain"] = False
+            out["chain_status"] = "failed"
+            out["chain_error"] = str(e)[:120]
         except Exception as e:  # noqa: BLE001
             out["on_chain"] = None
+            out["chain_status"] = "unavailable"
             out["chain_error"] = str(e)[:120]
         out["explorer"] = f"https://explorer.solana.com/tx/{sol['sig']}?cluster={v.get('cluster', 'devnet')}"
     else:
-        out["on_chain"] = None  # not sent yet
-    out["verified"] = bool(out["tiger_row_unchanged"] and out.get("on_chain") and out.get("picture_unchanged", True))
+        out["on_chain"] = None
+        out["chain_status"] = "unavailable" if sol.get("sig") else "pending"
+    _finish_sighting_verification(out, bool(image_sha256))
     return out
 
 
@@ -385,6 +443,7 @@ def t_rat_sightings(d: Data, a: dict) -> tuple[Any, list]:
     rows = rows[:limit]
     want_pics = a.get("with_images", True)
     out, imgs = [], []
+    image_attempts = 0
     for i, r in enumerate(rows):
         when = datetime.fromisoformat(r["ts"].replace("Z", "+00:00"))
         item = {"time": when.strftime("%b %d %H:%M:%S UTC"), "ago": _ago(when.timestamp() * 1000), "label": r["label"],
@@ -392,17 +451,39 @@ def t_rat_sightings(d: Data, a: dict) -> tuple[Any, list]:
                 "model": r.get("model"), "recording": r.get("recording"), "has_picture": bool(r.get("image_sha256"))}
         sol = r.get("solana")
         item["solana"] = {"status": sol["status"], "hash": sol["hash"]} if sol else None
-        if sol and i < 3 and a.get("verify", True):
-            item["solana"].update(_verify_sighting(sol))
+        if sol:
+            if i < 3 and a.get("verify", True):
+                try:
+                    item["solana"].update(_verify_sighting(sol, r.get("image_sha256")))
+                except Exception as e:  # noqa: BLE001
+                    item["solana"].update({"verified": False, "row_only_verified": False,
+                                           "verification_status": "unavailable", "verification_error": str(e)[:120]})
+            else:
+                item["solana"].update({"verified": False, "row_only_verified": False,
+                                       "verification_status": "not_checked"})
         out.append(item)
-        if want_pics and r.get("image_sha256") and len(imgs) < 3:
-            jpg = _dash_bytes("/api/detections?image=" + r["image_sha256"])
-            tick = " · ✓ verified on Solana" if (item["solana"] or {}).get("verified") else ""
-            imgs.append({"src": "data:image/jpeg;base64," + base64.b64encode(jpg).decode(),
-                         "caption": f"{r['label']} {round(r['confidence'] * 100)}% · {item['time']}{tick}"})
+        if r.get("image_sha256"):
+            item["image_status"] = "not_requested"
+            if want_pics and image_attempts < 3:
+                image_attempts += 1
+                try:
+                    jpg = _dash_bytes("/api/detections?image=" + urllib.parse.quote(r["image_sha256"]))
+                    matches = hashlib.sha256(jpg).hexdigest() == r["image_sha256"]
+                    item["image_status"] = "available" if matches else "hash_mismatch"
+                    if item["solana"] and "image_bytes_match" in item["solana"]:
+                        item["solana"]["image_bytes_match"] = matches
+                        _finish_sighting_verification(item["solana"], True)
+                    if matches:
+                        tick = " · ✓ data integrity verified on Solana" if (item["solana"] or {}).get("verified") else ""
+                        imgs.append({"src": "data:image/jpeg;base64," + base64.b64encode(jpg).decode(),
+                                     "caption": f"{r['label']} {round(r['confidence'] * 100)}% · {item['time']}{tick}"})
+                except Exception as e:  # noqa: BLE001
+                    item["image_status"] = "unavailable"
+                    item["image_error"] = str(e)[:120]
     return {"total_in_window": total, "sightings": out,
-            "note": "Sightings before the picture feature have no picture. Hashes can't be reversed: verification recomputes them "
-                    "from the stored row and picture and compares with the hash written on Solana."}, imgs
+            "note": "Older detections may have no picture and receive a separate row-only check. The dashboard checks "
+                    "its stored row and picture; the agent hashes each downloaded JPEG and checks the Solana transaction. "
+                    "These checks show data integrity, not whether the model identified a rat correctly."}, imgs
 
 
 def t_pi_recordings(d: Data, a: dict) -> tuple[Any, list]:
@@ -471,8 +552,9 @@ SERVER_TOOLS: dict[str, tuple[Callable[[Data, dict], tuple[Any, list]], str, dic
         "pi_activity", "The Pi's motion activity over time from Tiger Data (TimescaleDB): per-minute motion share, detections, motion events, CPU temperature.",
         {"range_minutes": {"type": "number", "enum": [15, 60, 360, 1440, 10080]}})),
     "rat_sightings": (t_rat_sightings, "Checking the Pi's rat sightings", _fn(
-        "rat_sightings", "Rats the Pi's on-device model (V5) confirmed, newest first: time, confidence, box, the boxed camera "
-        "picture, and a Solana check (Tiger Data row + picture re-hashed and matched against the hash written on chain). "
+        "rat_sightings", "Detections the Pi's on-device model (V5) labelled rat, newest first: time, confidence, box, "
+        "picture, and data-integrity checks of the dashboard row, downloaded JPEG, and Solana transaction. "
+        "Verification does not establish that the animal is a rat. "
         "Use for 'show me the last rat', 'how many rats today', 'is it verified'.",
         {"limit": NUM, "since_minutes": NUM, "with_images": BOOL, "verify": BOOL})),
     "pi_recordings": (t_pi_recordings, "Listing recordings", _fn(
