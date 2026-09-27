@@ -157,6 +157,16 @@ NMS .7, and `max_det=300`. It also checks the actual Pi `Detector` at confidence
 NMS .45, plus person suppression, and writes per-frame contact sheets. The report is
 diagnostic; sampled frame detection counts do not establish event-level push recall.
 
+After the candidate ONNX hash is locked, the independent reserved set can be scored once
+with `--test-set vision/final_test/eval_dataset` in place of `--dataset`, plus
+`--expected-onnx-sha256` set to that locked hash and `--selection-dataset` pointing at the
+dataset snapshot used to train/select the model. The verifier checks split disjointness,
+reviewed-frame markers, exclusions, source recording hashes, and image/label fingerprints
+before scoring.
+An all-negative clip has undefined AP50; its unmatched rat detections are reported as counts.
+Use an original video replay for event counts because the sampled test frames lack continuous
+timing.
+
 ## 6. Ship to the node
 
 ```

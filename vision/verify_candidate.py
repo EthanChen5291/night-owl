@@ -36,19 +36,30 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def inventory(dataset: Path) -> tuple[dict, dict[str, list[Path]]]:
+def inventory(dataset: Path, *, test_only: bool = False) -> tuple[dict, dict[str, list[Path]]]:
     manifest = json.loads((dataset / "manifest.json").read_text())
     train_tags = set(manifest["train_tags"])
     val_tags = set(manifest["val_tags"])
-    if not manifest.get("reviewed_only") or not manifest.get("gray") or not train_tags or not val_tags or train_tags & val_tags:
+    if not manifest.get("reviewed_only") or not manifest.get("gray") or not val_tags or train_tags & val_tags:
         raise ValueError("dataset needs reviewed grayscale data and disjoint whole-clip splits")
     train_names = set(manifest["frames"]["train"])
     expected = set(manifest["frames"]["val"])
+    if test_only:
+        if manifest.get("test_only") is not True or train_tags or train_names:
+            raise ValueError("independent test set must have test_only=true and no training split")
+        for directory in (dataset / "images/train", dataset / "labels/train"):
+            if directory.exists() and any(directory.iterdir()):
+                raise ValueError("independent test set contains training files")
+    elif not train_tags or manifest.get("test_only") is True:
+        raise ValueError("training validation needs train clips and cannot use an independent test set")
     if train_names & expected or any(tag_of(Path(name).stem) not in train_tags for name in train_names):
         raise ValueError("train manifest contains a held-out frame or clip")
     images = sorted((dataset / "images/val").glob("*.jpg"))
     if {p.name for p in images} != expected or len(images) != len(expected):
         raise ValueError("validation images differ from the manifest")
+    expected_labels = {Path(name).stem + ".txt" for name in expected}
+    if {p.name for p in (dataset / "labels/val").iterdir() if p.is_file()} != expected_labels:
+        raise ValueError("validation labels differ from the manifest")
     by_tag: dict[str, list[Path]] = defaultdict(list)
     for image in images:
         tag = tag_of(image.stem)
@@ -58,6 +69,79 @@ def inventory(dataset: Path) -> tuple[dict, dict[str, list[Path]]]:
     if set(by_tag) != val_tags:
         raise ValueError("a validation clip has no frames")
     return manifest, dict(by_tag)
+
+
+def file_pair_fingerprint(root: Path, names: set[str], image_dir: str,
+                          label_dir: str) -> str:
+    rows = []
+    for name in sorted(names):
+        stem = Path(name).stem
+        image_hash = sha256(root / image_dir / name)
+        label_hash = sha256(root / label_dir / f"{stem}.txt")
+        rows.append(f"{stem}\t{image_hash}\t{label_hash}")
+    return hashlib.sha256("\n".join(rows).encode()).hexdigest()
+
+
+def verify_test_provenance(dataset: Path, manifest: dict,
+                           project_root: Path | None = None) -> dict:
+    provenance = manifest.get("provenance", {})
+    project_root = project_root or Path(__file__).resolve().parents[1]
+    base = (project_root / provenance.get("path_base", "")).resolve()
+    if base != dataset.parent.resolve() or not base.is_dir():
+        raise ValueError("test provenance path_base must identify the source final_test directory")
+    reviewed: set[str] = set()
+    excluded: set[str] = set()
+    verified = {}
+    for category in ("source_markers", "exclusion_files", "source_clips"):
+        entries = provenance.get(category)
+        if not isinstance(entries, list) or not entries:
+            raise ValueError(f"test provenance needs {category}")
+        verified[category] = []
+        for entry in entries:
+            relative = Path(entry["path"])
+            path = (base / relative).resolve()
+            if not path.is_file() or sha256(path) != entry.get("sha256"):
+                raise ValueError(f"test provenance hash mismatch: {relative}")
+            verified[category].append({"path": str(relative), "sha256": entry["sha256"]})
+            if category in {"source_markers", "exclusion_files"}:
+                stems = {line.split("\t", 1)[0].strip() for line in path.read_text().splitlines() if line.strip()}
+                target = reviewed if category == "source_markers" else excluded
+                if target & stems:
+                    raise ValueError(f"duplicate test marker or exclusion: {relative}")
+                target.update(stems)
+    expected = {Path(name).stem for name in manifest["frames"]["val"]}
+    if reviewed & excluded or reviewed - excluded != expected:
+        raise ValueError("reviewed test markers and exclusions differ from test manifest")
+    source_frames = {p.stem for p in (base / "frames").glob("*.jpg")}
+    if source_frames != reviewed | excluded:
+        raise ValueError("source test frames differ from reviewed markers and exclusions")
+    source_names = {stem + ".jpg" for stem in expected}
+    source_fingerprint = file_pair_fingerprint(base, source_names, "frames", "labels")
+    eval_fingerprint = file_pair_fingerprint(dataset, set(manifest["frames"]["val"]),
+                                             "images/val", "labels/val")
+    if provenance.get("source_image_label_sha256") != source_fingerprint:
+        raise ValueError("source test image/label fingerprint mismatch")
+    if provenance.get("eval_image_label_sha256") != eval_fingerprint:
+        raise ValueError("converted test image/label fingerprint mismatch")
+    verified.update({"source_image_label_sha256": source_fingerprint,
+                     "eval_image_label_sha256": eval_fingerprint,
+                     "reviewed_frames": len(expected), "excluded_frames": len(excluded)})
+    return verified
+
+
+def verify_selection_disjoint(test_manifest: dict, selection_dataset: Path) -> dict:
+    path = selection_dataset / "manifest.json"
+    selection = json.loads(path.read_text())
+    selected_tags = set(selection.get("train_tags", [])) | set(selection.get("val_tags", []))
+    test_tags = set(test_manifest["val_tags"])
+    selected_frames = set(selection.get("frames", {}).get("train", [])) | set(selection.get("frames", {}).get("val", []))
+    test_frames = set(test_manifest["frames"]["val"])
+    if selected_tags & test_tags or selected_frames & test_frames:
+        raise ValueError("independent test set overlaps model-selection clips or frames")
+    return {"selection_manifest_sha256": sha256(path),
+            "selection_train_tags": sorted(selection.get("train_tags", [])),
+            "selection_val_tags": sorted(selection.get("val_tags", [])),
+            "test_tags": sorted(test_tags)}
 
 
 def xywh_to_xyxy(values: list[float], width: int, height: int) -> list[float]:
@@ -111,6 +195,16 @@ def score_models(dataset: Path, by_tag: dict[str, list[Path]], pt: Path, onnx: P
         yaml = root / "data.yaml"
         yaml.write_text(f"path: {root}\ntrain: images/val\nval: images/val\nnc: 2\nnames:\n  0: rat\n  1: person\n")
         result = {"frames": len(images)}
+        if not any((dataset / "labels/val" / f"{image.stem}.txt").read_text().strip() for image in images):
+            empty = {"map50": None, "ap50": {"rat": None, "person": None},
+                     "undefined": "no ground-truth boxes"}
+            result["pt"] = empty
+            result["onnx"] = empty
+            if tag == "combined":
+                scores["combined"] = result
+            else:
+                scores["clips"][tag] = result
+            continue
         for kind, model_path in (("pt", pt), ("onnx", onnx)):
             metrics = YOLO(str(model_path)).val(
                 data=str(yaml), imgsz=IMGSZ, batch=1, rect=False,
@@ -192,7 +286,9 @@ def runtime_counts(dataset: Path, onnx: Path, frames: list[dict]) -> dict:
                     fp += 1
         output[tag] = {"rat_proposals": total, "rat_kept": kept,
                        "rat_suppressed": dropped, "matched_rat": tp,
-                       "unmatched_rat": fp, "gt_rat": gt_total}
+                       "unmatched_rat": fp, "gt_rat": gt_total,
+                       "event_count": None,
+                       "event_count_reason": "sampled frames lack continuous video timing"}
     return output
 
 
@@ -234,13 +330,27 @@ def contact_sheets(dataset: Path, frames: list[dict], output: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--dataset", type=Path, help="reviewed train/validation snapshot")
+    source.add_argument("--test-set", type=Path, help="sealed independent test-only snapshot")
     parser.add_argument("--pt", type=Path, required=True)
     parser.add_argument("--onnx", type=Path, required=True)
+    parser.add_argument("--expected-onnx-sha256", help="required locked candidate hash for --test-set")
+    parser.add_argument("--selection-dataset", type=Path,
+                        help="required original train/validation snapshot for --test-set overlap check")
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args()
-    dataset, pt, onnx, output = (p.resolve() for p in (args.dataset, args.pt, args.onnx, args.out_dir))
-    manifest, by_tag = inventory(dataset)
+    dataset, pt, onnx, output = (p.resolve() for p in (args.dataset or args.test_set, args.pt, args.onnx, args.out_dir))
+    test_only = args.test_set is not None
+    onnx_hash = sha256(onnx)
+    if test_only:
+        if not args.expected_onnx_sha256 or onnx_hash != args.expected_onnx_sha256.lower() or not args.selection_dataset:
+            parser.error("--test-set requires the exact locked --expected-onnx-sha256 and --selection-dataset")
+    elif args.expected_onnx_sha256 or args.selection_dataset:
+        parser.error("--expected-onnx-sha256 and --selection-dataset are for --test-set")
+    manifest, by_tag = inventory(dataset, test_only=test_only)
+    provenance = verify_test_provenance(dataset, manifest) if test_only else None
+    disjoint = verify_selection_disjoint(manifest, args.selection_dataset.resolve()) if test_only else None
     import ultralytics
     import onnxruntime
 
@@ -254,13 +364,22 @@ def main() -> None:
     (output / "per_frame_predictions.json").write_text(json.dumps(frames, indent=2) + "\n")
     by_clip = {tag: [f for f in frames if f["clip"] == tag] for tag in by_tag}
     report = {
-        "status": "DIAGNOSTIC_ONLY",
+        "status": "INDEPENDENT_TEST" if test_only else "DIAGNOSTIC_ONLY",
         "protocol": {"imgsz": IMGSZ, "batch": 1, "rect": False,
                      "conf": CONF_AP, "iou": IOU_NMS, "max_det": MAX_DET, "device": "cpu"},
         "packages": {"ultralytics": ultralytics.__version__, "onnxruntime": onnxruntime.__version__},
         "dataset_manifest_sha256": sha256(dataset / "manifest.json"),
+        "image_label_fingerprint": file_pair_fingerprint(dataset, set(manifest["frames"]["val"]),
+                                                         "images/val", "labels/val"),
+        "test_provenance": provenance,
+        "selection_disjoint": disjoint,
         "train_tags": manifest["train_tags"], "val_tags": manifest["val_tags"],
-        "pt_sha256": sha256(pt), "onnx_sha256": sha256(onnx),
+        "pt_sha256": sha256(pt), "onnx_sha256": onnx_hash,
+        "locked_onnx_sha256": args.expected_onnx_sha256 if test_only else None,
+        "limits": ("Same camera/table domain; an all-negative new-scene clip has undefined AP50. "
+                   "Static sampled frames cannot establish push-event recall or event false rate."
+                   if test_only else
+                   "Validation clips have guided model selection; event gate is unverified."),
         "scores": scores,
         "threshold_counts": {
             tag: {str(t): match_counts(records, t) for t in (0.5, 0.3, 0.1, 0.05, 0.01, 0.001)}
