@@ -12,7 +12,7 @@ cd /tmp/barn-owl-v4/rat-litroom-v4-candidate-20260927
 python3 verify_bundle.py
 ```
 
-The ZIP has 2,193 files, is 91,067,802 bytes, and has SHA256 `5dae4e6446a5613fea79ffdec7c4ebcd9ecccad2fadcf67232f77a17d09fae45`. The extracted checksum script verifies all 2,192 other files. Extraction, checksum verification, and the bundled reserved-test source/provenance check passed on a clean temporary directory. The extracted `README.md` gives the exact model hashes, recorded results, and a `--no-post` Pi dry-run command at locked confidence 0.70. Keep the model under a distinct filename; do not replace `pi/rat.onnx` until formal promotion gates pass.
+The ZIP has 2,193 files, is 91,067,807 bytes, and has SHA256 `8757ba863b0b20618f49b817059bec9a6af0d5d4268126f0f46e4704de4cecc7`. The extracted checksum script verifies all 2,192 other files. Extraction, checksum verification, and the bundled reserved-test source/provenance check passed on a clean temporary directory. The extracted `README.md` gives the exact model hashes, recorded results, and a `--no-post` Pi dry-run command at locked confidence 0.70. Keep the model under a distinct filename; do not replace `pi/rat.onnx` until formal promotion gates pass.
 
 ## Evidence and limits
 
