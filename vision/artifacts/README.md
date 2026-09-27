@@ -1,6 +1,12 @@
 # Plush detector candidate bundles
 
-The current recorded-footage candidate is [rat-litroom-v4-candidate-20260927.zip](rat-litroom-v4-candidate-20260927.zip). It contains the locked V4 ONNX and PyTorch model, all reviewed grayscale training/validation frames and labels, source and package lockfile, checkpoint selection and training curves, CPU evaluation reports, original development and reserved videos, truth/provenance, replay crops, and a Raspberry Pi saved-frame timing report. It is a **candidate for a lit metal-table plush demo**, not a promoted detector for live rats.
+The latest **development candidate** is [rat-litroom-v5-development-candidate-20260927.zip](rat-litroom-v5-development-candidate-20260927.zip), SHA256 `5d4098dfea86dc80de230f9a689dad4ccdf819c194ac2ba5cdf96185bd5ca38e` (94,422,665 bytes). Its extracted `README.md` and `verify_bundle.py` describe and check all 2,261 other files. A clean extraction passed CRC, per-file checksums, and model/lock hash checks. V5 was trained from V4 on reviewed new-room development data. Its selected epoch-35 ONNX passed the predeclared whole-clip development AP floors and fixed-rule replay audits, including the previously missed parked plush. **No fresh post-V5 independent test exists yet**, so the model remains a candidate and is not promoted to `pi/rat.onnx`. See [V5 results](../V5_RESULTS.md) for scores and limits.
+
+The V4 recorded-footage candidate remains [rat-litroom-v4-candidate-20260927.zip](rat-litroom-v4-candidate-20260927.zip). Its separate [new-room evaluation supplement](rat-litroom-v4-new-room-evaluation-20260927.zip), SHA256 `8e9a126fc1360bae1a19378d46743f96a31a8a361650288b55d1b34b895d7661`, preserves the failed first post-lock new-room check. Both V4 archives are unchanged. The V5 ZIP references their original source videos by SHA rather than duplicating those recordings.
+
+## V4 bundle history
+
+The V4 model bundle contains the locked V4 ONNX and PyTorch model, all reviewed grayscale training/validation frames and labels, source and package lockfile, checkpoint selection and training curves, CPU evaluation reports, original development and reserved videos, truth/provenance, replay crops, and a Raspberry Pi saved-frame timing report. It is a **candidate for a lit metal-table plush demo**, not a promoted detector for live rats.
 
 ## Extract and verify
 
@@ -30,6 +36,6 @@ The supplement's evidence index is:
 - `vision/runs/modal-rat-v4-20260926/new_room_final_once/`: sampled-frame `verification/verification_report.json`, full-video `replay/<clip>/report.json`, event crops, and `audit/independent_review.md`.
 - `vision/runs/modal-rat-v4-20260926/pi_live_trial_2026-09-27/`: a plush-free Pi live-viewer timing and event observation, with no API post.
 
-The locked model measured rat AP50 0.8827 on 439 reviewed changed-view frames, below the 0.90 target. Full-video replay saved nine plush events and one black-case false alert in the moving clip, no events for the parked plush, and none in the 181-second people-only clip. These clips are now consumed V5 development material, so they cannot be used as an independent V5 test. V5 training results are pending.
+The locked V4 model measured rat AP50 0.8827 on 439 reviewed changed-view frames, below the 0.90 target. Full-video replay saved nine plush events and one black-case false alert in the moving clip, no events for the parked plush, and none in the 181-second people-only clip. These clips are now consumed V5 development material, so they cannot be used as an independent V5 test. The separate V5 candidate above records the adaptation result; fresh post-V5 footage is still needed to test it.
 
 The earlier [V2 bundle](rat-litroom-candidate-20260926.zip) remains available for history. Its combined rat AP50 was 0.7903 and it failed the 0.9 box gate. The intervening V3 model passed tuned validation but failed its separate new-scene test; its failure report is preserved inside the V4 archive.

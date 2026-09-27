@@ -1,12 +1,12 @@
-# Training demo clip
+# V4 training demo clip (dated)
 
-[Current V3 MP4](out/barn-owl-training-demo-v3.mp4) · [preview](out/barn-owl-training-demo-v3-preview.jpg)
+[V3 MP4](out/barn-owl-training-demo-v3.mp4) · [preview](out/barn-owl-training-demo-v3-preview.jpg)
 
 This 15.6-second, silent H.264 clip uses the saved 150-epoch V4 training log and exported V4 ONNX model. The animated curve is `metrics/mAP50(B)` from `results.csv`, covering both rat and person. The camera segment is the original room-lit `zoom15_b` metal-table video at 62–66.5 seconds. Each rat box and crop comes from V4 ONNX inference on a grayscale copy of that frame at confidence .70. The underlying camera frame remains in color. `zoom15_b` was reused for model selection, so these images are a demonstration, not independent evidence.
 
-The closing rat AP50 figures come from matched square-416 CPU verification. **.958** is tuned validation on 49 frames reused for checkpoint selection. **.926** is the locked V4 candidate on 59 reserved frames from four previously unused clips, with ONNX SHA256 `fb557bd9c1dafa7466a45afb50ac47668550a666a44f1791af714011a0bf1b27`. Those clips share the table, camera, and capture session with training recordings. AP50 measures ranked box detections; it is not 92.6% accuracy, push-event recall, or new-room performance. New-room footage, live Pi camera inference, and the formal 20-push/3-minute-negative event gate remain open. The video never reads the reserved test footage or presents a fake GPU console.
+The closing rat AP50 figures come from matched square-416 CPU verification. **.958** is tuned validation on 49 frames reused for checkpoint selection. **.926** is the locked V4 candidate on 59 reserved frames from four previously unused clips, with ONNX SHA256 `fb557bd9c1dafa7466a45afb50ac47668550a666a44f1791af714011a0bf1b27`. Those clips share the table, camera, and capture session with training recordings. AP50 measures ranked box detections; it is not 92.6% accuracy, push-event recall, or new-room performance. **Later result:** V4 scored .883 rat AP50 on 439 reviewed new-room frames, below the .90 target, and missed a parked plush in recorded replay. V5 was adapted using those clips; its fresh independent test is pending. The video never reads the reserved test footage or presents a fake GPU console.
 
-The earlier [V2 clip](out/barn-owl-training-demo-v2.mp4) documents V3, which scored .943 on reused validation clips and failed its separate one-time independent test at .870 combined rat AP50 (.844 on the fresh new-angle positive clip). [V1](out/barn-owl-training-demo-v1.mp4) predates that test and has a stale “independent scene test pending” caption. Use V3 for the current V4 result.
+The earlier [V2 clip](out/barn-owl-training-demo-v2.mp4) documents V3, which scored .943 on reused validation clips and failed its separate one-time independent test at .870 combined rat AP50 (.844 on the fresh new-angle positive clip). [V1](out/barn-owl-training-demo-v1.mp4) predates that test and has a stale “independent scene test pending” caption. Use the [V5 recorded-development montage](v5-montage.md) for the current detector snapshot; keep this video for V4 training history.
 
 Inputs and SHA-256:
 
