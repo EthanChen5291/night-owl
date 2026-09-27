@@ -1,16 +1,20 @@
-"""Plain-language accuracy for Model A and Model B, on community districts the model never saw.
+"""Held-out ranking and capture for Model A and Model B, by community district.
 
 Why not "accuracy %": only ~10% of swept lots have rats, so a model that always says "no rats"
 is ~90% "accurate" and useless. Instead:
 
-  pairwise accuracy  = AUC: how often the model ranks a place WITH the outcome above a place without
-                       it (50% = coin flip, 100% = perfect). Not fooled by the 90% trick.
-  top-20% capture    = share of all outcomes that fall in the model's top 20% of places
-                       (random = 20%).
+  pairwise accuracy  = pooled out-of-fold AUC: how often a positive unit ranks above a
+                       negative unit (50% = chance, 100% = perfect).
+  top-20% capture    = share of outcome counts in highest-scored units. Entire cell-month
+                       rows are included at the cutoff, so the selected share can exceed 20%.
 
-Model B outcome: rat activity found on a swept lot (lot level; each lot gets its cell-month score).
-Model A outcome: at least one rat complaint in the cell-month.
-5-fold spatial CV, folds = whole community districts.
+Model A: each cell-month is one AUC unit, positive if it had any complaint; capture
+counts all complaints in the highest-scored 20% of cell-month rows.
+Model B: each swept lot is one weighted AUC unit, positive if rat activity was found;
+all lots in a cell-month get the same score. Capture counts positive swept lots in
+the highest-scored cell-months covering at least 20% of swept lots.
+These AUCs have different outcomes and units, so their difference is not a measure
+of reporting bias. Five spatial folds hold out whole community districts.
 
 Run: python3 model/accuracy_report.py   -> prints, writes model/out/accuracy.json
 """

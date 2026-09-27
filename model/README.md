@@ -198,19 +198,24 @@ inspected, so scoring on "any inspection found rats" grades the model on where D
 
 ## Model accuracy (plain language)
 
-From `accuracy_report.py` → `out/accuracy.json`, 5-fold spatial CV on community districts the model never saw.
-"Pairwise accuracy" is AUC in plain words: how often the model ranks a place **with** the outcome above a place
-without it (50% = coin flip). We don't quote a plain "accuracy %": only ~10% of swept lots have rats, so a model
-that always says "no rats" would score ~90% and be useless.
+From `accuracy_report.py` → `out/accuracy.json`: five-fold spatial cross-validation holds out whole community
+districts, then pools the held-out predictions. AUC measures how often a positive unit ranks above a negative one
+(0.50 = chance). We avoid ordinary classification accuracy: only about 10% of swept lots have rat findings, so
+always predicting "no rats" would appear accurate while finding none.
 
-| Model | Pairwise accuracy | Baseline | Top 20% of places hold |
-|---|---|---|---|
-| **Model A** (any rat complaint in the cell-month) | **87%** | last year's complaints: 84% | **75%** of all complaints |
-| **Model B** (rats found on a swept lot) | **63%** | coin flip 50%, logistic 57% | **32%** of rats found (random: 20%, so ~1.6×) |
+| Model and unit | Pooled held-out AUC | Comparison | Capture among highest scores |
+|---|---:|---|---|
+| **A: cell-month**, positive if it had any rat complaint | **0.870** | Prior 12 months' complaints: **0.842** pooled AUC | Top 20% of cell-months contain **75.2% of complaint count** |
+| **B: swept lot**, assigned its cell-month score; positive if rats were found | **0.630** (lot-weighted) | Chance: **0.500** | Top roughly 20% of swept lots contain **31.7% of positive swept lots** |
 
-Why A scores higher: complaints follow habit (areas that called keep calling), while B predicts real rats from
-physical features alone, a much harder target. That gap is itself the point: complaints track who calls, not where
-rats are. The stronger evidence is still the backtest (28% more rats than complaint-based picks, 108 of 119 months).
+For B's capture figure, cell-months are ranked by score and taken whole until they cover at least 20% of swept
+lots, so the final cell-month can take the selected share above 20%. An earlier report, `out/metrics.json`, gives
+the logistic baseline as **0.567 mean fold AUC**; it is not the pooled statistic in this table. A and B have
+different outcomes and units, so their AUCs do not directly measure a reporting gap. B uses building and
+environmental features, season and district trash, plus income and population controls; it uses no complaint
+features. The rolling backtest compares positive rates on lots the city actually swept: **19.5%** for model picks
+versus **15.2%** for complaint-based picks, winning **108 of 119 months**. That is a 28% relative increase in the
+observed positive rate, not a count of rats found on unswept blocks.
 
 ## Why our picks find more rats
 
