@@ -25,3 +25,31 @@ export function linkClick(path: string) {
     navigate(path)
   }
 }
+
+/** Commit only the latest requested page, including a Back to the page still on screen. */
+export function createPageNavigation(
+  initial: string,
+  load: (path: string) => Promise<unknown>,
+  commit: (path: string, from: string) => void,
+  failed: (path: string) => void,
+) {
+  let current = initial
+  let revision = 0
+  let cancelled = false
+  return {
+    async go(path: string) {
+      const request = ++revision
+      if (cancelled || current === path) return
+      try {
+        await load(path)
+        if (cancelled || request !== revision) return
+        const from = current
+        current = path
+        commit(path, from)
+      } catch {
+        if (!cancelled && request === revision) failed(path)
+      }
+    },
+    cancel() { cancelled = true; revision++ },
+  }
+}

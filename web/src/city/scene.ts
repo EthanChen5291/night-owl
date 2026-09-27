@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { cellToBoundary, cellToLatLng, cellToParent, gridDisk, latLngToCell, polygonToCells } from 'h3-js'
+import { cellToBoundary, cellToLatLng, cellToParent, latLngToCell } from 'h3-js'
 import { colourFor, heightFor } from '../colours'
 import type { Area, Building, Cell, CityLayers, HoverInfo, Mode, OwlNode, PlanNode, Poly, Preset, Spot, Tile, Tree, ViewInfo } from '../types'
 import { makeProjector, type LatLon, type Projector } from './projection'
@@ -11,6 +11,7 @@ import { buildHexPrism } from './hexGeometry'
 import { installBuildingTheme, installFieldTheme } from './themeMaterials'
 import { buildFlat, tintBuildingGeometry, unpackGeometry, type BuildingRange, type TileGeometryReply, type TileGeometryRequest } from './tileGeometry'
 import type { FlatLayersReply } from './flatLayers.worker'
+import type { FieldRequest, FieldReply } from './fieldGeometry.worker'
 
 // No React in here. App owns the data; Scene.tsx owns the lifecycle; this class owns three.js.
 // Coordinates: local metres, x east, y north (from the projector); mapped to three.js x / -z.
@@ -101,9 +102,6 @@ interface Flight {
 
 const FLASH_MS = 1500
 const MAX_PIXEL_RATIO = 1.5
-const FIELD_FEATHER = [0, 0.18, 0.38, 0.6, 0.8, 0.92] // the colour field's alpha ring by ring in from a land border (Westchester, Nassau): it fades out over ~1 km instead of stopping on the city line. At the coast it runs at full strength to the shore and the land stencil cuts it there
-const FIELD_ISLAND_MAX = 400 // land outside the borough outlines in pieces up to this many hexes (the Rockaways, Rikers, Randalls, the Jamaica Bay marshes) is still the city; bigger pieces are the neighbours
-const FIELD_REACH = 30 // rings searched for the nearest coloured hex when an island has no coloured neighbour to inherit from (~5 km)
 // the search locator: a bright band lands on the hexagon after the flight, starts wide, shrinks onto it, holds, fades
 const LOCATE_GROW_MS = 1300
 const LOCATE_HOLD_MS = 1000
@@ -240,10 +238,14 @@ export class CityScene {
   private field: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null // the citywide 2D colour map
   private fieldNeutral: THREE.IUniform<THREE.Color> = { value: new THREE.Color() }
   private fieldMix: THREE.IUniform<number> = { value: 0 }
-  private fieldNeighbours: Map<string, string[]> | null = null // ring-1 neighbours of every hex the field covers, rebuilt when that set changes
-  private landHexes: string[] = [] // every r9 hex whose centre is on land in the citywide bake (NYC and the land around it)
-  private landHexHandle: number | null = null
-  private landHexKind: 'idle' | 'timeout' | null = null
+  private fieldWorker: Worker | null = null
+  private fieldWorkerFailed = false
+  private fieldRevision = 0
+  private fieldInFlight: number | null = null
+  private fieldPending = false
+  private fieldLand: Poly[] | null = null
+  private fieldLandDirty = false
+  private fieldAreasDirty = true
   private areaLayerGroup = new THREE.Group() // the active area's own ground: the only land drawn inside an area
   private cityLayerMeshes = new Map<FlatLayer, THREE.Mesh>()
   private cityLayerWorker: Worker | null = null
@@ -271,7 +273,6 @@ export class CityScene {
   private hoveredArea: string | null = null
   private tileAreas: Record<string, string | null | undefined> = {} // r7 tile -> area id, from tiles.json
   private cellArea = new Map<string, string | null>() // r9 cell -> area id (by the borough outline, else the tile's area), memoised
-  private cellInBorough = new Map<string, boolean>() // r9 cell -> centre inside a borough outline (no tile fallback), for the field's extent
   private ground: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>
   private sky: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>
   private look: Look = LOOKS.day
@@ -450,7 +451,6 @@ export class CityScene {
     this.scheduleHexBuild()
     this.applyAreaVisibility()
     this.retintBuildings()
-    this.fieldNeighbours = null
     this.rebuildField()
     this.invalidate()
   }
@@ -997,7 +997,7 @@ export class CityScene {
         bounds: { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) } })
     }
     this.cellArea.clear()
-    this.cellInBorough.clear()
+    this.fieldAreasDirty = true
     this.rebuildField()
     this.applyAreaVisibility()
     this.invalidate()
@@ -1084,7 +1084,9 @@ export class CityScene {
     this.cityLayerWorker?.terminate()
     this.cityLayerWorker = null
     this.pendingCityLayers = null
-    this.cancelLandHexes()
+    this.fieldWorker?.terminate()
+    this.fieldWorker = null
+    this.fieldPending = false
     this.cancelHexBuild()
     this.tileWorker?.terminate()
     this.tileWorker = null
@@ -1233,222 +1235,76 @@ export class CityScene {
     this.invalidate()
   }
 
-  /** Work out which r9 hexes the colour field should cover, off the critical path: the land polygons are large. */
   private scheduleLandHexes(land: Poly[]) {
-    this.cancelLandHexes()
-    const run = () => {
-      this.landHexHandle = null
-      this.landHexKind = null
-      if (this.disposed) return
-      this.landHexes = this.hexesOverLand(land)
-      this.fieldNeighbours = null
-      this.rebuildField()
-      this.invalidate()
-    }
-    if (typeof window.requestIdleCallback === 'function') {
-      this.landHexKind = 'idle'
-      this.landHexHandle = window.requestIdleCallback(run, { timeout: 1500 })
-    } else {
-      this.landHexKind = 'timeout'
-      this.landHexHandle = setTimeout(run, 0) as unknown as number
-    }
+    this.fieldLand = land
+    this.fieldLandDirty = true
+    this.rebuildField()
   }
 
-  private cancelLandHexes() {
-    if (this.landHexHandle == null) return
-    if (this.landHexKind === 'idle') window.cancelIdleCallback(this.landHexHandle)
-    else clearTimeout(this.landHexHandle)
-    this.landHexHandle = null
-    this.landHexKind = null
-  }
-
-  /** Every r9 hex whose centre is on land in the citywide bake. */
-  private hexesOverLand(land: Poly[]): string[] {
-    const set = new Set<string>()
-    for (const poly of land) {
-      if (poly.ring.length < 3) continue
-      const loop = poly.ring.map(([x, y]) => {
-        const { lat, lon } = this.projector.latLon(x, y)
-        return [lat, lon] as [number, number]
-      })
-      const cells = polygonToCells([loop], 9)
-      for (const h of cells) set.add(h)
-      if (cells.length === 0) {
-        // an islet smaller than a hex has no hex centre inside it: give it the hex under its centroid so it is still coloured
-        const lat = loop.reduce((sum, [la]) => sum + la, 0) / loop.length
-        const lon = loop.reduce((sum, [, lo]) => sum + lo, 0) / loop.length
-        set.add(latLngToCell(lat, lon, 9))
-      }
-    }
-    return [...set]
-  }
-
-  /**
-   * The citywide 2D colour map: one flat triangle fan per r9 hex over every land hex inside the five boroughs, colours
-   * averaged at shared corners and blurred over the neighbouring rings so it reads as a soft gradient rather than a
-   * honeycomb. Hexes with no cell (parks, yards) take the mean of their coloured neighbours. The field overshoots its
-   * edge by one ring: at the coast that ring is cut by the land stencil, so the colour runs to the shoreline; where land
-   * continues past the city line the ring is transparent and the rings inside it feather out. Colours are stored unmixed
-   * and the look's neutral mix is applied in the shader, so day/night changes touch uniforms, not geometry. Needs the
-   * land hexes, the borough outlines and the cells.
-   */
+  /** Coalesce changes while the worker builds; keep the last complete field on screen. */
   private rebuildField() {
-    if (this.field) {
-      this.scene.remove(this.field)
-      this.field.geometry.dispose()
-      this.field.material.dispose()
-      this.field = null
-    }
-    const L = this.look
-    if (!L.field || !this.landHexes?.length || !this.cells?.size || !this.areas?.size) {
-      this.syncCityLayerVisibility()
+    if (this.disposed) return
+    this.fieldRevision++
+    if (!this.look.field || !this.cells?.size || !this.areas?.size || this.fieldLand?.length === 0) {
+      this.fieldPending = false
+      if (this.field) {
+        this.scene.remove(this.field)
+        this.field.geometry.dispose()
+        this.field.material.dispose()
+        this.field = null
+        this.syncCityLayerVisibility()
+      }
       return
     }
-    // 1. the hexes the field covers: land inside a borough plus every cell (the core), then one ring past that edge; with
-    //    ring-1 neighbours within the set (cached until the set changes)
-    const land = new Set(this.landHexes)
-    const core = new Set<string>()
-    for (const h of land) if (this.insideBorough(h)) core.add(h)
-    for (const h3 of this.cells.keys()) core.add(h3)
-    // land outside the outlines comes in pieces: small ones are the city's own islands and airports, so they join the core;
-    // the large ones (Nassau past Far Rockaway) stay outside and get the feather
-    const outside = new Set([...land].filter((h) => !core.has(h)))
-    const seen = new Set<string>()
-    for (const start of outside) {
-      if (seen.has(start)) continue
-      const piece = [start]
-      seen.add(start)
-      for (let i = 0; i < piece.length; i++) for (const nb of gridDisk(piece[i], 1)) if (outside.has(nb) && !seen.has(nb)) {
-        seen.add(nb)
-        piece.push(nb)
-      }
-      if (piece.length <= FIELD_ISLAND_MAX) for (const h of piece) core.add(h)
-    }
-    const hexes = new Set(core)
-    for (const h of core) for (const n of gridDisk(h, 1)) hexes.add(n)
-    let neighbours = this.fieldNeighbours
-    if (!neighbours || neighbours.size !== hexes.size) {
-      neighbours = new Map()
-      for (const h of hexes) neighbours.set(h, gridDisk(h, 1).filter((n) => n !== h && hexes.has(n)))
-      this.fieldNeighbours = neighbours
-    }
-    const colours = new Map<string, THREE.Color>()
-    for (const [h3, cell] of this.cells) colours.set(h3, new THREE.Color(colourFor(this.mode, cell)))
-    // 2. hexes with no cell take the mean of their coloured neighbours, ring by ring outwards, so nothing on land is left grey
-    let pending = [...hexes].filter((h) => !colours.has(h))
-    while (pending.length) {
-      const next: string[] = []
-      const found = new Map<string, THREE.Color>()
-      for (const h of pending) {
-        const c = new THREE.Color(0, 0, 0)
-        let n = 0
-        for (const nb of neighbours.get(h) ?? []) {
-          const cc = colours.get(nb)
-          if (cc) {
-            c.add(cc)
-            n++
-          }
+    this.fieldPending = true
+    this.pumpField()
+  }
+
+  private pumpField() {
+    if (this.disposed || this.fieldWorkerFailed || this.fieldInFlight != null || !this.fieldPending ||
+        !this.look.field || !this.fieldLand || !this.cells?.size || !this.areas?.size) return
+    try {
+      if (!this.fieldWorker) {
+        this.fieldWorker = new Worker(new URL('./fieldGeometry.worker.ts', import.meta.url), { type: 'module' })
+        this.fieldWorker.onmessage = ({ data }: MessageEvent<FieldReply>) => {
+          if (this.disposed || data.id !== this.fieldInFlight) return
+          this.fieldInFlight = null
+          if (data.id === this.fieldRevision) this.installField(data)
+          this.pumpField()
         }
-        if (n) found.set(h, c.multiplyScalar(1 / n))
-        else next.push(h)
+        // Keep the existing map on failure; never retry expensive work on the UI thread.
+        this.fieldWorker.onerror = () => this.stopFieldWorker()
+        this.fieldWorker.onmessageerror = () => this.stopFieldWorker()
       }
-      if (found.size === 0) {
-        // islands: nothing coloured touches them, so each takes the mean of the nearest coloured hexes across the water
-        for (const h of pending) {
-          for (let k = 2; k <= FIELD_REACH; k++) {
-            const near = gridDisk(h, k).filter((n) => colours.has(n))
-            if (near.length === 0) continue
-            const c = new THREE.Color(0, 0, 0)
-            for (const n of near) c.add(colours.get(n)!)
-            colours.set(h, c.multiplyScalar(1 / near.length))
-            break
-          }
-        }
-        break
+      const request: FieldRequest = {
+        id: this.fieldRevision,
+        centre: this.projector.centre,
+        colours: [...this.cells].map(([h3, cell]) => [h3, colourFor(this.mode, cell)]),
+        smooth: this.look.field.smooth,
+        ...(this.fieldLandDirty ? { land: this.fieldLand } : {}),
+        ...(this.fieldAreasDirty ? { areas: [...this.areas.values()].map(({ outline, bounds }) => ({ outline, bounds })) } : {}),
       }
-      for (const [h, c] of found) colours.set(h, c)
-      pending = next
+      this.fieldInFlight = request.id
+      this.fieldWorker.postMessage(request)
+      this.fieldLandDirty = false
+      this.fieldAreasDirty = false
+      this.fieldPending = false
+    } catch {
+      this.stopFieldWorker()
     }
-    // 3. blur: each hex takes the mean of itself and its ring, `smooth` times
-    let current = colours
-    for (let pass = 0; pass < L.field.smooth; pass++) {
-      const blurred = new Map<string, THREE.Color>()
-      for (const [h, own] of current) {
-        const c = own.clone()
-        let n = 1
-        for (const nb of neighbours.get(h) ?? []) {
-          const cc = current.get(nb)
-          if (cc) {
-            c.add(cc)
-            n++
-          }
-        }
-        blurred.set(h, c.multiplyScalar(1 / n))
-      }
-      current = blurred
-    }
-    // 4. edges: the overshoot ring is transparent. Off land it only exists for the stencil to cut, so the shore hexes inside
-    //    it keep full strength; on land (past the city line) it seeds a feather that climbs over the next rings in
-    const alpha = new Map<string, number>()
-    let frontier: string[] = []
-    for (const h of current.keys()) {
-      if (core.has(h)) continue
-      alpha.set(h, FIELD_FEATHER[0])
-      if (land.has(h)) frontier.push(h)
-    }
-    for (let ring = 1; ring < FIELD_FEATHER.length; ring++) {
-      const next: string[] = []
-      for (const h of frontier) for (const nb of neighbours.get(h) ?? []) if (current.has(nb) && !alpha.has(nb)) {
-        alpha.set(nb, FIELD_FEATHER[ring])
-        next.push(nb)
-      }
-      frontier = next
-    }
-    // 5. one fan per hex, corner colours and alpha averaged across the hexes that share the corner
-    const cornerKey = (lat: number, lon: number) => `${lat.toFixed(6)},${lon.toFixed(6)}`
-    const corners = new Map<string, { r: number; g: number; b: number; a: number; n: number }>()
-    const rings: { h3: string; ring: [number, number][]; colour: THREE.Color; a: number }[] = []
-    let nVerts = 0
-    let nIdx = 0
-    for (const [h3, colour] of current) {
-      const ring = cellToBoundary(h3)
-      const a = alpha.get(h3) ?? 1
-      rings.push({ h3, ring, colour, a })
-      for (const [lat, lon] of ring) {
-        const k = cornerKey(lat, lon)
-        const c = corners.get(k) ?? { r: 0, g: 0, b: 0, a: 0, n: 0 }
-        c.r += colour.r
-        c.g += colour.g
-        c.b += colour.b
-        c.a += a
-        c.n++
-        corners.set(k, c)
-      }
-      nVerts += ring.length + 1
-      nIdx += ring.length * 3
-    }
-    const pos = new Float32Array(nVerts * 3)
-    const col = new Float32Array(nVerts * 4) // rgba: three.js reads vertex alpha from a 4-wide colour attribute
-    const idx = new Uint32Array(nIdx)
-    let v = 0
-    let k = 0
-    for (const { h3, ring, colour, a } of rings) {
-      const [cx, cy] = this.projector.xy(...cellToLatLng(h3))
-      const centre = v
-      pos.set([cx, 0, -cy], v * 3)
-      col.set([colour.r, colour.g, colour.b, a], v * 4)
-      v++
-      ring.forEach(([lat, lon], i) => {
-        const [x, y] = this.projector.xy(lat, lon)
-        const c = corners.get(cornerKey(lat, lon))!
-        pos.set([x, 0, -y], v * 3)
-        col.set([c.r / c.n, c.g / c.n, c.b / c.n, c.a / c.n], v * 4)
-        idx[k++] = centre
-        idx[k++] = centre + 1 + i
-        idx[k++] = centre + 1 + ((i + 1) % ring.length)
-        v++
-      })
-    }
+  }
+
+  private stopFieldWorker() {
+    this.fieldWorker?.terminate()
+    this.fieldWorker = null
+    this.fieldInFlight = null
+    this.fieldPending = false
+    this.fieldWorkerFailed = true
+  }
+
+  private installField(data: FieldReply) {
+    const { pos, col, idx } = data.geometry
+    const L = this.look
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     g.setAttribute('color', new THREE.BufferAttribute(col, 4))
@@ -1464,12 +1320,18 @@ export class CityScene {
     this.fieldNeutral.value.set(L.field.neutral)
     this.fieldMix.value = L.field.mix
     installFieldTheme(material, this.fieldNeutral, this.fieldMix)
+    if (this.field) {
+      this.scene.remove(this.field)
+      this.field.geometry.dispose()
+      this.field.material.dispose()
+    }
     this.field = new THREE.Mesh(g, material)
     this.field.position.y = 0.6
     this.field.renderOrder = -8
-    this.field.visible = !this.activeArea
+    this.field.visible = !this.activeArea && this.flightAreas.size === 0
     this.scene.add(this.field)
     this.syncCityLayerVisibility()
+    this.invalidate()
   }
 
   /** Keep the city coast around the detailed borough map. */
@@ -1482,22 +1344,6 @@ export class CityScene {
     if (!this.activeArea && this.flightAreas.size === 0) return false
     const a = this.areaOfCell(h3)
     return a === null || a === this.activeArea || this.flightAreas.has(a)
-  }
-
-  /** Whether an r9 cell's centre lies inside a borough outline. Unlike areaOfCell there is no tile fallback: this is the city line. */
-  private insideBorough(h3: string): boolean {
-    const cached = this.cellInBorough.get(h3)
-    if (cached !== undefined) return cached
-    const [cx, cy] = this.projector.xy(...cellToLatLng(h3))
-    let inside = false
-    for (const a of this.areas.values()) {
-      if (cx >= a.bounds.minX && cx <= a.bounds.maxX && cy >= a.bounds.minY && cy <= a.bounds.maxY && pointInRing(cx, cy, a.outline)) {
-        inside = true
-        break
-      }
-    }
-    this.cellInBorough.set(h3, inside)
-    return inside
   }
 
   /** Which area an r9 cell belongs to: its centre against the borough outlines, else the area of its r7 tile. */
