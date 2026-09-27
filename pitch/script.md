@@ -1,6 +1,6 @@
 # Barn Owl: three-minute pitch
 
-Use the live map on slide 2 and the verified recorded-footage replay on slide 4. Try the physical prop only after a fresh Pi test succeeds. Keep the deck visible during the other slides. The spoken text is about 360 words; leave time for the replay.
+Use the live map on slide 2 and the verified recorded-footage replay on slide 4. Slide 4 shows the physical prototype photographed at the hackathon. Try the physical prop only after a fresh Pi test succeeds. Keep the deck visible during the other slides. The spoken text is about 360 words; leave time for the replay.
 
 ## 1. Reporting gap, 0:00–0:25
 
@@ -20,7 +20,7 @@ A ranking is a place to start, so the planner proposes tree-pit sites where risk
 
 ## 5. What is real, 2:30–3:00
 
-The city data, cell models, backtest, and recorded-footage map update are real. Teammates report that the Pi camera, PIR, and IR capture work. The room-lit plush model scored .94 AP50 on 22 held-out close-view frames, but .79 across both clips, below our .90 gate. The formal push test and physical Pi inference remain untested. We have no field deployment or rat count. Next is a supervised 50-node pilot checked against later sweeps.
+The city data, cell models, backtest, and recorded-footage map update are real. Teammates report that the Pi camera, PIR, and IR capture work. The room-lit plush model scored .943 rat AP50 on clips reused during tuning. It scored .870 on a separate 186-frame test, below our .90 target. The formal push test and physical Pi inference remain untested. We have no field deployment or rat count. Next is a supervised 50-node pilot checked against later sweeps.
 
 ## Presenter guardrails
 
@@ -29,7 +29,7 @@ The city data, cell models, backtest, and recorded-footage map update are real. 
 - The East Harlem North and West Village numbers on slide 2 are model export values for two cells. They are examples, not citywide prevalence or evidence that income caused reporting differences. The screenshot's income and recent-inspection denominators were not reproducible from the available exports, so they are omitted.
 - The Pi PIR wakes capture. It does not recognize rats. A successful live event needs the detector, the API, and the map.
 - An accepted event updates a chosen Beta prior and may re-rank candidate sites. It does not refit Model B. Model exports also contain historical sweep-informed posteriors; use the API's live event value when speaking about the stage update.
-- The toy-rat detector is a prop demo. V1 failed box detection validation (rat AP50 .00755), not an event test. V2 PyTorch and ONNX matched at square 416: .93674 on 22 held-out close-view frames (17 rat boxes), .65108 on 27 separate floor frames (12 rat boxes), and .79031 combined. The combined result missed the >.9 rat gate. These boxes had agent review and no independent human signoff.
+- The toy-rat detector is a prop demo. V1 failed box detection validation (rat AP50 .00755), not an event test. The V3 candidate matched PyTorch and ONNX at square 416: .943296 rat AP50 on fixed clips reused for tuning. A one-time independent test on 186 reviewed frames measured .870308 combined and .844166 on the fresh new-angle positive clip. This missed the .90 target. Further training is under way; do not claim generalization is solved.
 - The formal 20-push / 3-minute-negative event gate and physical Pi inference are not evaluated. Keep the saved-video integration result separate from those tests.
 - The saved-video integration replay produced exactly one accepted event from original `zoom15_b` footage at 59–63 seconds. Exported ONNX, Pi Detector rules, crop, local API, and frontend map were exercised on a Mac. Score moved 0.0923→0.1297 and plan candidate rank 11→2. This is recorded-footage integration evidence; it does not establish physical Pi performance or the formal event gate.
 - The stage prop is lit by room lights. Hardware IR capture and new rig footage do not establish detector performance under IR.
@@ -37,4 +37,4 @@ The city data, cell models, backtest, and recorded-footage map update are real. 
 
 ## Source snapshot
 
-`model/out/backtest.json`, `model/out/cells.json`, `model/out/metrics.json`, and `vision/TRAINING_RESULTS.md` in this checkout, read 2026-09-26. Hardware status came from `node/DEBRIEF-utsav.md` and the team's later confirmation that the Pi 5 camera is aimed at the table with new IR footage. The recorded-footage integration result came from the team's local replay and frontend screenshot. The plan's older pitch and “What's real” section contain future-tense claims; this script uses the current artifacts.
+`model/out/backtest.json`, `model/out/cells.json`, `model/out/metrics.json`, and `vision/HILL_CLIMB.md` in this checkout, read 2026-09-26. Hardware status came from `node/DEBRIEF-utsav.md` and the team's later confirmation that the Pi 5 camera is aimed at the table with new IR footage. The physical rig photo came from Sanjavan's 2026-09-26 team media. The recorded-footage integration result came from the team's local replay and frontend screenshot. The plan's older pitch and “What's real” section contain future-tense claims; this script uses the current artifacts.
