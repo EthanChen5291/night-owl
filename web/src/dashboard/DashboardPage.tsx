@@ -65,10 +65,18 @@ function Thumb({ artifact }: { artifact: DashboardArtifact }) {
 /** What the assistant did: live while it works, then folded into one line once the answer streams. */
 function Trace({ turn, live, status }: { turn: Turn; live: boolean; status: string }) {
   const [expanded, setExpanded] = useState(false)
+  const thinkingRef = useRef<HTMLParagraphElement>(null)
   const steps = turn.steps ?? []
   const thinking = turn.thinking?.trim() ?? ''
-  if (!live && !steps.length && !thinking) return null
   const working = live && !turn.content
+  // While reasoning streams, keep its newest line in view; the reader can still scroll back.
+  useLayoutEffect(() => {
+    const node = thinkingRef.current
+    if (!node || !working) return
+    node.scrollTop = node.scrollHeight
+    node.classList.toggle('clipped', node.scrollTop > 0)
+  }, [thinking, working])
+  if (!live && !steps.length && !thinking) return null
   const open = working || expanded
   const summary = steps.length ? `${steps.length} step${steps.length === 1 ? '' : 's'}` : 'the question'
   return <div className={`dx-trace${open ? ' open' : ''}`}>
@@ -79,7 +87,7 @@ function Trace({ turn, live, status }: { turn: Turn; live: boolean; status: stri
         <ChevronIcon size={13} dir={expanded ? 'down' : 'right'} />
       </button>}
     {open && (thinking || steps.length > 0) && <div className="dx-trace-body">
-      {thinking && <p className={`dx-thinking${working ? ' tail' : ''}`}>{working ? thinking.slice(-360) : thinking}</p>}
+      {thinking && <p ref={thinkingRef} className={`dx-thinking${working ? ' tail' : ''}`} onScroll={(event) => event.currentTarget.classList.toggle('clipped', event.currentTarget.scrollTop > 0)}>{thinking}</p>}
       {steps.length > 0 && <ol className="dx-steps">{steps.map((step, i) => <li key={i} className={step.error ? 'error' : ''}>
         <span className="dx-step-dot">{step.error ? <CloseIcon size={10} /> : <CheckIcon size={10} />}</span>
         <span>{step.text}{step.detail && <small>{step.detail}</small>}</span>

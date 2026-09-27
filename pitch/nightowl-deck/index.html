@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightOwl · Pitch · DivHacks 2026</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+  /* Same mechanics as the ShapeUp deck: one file, stacked slides, reveal-on-enter, HUD + progress.
+     Colours are the NightOwl palette as variables; re-theme by editing :root only. */
+  :root {
+    --bg:          #0B0B0B;
+    --bg-2:        #121210;
+    --bg-3:        #181816;
+    --ink:         #EDE8D8;
+    --ink-2:       #CFCABC;
+    --ink-dim:     rgba(237, 232, 216, 0.62);
+    --ink-faint:   rgba(237, 232, 216, 0.30);
+    --rule:        rgba(237, 232, 216, 0.12);
+    --rule-strong: rgba(237, 232, 216, 0.26);
+    --accent:      #F2D544;
+    --accent-deep: #C9A92E;
+    --accent-soft: rgba(242, 213, 68, 0.12);
+    --glass:       rgba(237, 232, 216, 0.035);
+    --glass-border:rgba(242, 213, 68, 0.24);
+    --glow-sm:     0 0 18px rgba(242, 213, 68, 0.35);
+    --ease:        cubic-bezier(.2, .8, .2, 1);
+    --f-display:   "Fraunces", Georgia, serif;
+    --f-italic:    "Instrument Serif", "Fraunces", Georgia, serif;
+    --f-sans:      "Geist", Arial, Helvetica, sans-serif;
+    --f-mono:      "Geist Mono", "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #050505; overflow: hidden; }
+  #stage { position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px; transform: translate(-50%, -50%);
+           background: var(--bg); color: var(--ink); font-family: var(--f-sans); overflow: hidden; }
+  .bg { position: absolute; inset: 0; pointer-events: none;
+        background: radial-gradient(900px 620px at 80% 16%, rgba(242,213,68,.065), transparent 62%),
+                    radial-gradient(820px 600px at 6% 94%, rgba(237,232,216,.04), transparent 60%); }
+  .stars { position: absolute; inset: 0; pointer-events: none; opacity: .5;
+    background-image:
+      radial-gradient(1.3px 1.3px at 14% 12%, #EDE8D8, transparent), radial-gradient(1px 1px at 27% 31%, #EDE8D8, transparent),
+      radial-gradient(1.2px 1.2px at 41% 8%, #EDE8D8, transparent), radial-gradient(1px 1px at 58% 22%, #EDE8D8, transparent),
+      radial-gradient(1.4px 1.4px at 66% 6%, #EDE8D8, transparent), radial-gradient(1px 1px at 79% 34%, #EDE8D8, transparent),
+      radial-gradient(1.2px 1.2px at 91% 14%, #EDE8D8, transparent), radial-gradient(1px 1px at 8% 48%, #EDE8D8, transparent),
+      radial-gradient(1px 1px at 35% 57%, #EDE8D8, transparent), radial-gradient(1.2px 1.2px at 52% 44%, #EDE8D8, transparent),
+      radial-gradient(1px 1px at 73% 61%, #EDE8D8, transparent), radial-gradient(1.3px 1.3px at 88% 52%, #EDE8D8, transparent),
+      radial-gradient(1px 1px at 19% 78%, #EDE8D8, transparent), radial-gradient(1px 1px at 46% 84%, #EDE8D8, transparent),
+      radial-gradient(1.2px 1.2px at 63% 90%, #EDE8D8, transparent), radial-gradient(1px 1px at 95% 80%, #EDE8D8, transparent); }
+
+  /* ---------- frame (on every slide) */
+  .progress { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: rgba(237,232,216,.06); z-index: 25; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--accent); box-shadow: var(--glow-sm); transition: width 520ms var(--ease); }
+  .topbar { position: absolute; top: 28px; left: 130px; right: 62px; z-index: 20; display: flex; justify-content: space-between; align-items: center;
+            font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .24em; text-transform: uppercase; color: var(--ink-dim); }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand .logo { font-family: var(--f-italic); font-style: italic; font-size: 21px; letter-spacing: 0; text-transform: none; color: var(--accent); }
+  .brand .sep { width: 1px; height: 14px; background: var(--rule-strong); }
+  .keys b { font-weight: 400; border: 1px solid var(--rule-strong); border-radius: 3px; padding: 1px 5px; margin: 0 2px; color: var(--ink-2); }
+  .rail { position: absolute; left: 54px; top: 112px; bottom: 112px; width: 26px; z-index: 20; }
+  .rail::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--rule); }
+  .rail .tick { position: absolute; left: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: var(--ink-faint); }
+  .rail .eyes { position: absolute; left: 50%; top: 0; display: flex; gap: 5px; transform: translate(-50%, -50%); transition: top 620ms var(--ease); }
+  .rail .eyes i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px rgba(242,213,68,.8); }
+  .vtext { position: absolute; right: 22px; top: 112px; bottom: 112px; writing-mode: vertical-rl; text-align: center; z-index: 20;
+           font-family: var(--f-mono); font-size: 10px; letter-spacing: .42em; text-transform: uppercase; color: var(--ink-faint); }
+  .hud { position: absolute; left: 130px; right: 62px; bottom: 24px; z-index: 24; display: flex; align-items: center; gap: 28px;
+         font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .24em; text-transform: uppercase; color: var(--ink-dim); }
+  .hud .count b { color: var(--ink); font-weight: 500; }
+  .ticker { flex: 1; overflow: hidden; white-space: nowrap; color: var(--ink-faint);
+            -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+  .ticker .track { display: inline-block; animation: tick 46s linear infinite; }
+  .ticker .track span { margin-right: 44px; }
+  .ticker .track span::before { content: "✦"; color: var(--accent); margin-right: 14px; font-size: 8px; vertical-align: 2px; }
+  @keyframes tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .nav { display: flex; gap: 8px; }
+  .nav button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--rule-strong); background: transparent; color: var(--ink-2); font-size: 14px; cursor: pointer; }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- slides */
+  .slide { position: absolute; inset: 0; padding: 112px 110px 104px 130px; z-index: 5; opacity: 0; pointer-events: none;
+           transform: translateX(40px) scale(.995); filter: blur(6px);
+           transition: opacity 520ms var(--ease), transform 620ms var(--ease), filter 620ms var(--ease); }
+  .slide.prev { transform: translateX(-40px) scale(.995); }
+  .slide.active { opacity: 1; transform: none; filter: none; pointer-events: auto; }
+  .slide .reveal { opacity: 0; }
+  .slide.active .reveal { animation: reveal 820ms var(--ease) both; }
+  .slide.active .r1 { animation-delay: 60ms; }  .slide.active .r2 { animation-delay: 160ms; }
+  .slide.active .r3 { animation-delay: 270ms; } .slide.active .r4 { animation-delay: 380ms; }
+  .slide.active .r5 { animation-delay: 490ms; } .slide.active .r6 { animation-delay: 600ms; }
+  .slide.active .r7 { animation-delay: 710ms; }
+  @keyframes reveal { from { opacity: 0; transform: translateY(16px); filter: blur(5px); } to { opacity: 1; transform: none; filter: none; } }
+  .say { display: none; }
+
+  .eyebrow { font-family: var(--f-mono); font-size: 12.5px; letter-spacing: .3em; text-transform: uppercase; color: var(--accent);
+             display: flex; align-items: center; gap: 14px; margin-bottom: 26px; }
+  .eyebrow::before { content: ""; width: 34px; height: 1px; background: var(--accent); opacity: .7; }
+  .head { font-family: var(--f-italic); font-weight: 400; font-size: 76px; line-height: 1.0; letter-spacing: -.01em; margin: 0; max-width: 1200px; }
+  .head em { font-style: italic; color: var(--accent); }
+  .head.sm { font-size: 60px; }
+  .head.xs { font-size: 48px; margin-bottom: 26px; }
+  .lede { font-size: 19px; line-height: 1.55; color: var(--ink-dim); margin: 26px 0 0; max-width: 520px; }
+  .mono { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .24em; text-transform: uppercase; color: var(--ink-faint); }
+  .lab { font-family: var(--f-mono); font-size: 11px; letter-spacing: .26em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+  b { font-weight: 600; color: var(--ink); }
+  .pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase;
+          color: var(--accent); border: 1px solid var(--glass-border); border-radius: 999px; padding: 6px 13px; background: var(--accent-soft); }
+  .pill.ghost { background: transparent; color: var(--ink-2); border-color: var(--rule-strong); }
+  .pill.solid { background: var(--accent); color: #111; border-color: var(--accent); }
+  .frame { position: relative; border: 1px solid var(--glass-border); border-radius: 4px; overflow: hidden; background: #000; margin: 0; }
+  .frame .tag { position: absolute; top: 14px; right: 14px; font-family: var(--f-mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+                color: var(--accent); border: 1px solid var(--glass-border); background: rgba(0,0,0,.55); padding: 4px 8px; border-radius: 3px; }
+  .frame figcaption { position: absolute; left: 16px; bottom: 14px; }
+  .corner { position: absolute; width: 14px; height: 14px; border-color: var(--accent); border-style: solid; opacity: .8; }
+  .corner.tl { top: 8px; left: 8px; border-width: 1px 0 0 1px; }   .corner.tr { top: 8px; right: 8px; border-width: 1px 1px 0 0; }
+  .corner.bl { bottom: 8px; left: 8px; border-width: 0 0 1px 1px; } .corner.br { bottom: 8px; right: 8px; border-width: 0 1px 1px 0; }
+
+  .cols3 { position: absolute; left: 130px; right: 110px; bottom: 122px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 46px; }
+  .col { border-top: 1px solid var(--rule-strong); padding-top: 20px; }
+  .col h3 { font-family: var(--f-italic); font-style: italic; font-weight: 400; font-size: 31px; line-height: 1.08; margin: 0 0 12px; }
+  .col p { margin: 0; font-size: 16.5px; line-height: 1.5; color: var(--ink-dim); }
+  .col .chip { display: inline-block; margin-top: 16px; font-family: var(--f-mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+               color: var(--accent); border: 1px solid var(--glass-border); border-radius: 999px; padding: 4px 10px; }
+  .big-i { font-family: var(--f-italic); font-style: italic; font-size: 64px; line-height: 1; color: var(--accent); margin-bottom: 12px; }
+
+  /* 1 hero */
+  .hero-left { position: absolute; left: 130px; top: 196px; width: 860px; z-index: 2; }
+  .hero-chips { display: flex; align-items: center; gap: 18px; }
+  .title { font-family: var(--f-display); font-weight: 900; font-size: 176px; line-height: .92; letter-spacing: -.035em; margin: 30px 0 0; white-space: nowrap;
+           font-variation-settings: "opsz" 144; }
+  .title .t2 { font-family: var(--f-italic); font-style: italic; font-weight: 400; color: var(--accent); letter-spacing: -.01em; margin-left: 4px;
+               text-shadow: 0 0 60px rgba(242,213,68,.28); }
+  .hero .rule { width: 300px; height: 1px; background: var(--rule-strong); margin: 34px 0 26px; }
+  .hero-sub { margin: 0; font-family: var(--f-italic); font-style: italic; font-size: 34px; line-height: 1.2; }
+  .hero-sub em { color: var(--accent); }
+  .hero-sub span { display: block; font-family: var(--f-sans); font-style: normal; font-size: 18px; color: var(--ink-dim); margin-top: 12px; }
+  .hero-art { position: absolute; right: 110px; top: 112px; width: 470px; height: 600px; }
+  .hero-art img { width: 100%; height: 100%; object-fit: cover; object-position: 71% 42%; }
+  .meta { position: absolute; left: 130px; right: 110px; bottom: 116px; display: grid; grid-template-columns: 1fr 1fr 1fr 1.6fr; gap: 30px;
+          border-top: 1px solid var(--rule); padding-top: 16px; }
+  .meta b { display: block; font-family: var(--f-mono); font-weight: 400; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-2); margin-top: 6px; }
+
+  /* 3 silent blocks */
+  .silent-left { position: absolute; left: 130px; top: 112px; width: 640px; }
+  .bigstats { margin-top: 34px; }
+  .bs { display: grid; grid-template-columns: 200px 1fr; align-items: center; gap: 24px; padding: 18px 0; border-top: 1px solid var(--rule); }
+  .bs .n { font-family: var(--f-display); font-weight: 900; font-size: 78px; line-height: .95; letter-spacing: -.03em; color: var(--ink); }
+  .bs .n small { font-size: 36px; font-weight: 700; color: var(--accent); margin-left: 2px; }
+  .bs.acc .n { color: var(--accent); }
+  .bs .d { font-size: 17px; line-height: 1.4; color: var(--ink-2); }
+  .bs .src { display: block; margin-top: 8px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--ink-faint); }
+  .map-card { position: absolute; right: 110px; top: 112px; width: 640px; height: 676px; background: var(--bg-2); }
+  .map-card img { position: absolute; inset: 24px 24px 48px; width: calc(100% - 48px); height: calc(100% - 72px); object-fit: contain; }
+
+  /* 4 solution */
+  .steps { position: absolute; left: 130px; right: 110px; bottom: 122px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 36px; }
+  .steps .line { position: absolute; left: 0; right: 0; top: 6px; border-top: 1px dashed var(--rule-strong); }
+  .step { position: relative; padding-top: 34px; }
+  .step .dot { position: absolute; top: 0; left: 0; width: 13px; height: 13px; border-radius: 50%; background: var(--bg); border: 1px solid var(--accent); }
+  .step .dot::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent); }
+  .step .dot.on { box-shadow: 0 0 16px rgba(242,213,68,.7); }
+  .step h3 { font-family: var(--f-italic); font-style: italic; font-weight: 400; font-size: 32px; margin: 0 0 10px; }
+  .step p { margin: 0; font-size: 16px; line-height: 1.5; color: var(--ink-dim); }
+
+  /* 5 proof */
+  .chart-card { position: absolute; left: 130px; top: 318px; width: 870px; height: 382px; background: var(--bg-2); padding: 18px 20px 10px; }
+  .chart { width: 100%; height: auto; display: block; margin-top: 8px; }
+  .chart .grid { stroke: rgba(237,232,216,.10); stroke-width: 1; }
+  .chart .ax { font-family: var(--f-mono); font-size: 11px; fill: rgba(237,232,216,.42); letter-spacing: .08em; }
+  .chart .lb { fill: none; stroke: var(--accent); stroke-width: 2.6; stroke-linejoin: round; filter: drop-shadow(0 0 6px rgba(242,213,68,.45)); }
+  .chart .l311 { fill: none; stroke: rgba(237,232,216,.55); stroke-width: 2; stroke-linejoin: round; }
+  .chart .lab { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; fill: rgba(237,232,216,.7); }
+  .chart .lab-b { fill: var(--accent); }
+  .readout { position: absolute; left: 1050px; right: 110px; top: 318px; }
+  .ro { padding: 16px 0 18px; border-top: 1px solid var(--rule); }
+  .ro .n { font-family: var(--f-display); font-weight: 900; font-size: 64px; line-height: 1; letter-spacing: -.03em; }
+  .ro .n.acc { color: var(--accent); }
+  .ro .n small { font-size: 28px; font-weight: 700; color: var(--ink-dim); }
+  .ro .d { font-size: 15.5px; color: var(--ink-dim); margin-top: 8px; line-height: 1.4; }
+  .pipe { position: absolute; left: 130px; right: 110px; bottom: 112px; display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 22px;
+          border: 1px solid var(--rule); border-radius: 4px; padding: 13px 22px; background: var(--glass); }
+  .pstep b { display: block; font-family: var(--f-italic); font-style: italic; font-weight: 400; font-size: 21px; margin-top: 4px; }
+  .arr { color: var(--accent); font-size: 20px; }
+
+  /* 6 owl */
+  .owl-photo { position: absolute; left: 130px; top: 112px; width: 500px; height: 676px; }
+  .owl-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; filter: saturate(.85) contrast(1.05); }
+  .owl-right { position: absolute; left: 700px; right: 110px; top: 112px; }
+  .specs { list-style: none; margin: 34px 0 0; padding: 0; }
+  .specs li { display: grid; grid-template-columns: 58px 1fr; gap: 10px; padding: 15px 0; border-top: 1px solid var(--rule); }
+  .specs .idx { font-family: var(--f-italic); font-style: italic; font-size: 34px; line-height: 1; color: var(--accent); }
+  .specs p { margin: 0; font-size: 23px; line-height: 1.45; color: var(--ink-2); }
+  .specs .lab { margin-bottom: 6px; }
+
+  /* 9 close */
+  .close-in { position: absolute; left: 130px; right: 110px; top: 190px; text-align: center; }
+  .eyebrow.center { justify-content: center; }
+  .eyebrow.center::after { content: ""; width: 34px; height: 1px; background: var(--accent); opacity: .7; }
+  .close-head { font-family: var(--f-display); font-weight: 800; font-size: 126px; line-height: .98; letter-spacing: -.03em; margin: 0; }
+  .close-head em { font-family: var(--f-italic); font-weight: 400; color: var(--accent); letter-spacing: -.01em; text-shadow: 0 0 60px rgba(242,213,68,.3); }
+  .close-sub { font-family: var(--f-italic); font-style: italic; font-size: 30px; line-height: 1.3; color: var(--ink-2); margin: 34px 0 0; }
+  .chips { display: flex; justify-content: center; gap: 12px; margin-top: 40px; }
+
+  /* 10 crew */
+  .team { position: absolute; left: 130px; right: 110px; bottom: 122px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+  .portrait { height: 330px; border: 1px solid var(--rule-strong); border-radius: 4px; display: grid; place-items: center;
+              background: linear-gradient(180deg, var(--bg-3), var(--bg)); }
+  .portrait { overflow: hidden; }
+  .portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .member .nm { font-family: var(--f-italic); font-style: italic; font-size: 32px; margin: 14px 0 4px; }
+
+  /* backups */
+  .blist { list-style: none; margin: 0; padding: 0; max-width: 1240px; }
+  .blist li { position: relative; padding: 13px 0 13px 34px; border-top: 1px solid var(--rule); font-size: 19px; line-height: 1.45; color: var(--ink-2); }
+  .blist li::before { content: "—"; position: absolute; left: 0; color: var(--accent); }
+  .limit { position: absolute; left: 130px; right: 110px; bottom: 112px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-faint); }
+  .bento { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, 150px); gap: 14px; margin-top: 10px; }
+  .tile { border: 1px solid var(--rule-strong); border-radius: 4px; background: var(--bg-2); padding: 18px 20px; display: flex; flex-direction: column; justify-content: flex-end; }
+  .tile h3 { font-family: var(--f-italic); font-style: italic; font-weight: 400; font-size: 28px; margin: 8px 0 4px; }
+  .tile p { margin: 0; font-size: 14.5px; color: var(--ink-dim); }
+  .tile .mono { margin-bottom: auto; }
+  .tile.big { grid-column: span 2; grid-row: span 2; background: linear-gradient(135deg, rgba(242,213,68,.92), rgba(201,169,46,.92)); border-color: var(--accent); }
+  .tile.big h3 { font-size: 64px; color: #111; }
+  .tile.big p, .tile.big .mono { color: rgba(17,17,17,.75); font-size: 17px; }
+  .tile.big .mono { font-size: 11px; }
+
+
+  /* 2 problem: two big numbers */
+  .duo { position: absolute; left: 130px; right: 110px; bottom: 122px; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
+  .duo .st { border-top: 1px solid var(--rule-strong); padding-top: 22px; }
+  .duo .n { font-family: var(--f-display); font-weight: 900; font-size: 150px; line-height: .9; letter-spacing: -.04em; }
+  .duo .n.acc { color: var(--accent); text-shadow: 0 0 60px rgba(242,213,68,.22); }
+  .duo .d { font-family: var(--f-italic); font-style: italic; font-size: 30px; line-height: 1.15; margin-top: 18px; max-width: 580px; }
+  .duo .src { margin-top: 14px; }
+  /* 3 exhibit: side-by-side table */
+  .cmp { position: absolute; left: 130px; top: 318px; width: 1360px; border-collapse: collapse; }
+  .cmp th, .cmp td { text-align: left; padding: 18px 26px; border-top: 1px solid var(--rule); vertical-align: middle; }
+  .cmp thead th { border-top: 0; font-family: var(--f-italic); font-style: italic; font-weight: 400; font-size: 38px; color: var(--ink); padding-bottom: 14px; }
+  .cmp td:first-child { font-size: 20px; color: var(--ink-2); width: 44%; padding-left: 0; }
+  .cmp td span { display: block; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-faint); margin-top: 7px; }
+  .cmp td.v { font-family: var(--f-display); font-weight: 800; font-size: 60px; letter-spacing: -.03em; line-height: 1; }
+  .cmp .hl { background: var(--accent-soft); }
+  .cmp thead th.hl { color: var(--accent); }
+  .cmp td.v.acc { color: var(--accent); }
+  .cmp-src { position: absolute; left: 130px; bottom: 112px; }
+  /* 4 silent blocks */
+  .n382 { font-family: var(--f-display); font-weight: 900; font-size: 220px; line-height: .85; letter-spacing: -.045em; color: var(--accent);
+          margin-top: 22px; text-shadow: 0 0 70px rgba(242,213,68,.25); }
+  .silent-line { font-family: var(--f-italic); font-size: 50px; line-height: 1.06; margin: 24px 0 0; max-width: 640px; }
+  .silent-line em { color: var(--accent); }
+  .silent-note { margin: 34px 0 0; font-size: 16.5px; line-height: 1.55; color: var(--ink-dim); max-width: 580px; border-top: 1px solid var(--rule); padding-top: 18px; }
+  /* 5 two models */
+  .models { position: absolute; left: 130px; right: 110px; top: 244px; bottom: 188px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 30px; }
+  .model { margin: 0; display: flex; flex-direction: column; align-items: center; height: 100%; min-height: 0; }
+  .model img { flex: 1; min-height: 0; max-width: 100%; object-fit: contain; }
+  .model.b img { transform: scale(1.08); }
+  .model.b .cap { margin-top: 22px; }
+  .model .cap { text-align: center; margin-top: 8px; }
+  .model .cap b { display: block; font-family: var(--f-italic); font-style: italic; font-weight: 400; font-size: 30px; margin-top: 6px; }
+  .model.b .cap b { color: var(--accent); }
+  .vs { font-family: var(--f-italic); font-style: italic; font-size: 44px; color: var(--ink-faint); }
+  .gapline { position: absolute; left: 130px; right: 110px; bottom: 112px; margin: 0; text-align: center; font-family: var(--f-italic); font-size: 36px;
+             border-top: 1px solid var(--rule); padding-top: 20px; }
+  .gapline em { color: var(--accent); }
+  /* 6 proof: two bars */
+  .bars2 { position: absolute; left: 130px; right: 110px; top: 400px; }
+  .brow { display: grid; grid-template-columns: 330px 1fr 200px; align-items: center; gap: 30px; padding: 26px 0; border-top: 1px solid var(--rule); }
+  .bname { font-family: var(--f-italic); font-style: italic; font-size: 34px; }
+  .btrack { height: 58px; background: rgba(237,232,216,.04); border-radius: 3px; overflow: hidden; }
+  .bfill { height: 100%; background: rgba(237,232,216,.45); border-radius: 3px; }
+  .bfill.acc { background: var(--accent); box-shadow: 0 0 24px rgba(242,213,68,.35); }
+  .slide.active .bfill { animation: grow 1100ms var(--ease) 420ms both; }
+  @keyframes grow { from { width: 0; } }
+  .bval { font-family: var(--f-display); font-weight: 900; font-size: 74px; letter-spacing: -.03em; text-align: right; }
+  .bval.acc { color: var(--accent); }
+  .baxis { margin-top: 18px; }
+  /* 7 owl */
+  .lede.big { font-family: var(--f-italic); font-style: italic; font-size: 40px; line-height: 1.2; color: var(--ink); max-width: 720px; margin-top: 22px; }
+  /* 8 what's next: one big statement */
+  .big-in { position: absolute; left: 130px; right: 110px; top: 200px; text-align: center; }
+  .big-head { font-family: var(--f-display); font-weight: 800; font-size: 134px; line-height: .98; letter-spacing: -.03em; margin: 0; }
+  .big-head em { font-family: var(--f-italic); font-weight: 400; color: var(--accent); letter-spacing: -.01em; text-shadow: 0 0 60px rgba(242,213,68,.3); }
+  .big-sub { font-family: var(--f-italic); font-style: italic; font-size: 34px; color: var(--ink-2); margin: 32px 0 0; }
+  .next-chips { display: flex; justify-content: center; gap: 14px; margin-top: 46px; flex-wrap: wrap; }
+  .next-chips .pill { font-size: 12px; padding: 9px 16px; }
+  .next-chips .pill b { color: var(--ink); font-weight: 400; margin-left: 2px; }
+  /* backup B2: chart + notes */
+  .chart-card.b2 { top: 250px; }
+  .blist.side { position: absolute; left: 1040px; right: 110px; top: 250px; }
+  .blist.side li { font-size: 20px; padding: 14px 0 14px 30px; }
+  .blist.big li { font-size: 24px; padding: 18px 0 18px 38px; }
+
+  /* 2 problem: the claim under the headline */
+  .lede.sub { font-family: var(--f-italic); font-style: italic; font-size: 34px; line-height: 1.2; color: var(--ink-2); max-width: 1180px; margin-top: 22px; }
+  .lede.sub em { color: var(--accent); }
+  /* 3 exhibit: two pairs side by side */
+  .cmp4 { position: absolute; left: 130px; top: 250px; width: 1360px; border-collapse: collapse; table-layout: fixed; }
+  .cmp4 th, .cmp4 td { text-align: left; padding: 10px 18px; border-top: 1px solid var(--rule); vertical-align: middle; }
+  .cmp4 col.lbl { width: 300px; }
+  .cmp4 thead th { border-top: 0; font-weight: 400; }
+  .cmp4 tr.grp th { font-family: var(--f-mono); font-size: 11px; letter-spacing: .26em; text-transform: uppercase; color: var(--accent); padding-bottom: 4px; }
+  .cmp4 tr.nm th { font-family: var(--f-italic); font-style: italic; font-size: 30px; line-height: 1.02; color: var(--ink); padding-bottom: 12px; vertical-align: bottom; }
+  .cmp4 td:first-child { font-size: 18px; color: var(--ink-2); padding-left: 0; }
+  .cmp4 td span { display: block; font-family: var(--f-mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-faint); margin-top: 6px; }
+  .cmp4 td.v { font-family: var(--f-display); font-weight: 800; font-size: 44px; letter-spacing: -.03em; line-height: 1; }
+  .cmp4 .hl { background: var(--accent-soft); }
+  .cmp4 td.v.acc { color: var(--accent); }
+  .cmp4 .gap { border-left: 1px solid var(--rule-strong); }
+  .cmp4 tfoot td { border-top: 1px solid var(--rule-strong); font-family: var(--f-italic); font-style: italic; font-size: 28px; color: var(--ink); padding-top: 16px; }
+  .cmp4 tfoot td em { color: var(--accent); }
+  /* 4 scale: who gets inspected vs where the rats are */
+  .scale-left { position: absolute; left: 130px; top: 112px; width: 740px; }
+  .scale-left .head { font-size: 50px; line-height: 1.04; }
+  .sgroup { margin-top: 30px; }
+  .sgroup .who { display: flex; align-items: center; gap: 12px; font-family: var(--f-italic); font-style: italic; font-size: 28px; margin-bottom: 4px; }
+  .dot { display: inline-block; width: 13px; height: 13px; border-radius: 50%; flex: none; }
+  .dot.blue { background: #5B8DEF; } .dot.red { background: #E0604A; } .dot.grey { background: rgba(237,232,216,.35); }
+  .sbar { display: grid; grid-template-columns: 200px 1fr; align-items: center; gap: 16px; margin-top: 10px; }
+  .sbar .k { font-family: var(--f-mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-dim); }
+  .sbar .t { position: relative; height: 36px; }
+  .sbar .t i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; }
+  .sbar .t i.blue { background: #5B8DEF; } .sbar .t i.red { background: #E0604A; }
+  .sbar .t i.hatch { background-color: transparent; border: 2px solid; background-image: repeating-linear-gradient(45deg, currentColor 0 2px, transparent 2px 7px); }
+  .sbar .t i.blue.hatch { color: #5B8DEF; border-color: #5B8DEF; } .sbar .t i.red.hatch { color: #E0604A; border-color: #E0604A; }
+  .slide.active .sbar .t i { animation: grow 1100ms var(--ease) 420ms both; }
+  .sbar .t b { position: absolute; top: 50%; transform: translateY(-50%); font-family: var(--f-display); font-weight: 800; font-size: 28px; letter-spacing: -.02em; white-space: nowrap; }
+  .scale-punch { margin: 30px 0 0; font-family: var(--f-italic); font-style: italic; font-size: 34px; line-height: 1.2; }
+  .scale-punch em { color: var(--accent); }
+  .sides-map { position: absolute; right: 110px; top: 112px; width: 600px; height: 600px; background: var(--bg-2); }
+  .sides-map img { position: absolute; inset: 14px 14px 40px; width: calc(100% - 28px); height: calc(100% - 54px); object-fit: contain; }
+  .sides-map figcaption { display: flex; align-items: center; gap: 8px; }
+  .sides-map figcaption .dot { width: 9px; height: 9px; margin-left: 10px; }
+  .sides-map figcaption .dot:first-child { margin-left: 0; }
+  .leaves { position: absolute; left: 130px; right: 110px; bottom: 112px; margin: 0; font-family: var(--f-italic); font-style: italic; font-size: 38px;
+            border-top: 1px solid var(--rule); padding-top: 18px; }
+  .leaves em { color: var(--accent); }
+  /* 5 silent blocks: what qualifies, what they look like */
+  .silent-left.v3 { top: 222px; width: 620px; }
+  .silent-right { position: absolute; left: 840px; right: 110px; top: 150px; }
+  .health { margin: 0 0 34px; }
+  .health .hrow { display: grid; grid-template-columns: 170px 1fr; align-items: baseline; gap: 10px; padding: 16px 0; border-top: 1px solid var(--rule); }
+  .health .n { font-family: var(--f-display); font-weight: 900; font-size: 50px; line-height: 1; letter-spacing: -.03em; }
+  .health .t { font-size: 19px; line-height: 1.35; color: var(--ink-2); }
+  .health .t b { display: block; font-family: var(--f-italic); font-style: italic; font-weight: 400; font-size: 30px; color: var(--ink); margin-bottom: 4px; }
+  .health .src { display: block; margin-top: 7px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-faint); }
+  .props { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 34px; }
+  .props div { border-top: 1px solid var(--rule); padding-top: 12px; }
+  .props b { display: block; font-family: var(--f-display); font-weight: 900; font-size: 50px; letter-spacing: -.03em; line-height: 1; }
+  .props span { display: block; margin-top: 7px; font-size: 16.5px; line-height: 1.35; color: var(--ink-dim); }
+  /* 9 warning light: a tree out of "Rats" */
+  .tree { position: absolute; left: 130px; right: 110px; top: 246px; height: 470px; }
+  .tree .links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .tree .links path { fill: none; stroke: rgba(242,213,68,.55); stroke-width: 1.6; stroke-dasharray: 700; stroke-dashoffset: 700; }
+  .slide.active .tree .links path { animation: draw 1400ms var(--ease) 380ms forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .tree .links circle { fill: var(--accent); }
+  .tree .root { position: absolute; left: 0; top: 235px; transform: translateY(-50%); font-family: var(--f-italic); font-style: italic; font-size: 60px; line-height: .98;
+                color: var(--accent); text-shadow: 0 0 60px rgba(242,213,68,.35); }
+  .tree .grp { position: absolute; left: 520px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .26em; text-transform: uppercase; color: var(--accent); }
+  .tree .grp span { color: var(--ink-faint); }
+  .tree .node { position: absolute; left: 520px; right: 0; display: grid; grid-template-columns: 150px 1fr; align-items: baseline; }
+  .tree .node .n { font-family: var(--f-display); font-weight: 900; font-size: 46px; line-height: 1; letter-spacing: -.03em; }
+  .tree .node .t { font-size: 18px; line-height: 1.35; color: var(--ink-2); }
+  .tree .node .t b { font-family: var(--f-italic); font-style: italic; font-weight: 400; font-size: 27px; color: var(--ink); margin-right: 10px; }
+  .tree .node .src { display: block; margin-top: 3px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-faint); }
+  .warn-next { position: absolute; left: 130px; right: 110px; bottom: 112px; margin: 0; border-top: 1px solid var(--rule); padding-top: 16px;
+               font-family: var(--f-italic); font-style: italic; font-size: 28px; color: var(--ink-2); }
+  .warn-next em { color: var(--accent); }
+  /* 10 try it */
+  .try-in { position: absolute; inset: 0; display: grid; place-items: center; }
+  .try { font-family: var(--f-display); font-weight: 800; font-size: 170px; line-height: 1; letter-spacing: -.035em; margin: 0; }
+  .try em { font-family: var(--f-italic); font-weight: 400; color: var(--accent); letter-spacing: -.01em; text-shadow: 0 0 60px rgba(242,213,68,.3); }
+
+  /* steps: slides with data-steps="2" take one extra → ; .swap crossfades an a-part into a b-part */
+  .swap { display: inline-grid; }
+  .swap > span { grid-area: 1 / 1; transition: opacity 480ms var(--ease), transform 640ms var(--ease), filter 480ms var(--ease);
+                 transition-delay: calc(var(--d, 0) * 70ms); }
+  .swap > .b { opacity: 0; transform: translateY(18px); filter: blur(5px); }
+  .slide.step-1 .swap > .a { opacity: 0; transform: translateY(-18px); filter: blur(5px); }
+  .slide.step-1 .swap > .b { opacity: 1; transform: none; filter: none; }
+  /* 3 exhibit: one pair at a time */
+  .ex { position: absolute; left: 130px; top: 262px; width: 1360px; border-collapse: collapse; table-layout: fixed; }
+  .ex col.lbl { width: 40%; }
+  .ex th, .ex td { text-align: left; padding: 11px 26px; border-top: 1px solid var(--rule); vertical-align: middle; }
+  .ex thead th { border-top: 0; font-family: var(--f-italic); font-style: italic; font-weight: 400; font-size: 38px; line-height: 1.04; color: var(--ink);
+                 padding-bottom: 14px; vertical-align: bottom; }
+  .ex thead th.hl { color: var(--accent); }
+  .ex td:first-child { font-size: 20px; color: var(--ink-2); padding-left: 0; }
+  .ex td .sub { display: block; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-faint); margin-top: 7px; }
+  .ex td.v { font-family: var(--f-display); font-weight: 800; font-size: 50px; letter-spacing: -.03em; line-height: 1; }
+  .ex .hl { background: var(--accent-soft); }
+  .ex td.v.acc { color: var(--accent); }
+  .ex tfoot td { border-top: 1px solid var(--rule-strong); font-family: var(--f-italic); font-style: italic; font-size: 32px; color: var(--ink); padding-top: 16px; }
+  .ex tfoot td em { color: var(--accent); }
+  /* 7 owl: the new render, and → fades the list into the validation loop */
+  .owl-photo.render { background: radial-gradient(ellipse at 50% 44%, #26261f 0%, #121210 58%, #0a0a09 100%); }
+  .owl-photo.render img { object-fit: contain; object-position: 50% 50%; padding: 16px; filter: drop-shadow(0 26px 40px rgba(0,0,0,.65)); }
+  .owl-swap { position: relative; }
+  .owl-swap .specs, .owl-swap .loop { transition: opacity 520ms var(--ease), transform 640ms var(--ease), filter 520ms var(--ease); }
+  .owl-swap .loop { position: absolute; left: 0; right: 0; top: 30px; opacity: 0; transform: translateY(18px) scale(.98); filter: blur(5px); pointer-events: none; }
+  .slide.step-1 .owl-swap .specs { opacity: 0; transform: translateY(-18px); filter: blur(5px); }
+  .slide.step-1 .owl-swap .loop { opacity: 1; transform: none; filter: none; }
+  .loop svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .loop .arc { fill: none; stroke: rgba(237,232,216,.42); stroke-width: 1.6; }
+  .loop .head-arrow { fill: rgba(237,232,216,.6); }
+  .loop .node { fill: #151513; stroke: rgba(237,232,216,.55); stroke-width: 1.6; }
+  .loop .node.acc { fill: #201d10; stroke: var(--accent); }                   /* opaque, so the moving pulse passes behind */
+  .loop .nl { font-family: var(--f-sans); font-weight: 600; font-size: 15px; fill: var(--ink); text-anchor: middle; }
+  .loop .ctr { font-family: var(--f-italic); font-style: italic; font-size: 42px; fill: var(--ink); text-anchor: middle; }
+  .loop .ctr-sub { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; fill: rgba(237,232,216,.5); text-anchor: middle; }
+  .loop .pulse { fill: var(--accent); filter: drop-shadow(0 0 7px rgba(242,213,68,.95)); }
+
+  /* ?pdf: static export (screenshots for the PDF), no navigation chrome */
+  body.pdf .keys, body.pdf .hud, body.pdf .rail, body.pdf .progress, body.pdf .vtext, body.pdf .notes { display: none !important; }
+
+  /* rehearsal notes: press N */
+  .notes { position: absolute; left: 130px; right: 62px; bottom: 66px; z-index: 30; display: none; background: rgba(8,8,8,.94);
+           border: 1px solid var(--rule-strong); border-radius: 8px; padding: 14px 18px; }
+  body.show-notes .notes { display: block; }
+  .notes .mono { color: var(--accent); }
+  .notes p { margin: 8px 0 0; font-size: 17px; line-height: 1.5; color: var(--ink-2); }
+
+  @media print {
+    @page { size: 1600px 900px; margin: 0; }
+    html, body { overflow: visible; height: auto; background: var(--bg); }
+    #stage { position: static; transform: none !important; height: auto; overflow: visible; }
+    .progress, .topbar, .rail, .vtext, .hud, .notes, .bg, .stars { display: none; }
+    .slide { position: relative; height: 900px; opacity: 1; transform: none; filter: none; break-after: page; }
+    .slide .reveal { opacity: 1 !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg"></div><div class="stars"></div>
+  <div class="progress"><i id="progress"></i></div>
+  <div class="topbar">
+    <div class="brand"><span class="logo">NightOwl</span><span class="sep"></span><span>Pitch · DivHacks 2026</span></div>
+    <div class="keys">Use <b>←</b><b>→</b> · <b>F</b> fullscreen · <b>N</b> notes</div>
+  </div>
+  <div class="rail" id="rail"><div class="eyes" id="eyes"><i></i><i></i></div></div>
+  <div class="vtext">NYC · block by block · the rat patrol · NightOwl</div>
+
+  <!-- ============================================================ 1 · HERO (Problem 0:00–0:05) -->
+  <section class="slide hero active" data-section="Problem" data-time="0:00–0:05">
+    <div class="hero-left">
+      <div class="hero-chips reveal r1"><span class="pill">● The Rat Patrol</span><span class="mono">Est. DivHacks · MMXXVI</span></div>
+      <h1 class="title reveal r2">Night<span class="t2">Owl</span></h1>
+      <div class="rule reveal r3"></div>
+      <p class="hero-sub reveal r4">Nothing hides from the <em>Owl.</em><span>Finding the rats New York isn't looking for.</span></p>
+    </div>
+    <figure class="frame hero-art reveal r3"><img src="assets/title_art.png" alt="An owl on a New York water tower at night">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <span class="tag">No. 001</span><figcaption class="mono">Fig. 01 · The watch</figcaption></figure>
+    <div class="meta reveal r5">
+      <div><span class="mono">Pitch no.</span><b>01 / NightOwl</b></div>
+      <div><span class="mono">Runtime</span><b>~3 minutes</b></div>
+      <div><span class="mono">Venue</span><b>DivHacks · Columbia</b></div>
+      <div><span class="mono">Crew</span><b>Ethan · Bruno · Utsav · Sanjavan</b></div>
+    </div>
+    <aside class="say">We're NightOwl, the Rat Patrol. We find the rats New York isn't looking for.</aside>
+  </section>
+  <!-- ============================================================ 2 · PROBLEM (0:05–0:15) -->
+  <section class="slide" data-section="Problem" data-time="0:05–0:15">
+    <div class="eyebrow reveal r1">01 · The Problem</div>
+    <h2 class="head reveal r2">New York's rat map is<br>a map of <em>who calls.</em></h2>
+    <p class="lede sub reveal r3">High-income, English-speaking blocks call the most.</p>
+    <div class="duo">
+      <div class="st reveal r4"><div class="n">76%</div><div class="d">more complaints from the rich than the poor, for the same number of rats.</div><div class="mono src">Richest vs poorest fifth of NYC blocks · 2015–2026</div></div>
+      <div class="st reveal r5"><div class="n acc">51%</div><div class="d">more rat infestations on poor blocks than on rich ones.</div><div class="mono src">Swept lots with active rats · 12.2% vs 8.1%</div></div>
+    </div>
+    <aside class="say">New York's rat map is a map of who calls. For the same rats, the rich complain 76% more than the poor. Yet the poor live with 51% more infestations.</aside>
+  </section>
+  <!-- ============================================================ 3 · EXHIBIT A (0:15–0:30) · → morphs the income pair into the language pair -->
+  <section class="slide" data-section="Problem" data-time="0:15–0:30" data-steps="2">
+    <div class="eyebrow reveal r1"><span class="swap" style="--d:0"><span class="a">Exhibit A · By income</span><span class="b">Exhibit B · By language, same income</span></span></div>
+    <h2 class="head sm reveal r2">Quieter phones. <em>More rats.</em></h2>
+    <table class="ex reveal r3">
+      <colgroup><col class="lbl"><col><col></colgroup>
+      <thead><tr><th></th><th><span class="swap" style="--d:0"><span class="a">West Village</span><span class="b">Crown Heights (South)</span></span></th><th class="hl"><span class="swap" style="--d:0"><span class="a">East Harlem (South)</span><span class="b">Jackson Heights</span></span></th></tr></thead>
+      <tbody>
+        <tr><td>Median household income</td><td class="v"><span class="swap" style="--d:1"><span class="a">$188k</span><span class="b">$84k</span></span></td><td class="v hl"><span class="swap" style="--d:1"><span class="a">$39k</span><span class="b">$81k</span></span></td></tr>
+        <tr><td>Poverty rate</td><td class="v"><span class="swap" style="--d:2"><span class="a">6%</span><span class="b">17%</span></span></td><td class="v hl"><span class="swap" style="--d:2"><span class="a">31%</span><span class="b">13%</span></span></td></tr>
+        <tr><td>Homes with limited English</td><td class="v"><span class="swap" style="--d:3"><span class="a">1%</span><span class="b">5%</span></span></td><td class="v hl"><span class="swap" style="--d:3"><span class="a">16%</span><span class="b">25%</span></span></td></tr>
+        <tr><td>Rat complaints to 311<span class="sub">per 1,000 residents, a year</span></td><td class="v"><span class="swap" style="--d:4"><span class="a">5.7</span><span class="b">5.0</span></span></td><td class="v hl"><span class="swap" style="--d:4"><span class="a">3.2</span><span class="b">2.2</span></span></td></tr>
+        <tr><td>Swept lots with rats<span class="sub">routine block sweeps</span></td><td class="v"><span class="swap" style="--d:5"><span class="a">6.4%</span><span class="b">4.7%</span></span></td><td class="v hl acc"><span class="swap" style="--d:5"><span class="a">15.9%</span><span class="b">7.9%</span></span></td></tr>
+      </tbody>
+      <tfoot><tr><td></td><td colspan="2"><span class="swap" style="--d:6"><span class="a"><em>2.5×</em> the rats, 44% fewer calls</span><span class="b">Same income. <em>1.7×</em> the rats, 56% fewer calls</span></span></td></tr></tfoot>
+    </table>
+    <div class="mono cmp-src reveal r4">NYC 311 · NYC Health sweeps · ACS 2024 (5-yr) · 2015–2026</div>
+    <aside class="say">West Village calls more than East Harlem South, which has two and a half times the rats. [→] Same income, different language: Jackson Heights calls less than half as much as Crown Heights, with 1.7 times the rats.</aside>
+  </section>
+  <!-- ============================================================ 4 · THE SCALE (0:30–0:43) -->
+  <section class="slide" data-section="Problem" data-time="0:30–0:43">
+    <div class="scale-left">
+      <div class="eyebrow reveal r1">The Scale</div>
+      <h2 class="head reveal r2">~150,000 rat inspections a year.<br><em>They go where the calls are.</em></h2>
+      <div class="sgroup reveal r3">
+        <div class="who"><span class="dot blue"></span>Richer blocks that call more</div>
+        <div class="sbar"><span class="k">Inspections a year</span><div class="t"><i class="blue" style="width:380px"></i><b style="left:394px">49,700</b></div></div>
+        <div class="sbar"><span class="k">Properties with rats</span><div class="t"><i class="blue hatch" style="width:164px"></i><b style="left:178px">21,400</b></div></div>
+      </div>
+      <div class="sgroup reveal r4">
+        <div class="who"><span class="dot red"></span>Poorer blocks that call less</div>
+        <div class="sbar"><span class="k">Inspections a year</span><div class="t"><i class="red" style="width:71px"></i><b style="left:85px">9,300</b></div></div>
+        <div class="sbar"><span class="k">Properties with rats</span><div class="t"><i class="red hatch" style="width:116px"></i><b style="left:130px">15,200</b></div></div>
+      </div>
+      <p class="scale-punch reveal r5">Blue gets <em>5×</em> the inspections for <em>1.4×</em> the rats.</p>
+    </div>
+    <figure class="frame sides-map reveal r3"><img src="assets/sides_map.png" alt="NYC blocks: blue where richer blocks call more, red where poorer blocks call less, grey for the rest">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <figcaption class="mono"><span class="dot blue"></span>Richer · more calls<span class="dot red"></span>Poorer · fewer calls<span class="dot grey"></span>The rest</figcaption></figure>
+    <p class="leaves reveal r6">…and it leaves <em>382 blocks</em> behind.</p>
+    <aside class="say">About 150,000 rat inspections a year go where the calls are. Rich, loud blocks get five times the inspections of poor, quiet ones, for only 1.4 times the rats. And that leaves 382 blocks behind. [Blue and red: split at the city median for income and for rat calls per resident; grey is everything else. Inspections: initial visits, 2023–25 average (about 230,000 a year counting follow-ups and baiting). Rats: properties times the share of swept lots with rats, 2015–26.]</aside>
+  </section>
+  <!-- ============================================================ 5 · THE SILENT BLOCKS (0:43–0:57) -->
+  <section class="slide" data-section="Problem" data-time="0:43–0:57">
+    <div class="silent-left v3">
+      <div class="eyebrow reveal r1">The Silent Blocks</div>
+      <div class="n382 reveal r2">382</div>
+      <p class="silent-line reveal r3">blocks where the rats are likely and the <em>phones are quiet.</em></p>
+    </div>
+    <div class="silent-right">
+      <div class="lab reveal r3">Why it matters</div>
+      <div class="health reveal r4">
+        <div class="hrow"><div class="n">1 in 3</div><div class="t"><b>Asthma</b>inner-city homes had rat allergen, linked to worse asthma in kids.<span class="src">Inner-City Asthma Study, 2003</span></div></div>
+        <div class="hrow"><div class="n">72%</div><div class="t"><b>Depression</b>more likely where rats are a big problem.<span class="src">Johns Hopkins · Baltimore, 2016</span></div></div>
+      </div>
+      <div class="lab reveal r5">What they look like</div>
+      <div class="props reveal r5">
+        <div><b>1.2M</b><span>people live on them</span></div>
+        <div><b>2×</b><span>NYC's average rat risk, with under half its calls per resident</span></div>
+        <div><b>$62k</b><span>median income (NYC: $90k)</span></div>
+        <div><b>17%</b><span>homes with limited English (NYC: 10%)</span></div>
+      </div>
+    </div>
+    <aside class="say">We call them silent blocks: twice the rat risk, under half the calls, and 1.2 million people living on them. And it matters: rat allergen is linked to worse asthma in kids, and where rats are a big problem, depressive symptoms are 72% more likely. [If asked: 211 of the 382 are red blocks from the last slide.]</aside>
+  </section>
+  <!-- ============================================================ 6 · TWO MODELS (Tech 0:57–1:15) -->
+  <section class="slide" data-section="Tech" data-time="0:57–1:15">
+    <div class="eyebrow reveal r1">02 · The Solution</div>
+    <h2 class="head reveal r2">Two models, <em>one gap.</em></h2>
+    <div class="models">
+      <figure class="model reveal r3"><img src="assets/modelA.png" alt="Model A: 311 complaints, past calls, violations">
+        <figcaption class="cap"><span class="mono">Model A · trained on 311 calls</span><b>What the city hears</b></figcaption></figure>
+      <div class="vs reveal r4">vs</div>
+      <figure class="model b reveal r5"><img src="assets/modelB.png" alt="Model B: rat inspections, environment, buildings, food">
+        <figcaption class="cap"><span class="mono">Model B · trained on everything objective</span><b>What's actually there</b></figcaption></figure>
+    </div>
+    <p class="gapline reveal r6">B high, A low: a <em>silent block.</em></p>
+    <aside class="say">So we built two models. Model A learns from 311: what the city hears. Model B learns from everything objective in NYC's datasets: inspections, buildings, restaurants, trash, weather. Where B is high and A is low, that's a silent block.</aside>
+  </section>
+  <!-- ============================================================ 7 · THE PROOF (Tech 1:15–1:30) -->
+  <section class="slide" data-section="Tech" data-time="1:15–1:30">
+    <div class="eyebrow reveal r1">The Proof</div>
+    <h2 class="head reveal r2">Ten years of history.<br>Who finds <em>more rats?</em></h2>
+    <div class="bars2">
+      <div class="brow reveal r3"><div class="bname">Model B's picks</div><div class="btrack"><div class="bfill acc" style="width:97.5%"></div></div><div class="bval acc">19.5%</div></div>
+      <div class="brow reveal r4"><div class="bname">Following 311 calls</div><div class="btrack"><div class="bfill" style="width:76%"></div></div><div class="bval">15.2%</div></div>
+      <div class="mono baxis reveal r5">Inspected lots where rats were found · 2016–2026</div>
+    </div>
+    <aside class="say">Big claim, so we backtested it on ten years of history, month by month, training only on the past. Model B's picks found rats 28% more often than following 311 calls: 19.5% versus 15.2%.</aside>
+  </section>
+  <!-- ============================================================ 8 · THE OWL (Tech 1:30–1:57) · → fades the list into the validation loop -->
+  <section class="slide" data-section="Tech · the Owl" data-time="1:30–1:57" data-steps="2">
+    <figure class="frame owl-photo render reveal r2"><img src="assets/owl_node_render.png" alt="The NightOwl sensor node">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      </figure>
+    <div class="owl-right">
+      <div class="eyebrow reveal r1">The Owl</div>
+      <h2 class="head reveal r2">Meet the <em>Owl.</em></h2>
+      <p class="lede big reveal r3">A sensor that spots rats in any light, every night.</p>
+      <div class="owl-swap">
+        <ol class="specs">
+          <li class="reveal r4"><span class="idx">i.</span><div><div class="lab">Costs</div><p>About <b>$30</b>, one inspector-hour.</p></div></li>
+          <li class="reveal r5"><span class="idx">ii.</span><div><div class="lab">Lasts</div><p>Up to <b>6 weeks</b> on watch, every night.</p></div></li>
+          <li class="reveal r6"><span class="idx">iii.</span><div><div class="lab">Private by design</div><p>Classification runs on the device. No video leaves it: only a rat event (time, block, confidence) and a crop of the confirmed rat.</p></div></li>
+        </ol>
+        <div class="loop" aria-label="Validation loop: placement model, PIR trigger, camera and classifier, server and map"><svg viewBox="0 0 790 380" role="img"><defs><marker id="loopArrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs><path class="arc" d="M524.4,72.4 A285,132 0 0 1 648.9,130.1" marker-end="url(#loopArrow)"/><path class="arc" d="M648.9,249.9 A285,132 0 0 1 524.4,307.6" marker-end="url(#loopArrow)"/><path class="arc" d="M265.6,307.6 A285,132 0 0 1 141.1,249.9" marker-end="url(#loopArrow)"/><path class="arc" d="M141.1,130.1 A285,132 0 0 1 265.6,72.4" marker-end="url(#loopArrow)"/><circle class="pulse" r="5"><animateMotion dur="7s" repeatCount="indefinite" path="M680.0,190.0 A285,132 0 1 1 110.0,190.0 A285,132 0 1 1 680.0,190.0"/></circle><circle class="node acc" cx="395.0" cy="58.0" r="52"/><text class="nl" x="395.0" y="55.0">Placement</text><text class="nl" x="395.0" y="74.0">model</text><circle class="node" cx="680.0" cy="190.0" r="52"/><text class="nl" x="680.0" y="187.0">PIR</text><text class="nl" x="680.0" y="206.0">trigger</text><circle class="node" cx="395.0" cy="322.0" r="52"/><text class="nl" x="395.0" y="319.0">Camera &amp;</text><text class="nl" x="395.0" y="338.0">classifier</text><circle class="node acc" cx="110.0" cy="190.0" r="52"/><text class="nl" x="110.0" y="187.0">Server</text><text class="nl" x="110.0" y="206.0">&amp; map</text><text class="ctr" x="395" y="204">Validation loop</text></svg></div>
+      </div>
+    </div>
+    <aside class="say">Then we send an Owl. It spots rats in any light, every night, for up to six weeks, for about thirty dollars. Classification runs on the device: no video leaves it, only a small rat event and a crop of the confirmed rat. [→] And it's a validation loop: the model places the Owl, motion wakes it, the camera confirms the rat, and the map updates that block and re-ranks where the next Owl goes. [Cost and battery: Bruno to confirm.]</aside>
+  </section>
+  <!-- ============================================================ 9 · WARNING LIGHT (What's next 1:57–2:25) -->
+  <section class="slide" data-section="What's next" data-time="1:57–2:25">
+    <div class="eyebrow reveal r1">03 · What's Next</div>
+    <h2 class="head sm reveal r2">Rats are a <em>warning light.</em></h2>
+    <div class="tree">
+      <svg class="links" viewBox="0 0 1360 470" aria-hidden="true"><path d="M318,235 C420,235 410,103 504,103"/><circle cx="504" cy="103" r="4"/><path d="M318,235 C420,235 410,223 504,223"/><circle cx="504" cy="223" r="4"/><path d="M318,235 C420,235 410,299 504,299"/><circle cx="504" cy="299" r="4"/><path d="M318,235 C420,235 410,375 504,375"/><circle cx="504" cy="375" r="4"/></svg>
+      <div class="root reveal r3">Rat<br>infestations</div>
+      <div class="grp reveal r4" style="top:55px">Health</div>
+      <div class="node reveal r4" style="top:79px"><div class="n">24</div><div class="t"><b>Leptospirosis</b>cases in NYC in 2023, a record. About 3 a year before 2021.<span class="src">NYC Health advisory, 2024</span></div></div>
+      <div class="grp reveal r5" style="top:175px">Home &amp; street <span>· swept buildings with rats vs without</span></div>
+      <div class="node reveal r5" style="top:199px"><div class="n">2.8×</div><div class="t"><b>Mold</b>the mold violations per home.<span class="src">NYC HPD · NYC Health sweeps · 2023–25</span></div></div>
+      <div class="node reveal r5" style="top:275px"><div class="n">2.3×</div><div class="t"><b>No heat</b>the heat and hot-water complaints per home.<span class="src">NYC 311 · 2023–25</span></div></div>
+      <div class="node reveal r5" style="top:351px"><div class="n">1.8×</div><div class="t"><b>Illegal dumping</b>the dumping complaints per property.<span class="src">NYC 311 · 2023–25</span></div></div>
+    </div>
+    <p class="warn-next reveal r6">Then: the same method for <em>mold, heat outages and dumping</em>, anything the city only hears about through calls.</p>
+    <aside class="say">And rat infestations are a warning light. Rat urine spreads leptospirosis: New York hit a record 24 cases in 2023. In the city's own data, buildings where inspectors found rats had nearly three times the mold violations, more than twice the heat complaints, and almost twice the illegal dumping. So a silent rat block is often a silent health and housing block. Then we take the same method to mold, heat and dumping.</aside>
+  </section>
+  <!-- ============================================================ 10 · TRY IT (Demo 2:25–2:55) -->
+  <section class="slide" data-section="Demo" data-time="2:25–2:55">
+    <div class="try-in"><h2 class="try reveal r2">Try it <em>yourself.</em></h2></div>
+    <aside class="say">Now try it yourself. [Hand a judge the rat and have them pass it in front of the Owl.] The Owl spots it and sends one small event: time, block, confidence. Watch the map: that block's risk goes up, and it becomes the top site for the next Owl. [Point at the map.]</aside>
+  </section>
+  <!-- ============================================================ 11 · CLOSE (2:55–3:00) -->
+  <section class="slide" data-section="Demo · close" data-time="2:55–3:00">
+    <div class="close-in">
+      <div class="eyebrow center reveal r1">The Close</div>
+      <h2 class="close-head reveal r2">Nothing hides<br>from the <em>Owl.</em></h2>
+      <p class="close-sub reveal r3">NightOwl turns silence into data,<br>and data into the next place to look.</p>
+      <div class="chips reveal r4"><span class="pill solid">● Thank you</span><span class="pill ghost">DivHacks 2026</span><span class="pill ghost">NYC, block by block</span></div>
+    </div>
+    <aside class="say">NightOwl: nothing hides from the Owl. Thank you.</aside>
+  </section>
+  <!-- ============================================================ Q&A: crew + backups -->
+  <section class="slide" data-section="Q&amp;A" data-time="questions">
+    <div class="eyebrow reveal r1">Q&amp;A · The Crew</div>
+    <h2 class="head reveal r2">Four humans, <em>one</em> Owl.</h2>
+    <div class="team">
+      <div class="member reveal r3"><div class="portrait"><img src="assets/team_ethan.jpg" alt="Ethan"></div><div class="nm">Ethan</div><div class="mono">I · Map &amp; API</div></div>
+      <div class="member reveal r4"><div class="portrait"><img src="assets/team_bruno.jpg" alt="Bruno"></div><div class="nm">Bruno</div><div class="mono">II · Hardware &amp; assistant</div></div>
+      <div class="member reveal r5"><div class="portrait"><img src="assets/team_utsav.jpg" alt="Utsav"></div><div class="nm">Utsav</div><div class="mono">III · Rat detector</div></div>
+      <div class="member reveal r6"><div class="portrait"><img src="assets/team_sanjavan.jpg" alt="Sanjavan"></div><div class="nm">Sanjavan</div><div class="mono">IV · Models &amp; data</div></div>
+    </div>
+    <aside class="say">Questions.</aside>
+  </section>
+  <section class="slide" data-section="Q&amp;A backup" data-time="B1">
+    <div class="eyebrow reveal r1">Q&amp;A · B1 · Under the hood</div>
+    <h2 class="head xs reveal r2">The tools that let us <em>see in the dark.</em></h2>
+    <div class="bento reveal r3">
+      <div class="tile big"><div class="mono">Models · hero</div><h3>LightGBM × 2</h3><p>Two gradient-boosted models, ten years of NYC data, tested on held-out districts.</p></div>
+      <div class="tile"><div class="mono">Map grid</div><h3>H3 hexagons</h3><p>~350 m cells, 2–3 blocks</p></div>
+      <div class="tile"><div class="mono">City data</div><h3>NYC Open Data</h3><p>3.1M inspections · 512K complaints</p></div>
+      <div class="tile"><div class="mono">Detector</div><h3>Rat detector V5</h3><p>object detector · ~15 fps on the Pi</p></div>
+      <div class="tile"><div class="mono">Node</div><h3>Raspberry Pi 5</h3><p>NoIR camera · PIR sensor</p></div>
+      <div class="tile"><div class="mono">API</div><h3>FastAPI</h3><p>events · scores · Owl sites</p></div>
+      <div class="tile"><div class="mono">Map</div><h3>React · three.js</h3><p>3D city, block by block</p></div>
+      <div class="tile"><div class="mono">Assistant</div><h3>Grok · xAI</h3><p>20 tools, plain English</p></div>
+      <div class="tile"><div class="mono">Messaging</div><h3>Photon</h3><p>the assistant on iMessage</p></div>
+    </div>
+    <aside class="say">If asked what it's built with.</aside>
+  </section>
+  <section class="slide" data-section="Q&amp;A backup" data-time="B2">
+    <div class="eyebrow reveal r1">Q&amp;A · B2 · Backtest</div>
+    <h2 class="head xs reveal r2">The backtest, <em>month by month.</em></h2>
+    <figure class="frame chart-card b2 reveal r3"><div class="mono">Share of inspected lots with active rat signs · top 50 swept blocks · 3-month average</div>
+      <!--CHART-START--><svg class="chart" viewBox="0 0 860 350" role="img" aria-label="Monthly backtest, Model B vs 311 ranking"><rect x="365.9" y="18" width="92.4" height="292" fill="rgba(237,232,216,.05)"/><text x="412.1" y="34" class="ax" text-anchor="middle">COVID</text><line x1="58" x2="840" y1="261.3" y2="261.3" class="grid"/><text x="48" y="265.3" class="ax" text-anchor="end">10%</text><line x1="58" x2="840" y1="164.0" y2="164.0" class="grid"/><text x="48" y="168.0" class="ax" text-anchor="end">20%</text><line x1="58" x2="840" y1="66.7" y2="66.7" class="grid"/><text x="48" y="70.7" class="ax" text-anchor="end">30%</text><text x="58.0" y="338" class="ax" text-anchor="middle">2016</text><text x="205.8" y="338" class="ax" text-anchor="middle">2018</text><text x="353.6" y="338" class="ax" text-anchor="middle">2020</text><text x="501.3" y="338" class="ax" text-anchor="middle">2022</text><text x="649.1" y="338" class="ax" text-anchor="middle">2024</text><text x="796.9" y="338" class="ax" text-anchor="middle">2026</text><path d="M58.0,231.5 L64.2,229.0 L70.3,235.7 L76.5,240.9 L82.6,256.6 L88.8,278.6 L94.9,291.5 L101.1,297.1 L107.3,296.7 L113.4,283.0 L119.6,274.7 L125.7,255.6 L131.9,251.0 L138.0,235.9 L144.2,229.4 L150.4,225.7 L156.5,232.2 L162.7,246.5 L168.8,269.7 L175.0,269.4 L181.1,251.0 L187.3,245.8 L193.5,237.3 L199.6,252.8 L205.8,252.2 L211.9,266.8 L218.1,262.0 L224.3,257.9 L230.4,260.5 L236.6,249.0 L242.7,242.8 L248.9,235.1 L255.0,255.9 L261.2,260.4 L267.4,264.4 L273.5,247.9 L279.7,256.0 L285.8,263.1 L292.0,265.6 L298.1,249.9 L304.3,241.5 L310.5,242.0 L316.6,245.7 L322.8,242.4 L328.9,236.5 L335.1,221.9 L341.2,222.7 L347.4,226.4 L353.6,239.8 L359.7,236.6 L365.9,249.4 M378.2,276.2 L384.3,283.1 L390.5,269.6 L396.7,256.3 L402.8,239.2 M439.8,180.9 L445.9,171.4 L452.1,168.3 L458.2,166.9 L464.4,151.1 L470.6,150.3 L476.7,161.5 M501.3,142.3 L507.5,151.2 L513.7,119.7 L519.8,106.3 L526.0,105.1 L532.1,129.8 L538.3,149.0 L544.4,136.0 L550.6,147.2 L556.8,153.5 L562.9,165.3 L569.1,163.0 L575.2,143.0 L581.4,140.5 L587.5,150.0 L593.7,160.7 L599.9,157.8 L606.0,134.9 L612.2,131.3 L618.3,136.5 L624.5,150.5 L630.6,146.5 L636.8,139.0 L643.0,130.1 L649.1,130.1 L655.3,131.2 L661.4,145.4 L667.6,145.4 L673.7,151.8 L679.9,148.7 L686.1,160.6 L692.2,172.9 L698.4,171.4 L704.5,163.5 L710.7,158.5 L716.9,173.1 L723.0,193.6 L729.2,207.8 L735.3,211.0 L741.5,217.2 L747.6,229.6 L753.8,221.6 L760.0,220.5 L766.1,207.4 L772.3,211.7 L778.4,204.8 L784.6,211.8 L790.7,225.8 L796.9,230.3 L803.1,242.5 L809.2,230.4 L815.4,219.7 L821.5,209.8 L827.7,223.6 L833.8,246.8 L840.0,250.1" class="l311"/><path d="M58.0,228.1 L64.2,218.3 L70.3,225.0 L76.5,224.1 L82.6,238.4 L88.8,255.4 L94.9,268.8 L101.1,279.5 L107.3,271.1 L113.4,258.9 L119.6,233.1 L125.7,230.7 L131.9,228.2 L138.0,222.0 L144.2,211.4 L150.4,197.8 L156.5,211.7 L162.7,218.4 L168.8,251.6 L175.0,255.6 L181.1,254.7 L187.3,240.6 L193.5,242.9 L199.6,235.6 L205.8,244.5 L211.9,240.5 L218.1,246.5 L224.3,227.4 L230.4,213.3 L236.6,208.4 L242.7,214.0 L248.9,225.8 L255.0,228.9 L261.2,227.5 L267.4,231.6 L273.5,214.2 L279.7,203.1 L285.8,200.5 L292.0,198.0 L298.1,204.0 L304.3,199.6 L310.5,211.3 L316.6,221.3 L322.8,227.0 L328.9,211.1 L335.1,181.9 L341.2,176.9 L347.4,199.5 L353.6,232.1 L359.7,215.9 L365.9,225.8 M378.2,276.2 L384.3,280.0 L390.5,261.4 L396.7,241.7 L402.8,219.8 M439.8,199.0 L445.9,176.8 L452.1,167.0 L458.2,148.7 L464.4,123.0 L470.6,113.7 L476.7,134.7 M501.3,106.2 L507.5,141.2 L513.7,117.3 L519.8,120.5 L526.0,102.3 L532.1,113.9 L538.3,101.7 L544.4,87.5 L550.6,105.9 L556.8,124.6 L562.9,131.0 L569.1,125.2 L575.2,104.1 L581.4,112.6 L587.5,121.9 L593.7,118.0 L599.9,105.0 L606.0,65.1 L612.2,69.1 L618.3,68.4 L624.5,89.5 L630.6,71.0 L636.8,72.2 L643.0,67.1 L649.1,88.6 L655.3,74.0 L661.4,76.2 L667.6,60.3 L673.7,85.1 L679.9,78.5 L686.1,79.1 L692.2,57.7 L698.4,62.6 L704.5,51.5 L710.7,53.5 L716.9,62.9 L723.0,113.4 L729.2,147.0 L735.3,147.5 L741.5,138.6 L747.6,143.4 L753.8,151.8 L760.0,165.7 L766.1,153.7 L772.3,147.8 L778.4,137.7 L784.6,152.0 L790.7,139.3 L796.9,129.9 L803.1,145.7 L809.2,160.7 L815.4,165.1 L821.5,146.7 L827.7,151.1 L833.8,165.1 L840.0,171.6" class="lb"/><line x1="72" x2="98" y1="32" y2="32" class="lb"/><text x="108" y="36" class="lab lab-b">Model B top picks</text><line x1="72" x2="98" y1="54" y2="54" class="l311"/><text x="108" y="58" class="lab">Following 311 calls</text></svg><!--CHART-END--></figure>
+    <ul class="blist side reveal r4">
+      <li>119 months, 2016–2026, each trained only on the past.</li>
+      <li>Scored on <b>routine sweeps</b>, not complaint visits.</li>
+      <li>Model B <b>19.5%</b> vs 311 <b>15.2%</b>: won <b>108 of 119</b> months.</li>
+      <li>Quiet blocks: <b>15.7%</b> vs 8.8% for random picks.</li>
+    </ul>
+    <div class="limit">Limit: covers blocks the city swept. It is not a citywide rat count.</div>
+    <aside class="say">If asked how we tested it. Gaps in the lines are 9 COVID-era months with no sweeps. The map legend shows the latest month (Aug 2026: 17% vs 11%).</aside>
+  </section>
+  <section class="slide" data-section="Q&amp;A backup" data-time="B3">
+    <div class="eyebrow reveal r1">Q&amp;A · B3 · Equity evidence</div>
+    <h2 class="head xs reveal r2">Raw city data, <em>no model.</em></h2>
+    <ul class="blist big reveal r3">
+      <li>Per rat found, the richest fifth of blocks calls <b>1.8×</b> as much as the poorest, and the most English-fluent fifth <b>2.2×</b> the least.</li>
+      <li>Same high rat risk: quiet blocks got <b>29</b> inspections per 100 properties in two years, loud ones <b>145</b>.</li>
+      <li>Routine sweeps do reach the poorest fifth most. The blind spot is <b>poor and quiet</b>.</li>
+      <li>Research agrees: low-income, minority areas report less despite greater need (Kansas City, 2021).</li>
+    </ul>
+    <div class="limit">A link with income and language, not proof of cause.</div>
+    <aside class="say">If asked whether the equity claim is real.</aside>
+  </section>
+  <section class="slide" data-section="Q&amp;A backup" data-time="B4">
+    <div class="eyebrow reveal r1">Q&amp;A · B4 · Privacy</div>
+    <h2 class="head xs reveal r2">Bytes, <em>not video.</em></h2>
+    <ul class="blist reveal r3">
+      <li>Frames stay on the Owl. By design, nothing is streamed or stored as video.</li>
+      <li>An event is a time, a block, the class, and a confidence, plus a cropped photo only for a confirmed rat.</li>
+      <li>The motion sensor wakes the camera. Otherwise it sleeps.</li>
+      <li>Only rat events leave the Owl, never people.</li>
+      <li>Unlike Flock or ShotSpotter-style systems, it records no people and no plates. It counts rats.</li>
+    </ul>
+    <aside class="say">If asked about surveillance or privacy.</aside>
+  </section>
+  <section class="slide" data-section="Q&amp;A backup" data-time="B5">
+    <div class="eyebrow reveal r1">Q&amp;A · B5 · Cost &amp; hardware</div>
+    <h2 class="head xs reveal r2">About <em>$30</em> an Owl.</h2>
+    <ul class="blist reveal r3">
+      <li><b>Demo Owl:</b> Raspberry Pi 5, IMX219 NoIR night camera, HC-SR501 motion sensor, 850 nm IR light, 3D-printed case on a gooseneck mount.</li>
+      <li>Motion wakes the camera. The detector runs on the device, about 15 frames a second.</li>
+      <li><b>Production design:</b> the same detector on a ~$14 ESP32-S3 camera board, about <b>$30 per Owl</b>.</li>
+      <li><b>Up to 6 weeks</b> on watch applies to the low-power production design, not the Pi 5 demo Owl.</li>
+      <li>It mounts on street-tree guards, and the planner picks the exact tree.</li>
+    </ul>
+    <aside class="say">If asked what it costs or how the hardware works. [Cost and battery figures: Bruno to confirm.]</aside>
+  </section>
+
+  <div class="notes" id="notes"><div class="mono" id="nmeta"></div><p id="ntext"></p></div>
+  <div class="hud">
+    <div class="count"><b id="cur">01</b> / <span id="tot">17</span></div>
+    <div class="ticker"><div class="track" id="track"></div></div>
+    <div class="nav"><button id="prev" aria-label="Previous slide">‹</button><button id="next" aria-label="Next slide">›</button></div>
+  </div>
+</div>
+
+<script>
+  const stage = document.getElementById("stage");
+  if (new URLSearchParams(location.search).has("pdf")) document.body.classList.add("pdf");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const total = slides.length;
+  const MAIN = 11;                                   // slides 1–11 are the 3-minute talk; the rest are Q&A
+  let idx = 0, step = 0;
+  const nsteps = s => +(s.dataset.steps || 1);          // data-steps="2": one extra → on that slide
+
+  function fit() {
+    const s = Math.min(innerWidth / 1600, innerHeight / 900);
+    stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+  }
+  addEventListener("resize", fit); fit();
+
+  // frame: counter, ticker, rail ticks
+  document.getElementById("tot").textContent = String(total).padStart(2, "0");
+  const facts = ["NightOwl · DivHacks 2026", "382 silent blocks", "~150K inspections a year", "19.5% vs 15.2% backtest",
+                 "3.1M inspections", "512K complaints", "~$30 per Owl", "detection on the device", "NYC, block by block"];
+  document.getElementById("track").innerHTML = [...facts, ...facts].map(f => `<span>${f}</span>`).join("");
+  const rail = document.getElementById("rail");
+  for (let k = 0; k < total; k++) {
+    const t = document.createElement("i"); t.className = "tick"; t.style.top = `${(k / (total - 1)) * 100}%`; rail.appendChild(t);
+  }
+
+  function go(n, instant, k = 0) {
+    n = (n + total) % total;
+    if (n === idx && !instant) return;
+    const fwd = n > idx;
+    slides.forEach(s => s.classList.remove("active", "prev"));
+    if (fwd && !instant) slides[idx].classList.add("prev");
+    slides[n].classList.add("active");
+    idx = n;
+    document.getElementById("cur").textContent = String(idx + 1).padStart(2, "0");
+    document.getElementById("progress").style.width = `${((idx + 1) / total) * 100}%`;
+    document.getElementById("eyes").style.top = `${(idx / (total - 1)) * 100}%`;
+    notes();
+    setStep(k === "last" ? nsteps(slides[idx]) - 1 : k);
+  }
+
+  function setStep(k) {
+    const s = slides[idx];
+    step = Math.max(0, Math.min(k, nsteps(s) - 1));
+    for (let j = 1; j < nsteps(s); j++) s.classList.toggle(`step-${j}`, step >= j);
+    history.replaceState(null, "", "#" + (idx + 1) + (step ? "." + (step + 1) : ""));
+  }
+  const next = () => step < nsteps(slides[idx]) - 1 ? setStep(step + 1) : go(idx + 1);
+  const back = () => step > 0 ? setStep(step - 1) : go(idx - 1, false, "last");
+
+  function notes() {
+    const s = slides[idx], say = (s.querySelector(".say")?.textContent || "").trim();
+    const words = say.replace(/\[[^\]]*\]/g, "").split(/\s+/).filter(Boolean).length;
+    const part = idx < MAIN ? `${s.dataset.section} · ${s.dataset.time} · speaker: ______ · ${words} words ≈ ${Math.round(words / 2.5)} s`
+                            : `${s.dataset.section} · ${s.dataset.time}`;
+    document.getElementById("nmeta").textContent = part;
+    document.getElementById("ntext").textContent = say;
+  }
+
+  document.addEventListener("keydown", e => {
+    if (["ArrowRight", " ", "PageDown"].includes(e.key)) { e.preventDefault(); next(); }
+    else if (["ArrowLeft", "PageUp"].includes(e.key)) { e.preventDefault(); back(); }
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(MAIN - 1);
+    else if (e.key === "n" || e.key === "N") document.body.classList.toggle("show-notes");
+    else if (e.key === "f" || e.key === "F") {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen();
+    }
+  });
+  document.getElementById("prev").addEventListener("click", back);
+  document.getElementById("next").addEventListener("click", next);
+
+  const m = location.hash.match(/^#(\d+)(?:\.(\d+))?$/);             // #3 or #3.2 (slide 3, step 2)
+  go(m ? Math.min(total, +m[1]) - 1 : 0, true, m && m[2] ? +m[2] - 1 : 0);
+</script>
+</body>
+</html>

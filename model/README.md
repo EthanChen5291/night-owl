@@ -196,6 +196,34 @@ About 5 minutes on an M-series Mac (the backtests are the slow part).
 Backtests are scored **only on cells DOHMH actually swept that month**. Silent blocks are rarely
 inspected, so scoring on "any inspection found rats" grades the model on where DOHMH goes, not where rats are.
 
+## Pitch numbers: who calls, who gets inspected, what rats signal
+
+These numbers appear in the HTML deck ([`pitch/nightowl-deck/`](../pitch/nightowl-deck/)). Unless noted:
+- **Blocks:** eligible cells with ≥20 lots, ≥100 homes and residents.
+- **Period:** 2015-01 → 2026-08.
+- **Rich and poor:** the richest vs poorest fifth of blocks by ACS 2024 median household income.
+- **Rats:** the share of swept lots with active rat signs.
+
+| Claim | Number | Method |
+|---|---|---|
+| The rich complain more **per rat** | **76% more** rat complaints per rat found, richest vs poorest fifth. Per resident alone it is only 17% more. | Complaints per 1,000 residents ÷ swept-lot rat rate |
+| The poor have more rats | **51% more** infestations: 12.2% vs 8.1% of swept lots | Sweeps only |
+| Language | The most English-fluent fifth files **2.2×** the complaints per rat found of the least fluent fifth (1.8× per resident) | ACS limited-English households (C16002) |
+| Scale | **~152,000** initial rat inspections a year (2023–25 average), ~230,000 with follow-ups and baiting | Raw DOHMH rodent inspections |
+| Who gets inspected | Richer blocks that call more: **49,700** inspections a year for **21,400** properties with rats. Poorer blocks that call less: **9,300** for **15,200**. That is 5.4× the inspections for 1.4× the rats. | Split at the city medians of income and calls per resident. Rats = lots × swept-lot rat rate; Model B's expected rats give the same 1.4×. Map: `visuals/_src/make_sides_map.py` (local) |
+| It's not "the city ignores the poor" | By income alone, the poorer half gets 62% of inspections, because routine sweeps target poor areas. The blind spot is poor **and** quiet. | Same data |
+| Neighbourhood pairs | West Village vs East Harlem (South): $188k vs $39k income, poverty 6% vs 31%, calls 5.7 vs 3.2 per 1,000 residents a year, rats 6.4% vs 15.9%. Crown Heights (South) vs Jackson Heights: $84k vs $81k, limited English 5% vs 25%, calls 5.0 vs 2.2, rats 4.7% vs 7.9%. | 2020 NTAs; poverty from ACS B17001; 311 and sweeps matched to NTAs by point location |
+| Silent-block profile | ~1.2M residents. 2× the average Model B risk with under half the calls per resident. 211 of the 382 are "poor and quiet". Median income $62k vs $90k, limited English 17% vs 10%, against blocks with ≥100 homes. The table above compares against all eligible blocks, which gives $92k and 9.2%. | `data/processed/scores.parquet` |
+| Rats are a warning light | Swept buildings with rats (2023–25) had **2.8×** the HPD mold violations per home, **2.3×** the heat and hot-water complaints per home, and **1.8×** the illegal-dumping complaints per property. Each holds within building-size bands. | HPD violations and 311 by BBL (NYC Open Data), against lots swept 2023–25 |
+
+These are associations, not causes, and swept-lot rates are not a citywide rat count. The published health
+figures in the deck come from outside sources:
+- Leptospirosis: 24 NYC cases in 2023, a record (NYC Health advisory, 2024).
+- Asthma: rat allergen in 1 in 3 inner-city homes (Inner-City Asthma Study, 2003). Shown on the 382 slide.
+- Depression: 72% more likely where rats are a big problem (Johns Hopkins, Baltimore, 2016). Shown on the 382 slide.
+
+The analysis scripts from pitch prep are not in the repo yet.
+
 ## Model accuracy (plain language)
 
 From `accuracy_report.py` → `out/accuracy.json`: five-fold spatial cross-validation holds out whole community
