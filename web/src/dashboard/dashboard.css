@@ -64,6 +64,7 @@
 .dx button { font: inherit; color: inherit; cursor: pointer; }
 .dx button:disabled { cursor: default; }
 .dx :focus-visible { outline: 2px solid var(--dx-accent-line); outline-offset: 2px; }
+.dx .dx-input textarea:focus-visible { outline: 0; }
 
 /* ---------- chat column ---------- */
 .dx-chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; }
@@ -92,17 +93,19 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
 }
 .dx-hero-mark { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 18px; border-radius: 12px; color: var(--dx-accent); background: var(--dx-accent-soft); }
-.dx-hero h1 { margin: 0 0 8px; font-size: clamp(22px, 3vw, 28px); line-height: 1.2; font-weight: 600; letter-spacing: -0.02em; }
-.dx-hero > p { margin: 0 0 24px; max-width: 44ch; color: var(--dx-muted); font-size: 14px; line-height: 1.5; }
+.dx-hero h1 { position: relative; display: inline-block; margin: 0 0 22px; font-size: clamp(22px, 3vw, 28px); line-height: 1.2; font-weight: 600; letter-spacing: -0.02em; text-align: left; }
+.dx-typed-ghost { visibility: hidden; }
+.dx-typed-live { position: absolute; inset: 0; white-space: pre-wrap; }
+.dx-hero h1.typing .dx-typed-live::after {
+  content: ''; display: inline-block; width: 2px; height: 0.9em; margin-left: 3px; vertical-align: -0.08em; border-radius: 1px;
+  background: var(--dx-accent); animation: dx-caret 0.9s steps(2, jump-none) infinite;
+}
 .dx-starters { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .dx-starters button {
-  padding: 11px 13px; text-align: left; border: 1px solid var(--dx-line); border-radius: 10px; background: var(--dx-surface);
-  transition: border-color 0.15s, background 0.15s;
+  padding: 12px 14px; text-align: left; border: 1px solid var(--dx-line); border-radius: 10px; background: var(--dx-surface);
+  font-size: 13px; font-weight: 500; line-height: 1.45; transition: border-color 0.15s, background 0.15s;
 }
 .dx-starters button:hover { border-color: var(--dx-line-strong); }
-.dx-starters b { display: block; font-size: 13px; font-weight: 600; }
-.dx-starters span { display: block; margin-top: 2px; color: var(--dx-muted); font-size: 12.5px; line-height: 1.4; }
-.dx-sources { margin: 20px 0 0; color: var(--dx-faint); font-size: 12px; }
 
 /* Thread */
 .dx-thread { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -180,10 +183,12 @@
 /* Composer */
 .dx-dock { flex: none; width: 100%; max-width: 720px; margin: 0 auto; padding: 0 16px 12px; }
 .dx-composer {
-  width: 100%; padding: 6px; text-align: left; border: 1px solid var(--dx-line); border-radius: 14px; background: var(--dx-surface);
-  box-shadow: var(--dx-shadow); transition: border-color 0.15s;
+  width: 100%; padding: 6px; margin: 0; text-align: left; border: 1px solid var(--dx-line); border-radius: 14px; background: var(--dx-surface);
+  box-shadow: var(--dx-shadow);
+  transition: border-color 0.2s, padding 0.45s var(--dx-ease), width 0.45s var(--dx-ease), margin 0.45s var(--dx-ease), box-shadow 0.45s var(--dx-ease);
 }
-.dx-composer:focus-within { border-color: var(--dx-line-strong); }
+.dx-composer:focus-within { border-color: var(--dx-line-strong); padding: 10px 9px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05), 0 14px 36px rgba(0, 0, 0, 0.1); }
+.dx-hero .dx-composer:focus-within { width: calc(100% + 24px); margin: 0 -12px; }
 .dx-input { display: flex; align-items: flex-end; gap: 8px; }
 .dx-input textarea {
   flex: 1; min-width: 0; max-height: 200px; padding: 8px 4px 8px 10px; border: 0; outline: 0; resize: none; background: transparent;
@@ -330,6 +335,7 @@
 
 /* ---------- motion ---------- */
 @keyframes dx-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes dx-caret { from { opacity: 1; } to { opacity: 0; } }
 @keyframes dx-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes dx-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
 @keyframes dx-skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }

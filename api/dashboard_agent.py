@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import math
 import os
 import queue
@@ -23,7 +24,7 @@ from store import Store
 XAI_RESPONSES_URL = "https://api.x.ai/v1/responses"
 MAX_REQUEST_BYTES = 100_000
 MAX_ROUNDS = 8
-MAX_TOOL_CALLS = 16
+MAX_QUERIES = 20  # query_data calls per turn; publish_dashboard is always allowed
 MAX_HISTORY = 12
 MAX_QUERY_PREVIEW = 40
 MAX_TEXT = 6000
@@ -31,6 +32,7 @@ MAX_THINKING = 2000
 MAX_SSE_EVENT_BYTES = 1_000_000
 RATE_PER_MIN, RATE_PER_DAY = 10, 100
 _hits: dict[str, deque[float]] = defaultdict(deque)
+log = logging.getLogger("nightowl.dashboard")
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -312,7 +314,7 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
     context.append({"role": "user", "content": message})
     artifact = None
     text = ""
-    calls_used = 0
+    queries_used = 0
     for round_index in range(MAX_ROUNDS):
         yield {"type": "status", "text": "Thinking"}
         round_text = ""
@@ -343,13 +345,11 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
                     text += final
                     yield {"type": "delta", "text": final}
             break
-        calls_used += len(calls)
-        if calls_used > MAX_TOOL_CALLS:
-            raise DashboardError("dashboard tool limit reached")
         for call in calls:
             name, call_id = call.get("name"), call.get("call_id")
             if not isinstance(call_id, str) or not call_id:
                 raise DashboardError("xAI returned an invalid tool call")
+            summary = name or "?"
             try:
                 args = json.loads(call.get("arguments") or "{}")
                 if not isinstance(args, dict):
@@ -357,19 +357,32 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
                 if name == "query_data":
                     raw_query = args.get("query")
                     dataset = raw_query.get("dataset") if isinstance(raw_query, dict) else None
+                    summary = f"query_data {json.dumps(raw_query, separators=(',', ':'))[:240]}" if isinstance(raw_query, dict) else "query_data ?"
                     label = DATASETS.get(dataset, {}).get("label", "Data") if isinstance(dataset, str) else "Data"
                     label = label[:1].lower() + label[1:] if label[1:2].islower() else label
-                    yield {"type": "status", "text": f"Querying {label}"}
-                    result = run_query(store, args.get("query"))
-                    yield {"type": "step", "text": f"Queried {label}", "detail": _query_detail(result)}
-                    result = {**result, "rows": result["rows"][:MAX_QUERY_PREVIEW],
-                              "preview_rows": min(len(result["rows"]), MAX_QUERY_PREVIEW)}
+                    queries_used += 1
+                    if queries_used > MAX_QUERIES:
+                        # Out of exploration budget: the model can still publish with what it has.
+                        yield {"type": "step", "text": "Query skipped", "detail": f"{MAX_QUERIES} queries per turn already used", "error": True}
+                        log.info("tool %s -> skipped, query budget used", summary)
+                        result = {"error": f"query budget of {MAX_QUERIES} per turn is used up; call publish_dashboard now "
+                                           "using only columns from earlier query results"}
+                    else:
+                        yield {"type": "status", "text": f"Querying {label}"}
+                        result = run_query(store, args.get("query"))
+                        yield {"type": "step", "text": f"Queried {label}", "detail": _query_detail(result)}
+                        log.info("tool %s -> %d rows", summary, result["total_rows"])
+                        result = {**result, "rows": result["rows"][:MAX_QUERY_PREVIEW],
+                                  "preview_rows": min(len(result["rows"]), MAX_QUERY_PREVIEW)}
                 elif name == "publish_dashboard":
+                    spec = args.get("spec")
+                    summary = f"publish_dashboard {len(spec.get('cards', [])) if isinstance(spec, dict) and isinstance(spec.get('cards'), list) else '?'} cards"
                     yield {"type": "status", "text": "Building dashboard"}
-                    artifact = render_dashboard(store, args.get("spec"), body["version"])
+                    artifact = render_dashboard(store, spec, body["version"])
                     count = len(artifact["results"])
                     yield {"type": "step", "text": "Built dashboard", "detail": f"{count} chart{'s' if count != 1 else ''}"}
                     yield {"type": "dashboard", "dashboard": artifact}
+                    log.info("tool %s -> built %s", summary, artifact["id"])
                     result = {"ok": True, "id": artifact["id"], "cards": list(artifact["results"]),
                               "total_rows": {key: value["total_rows"] for key, value in artifact["results"].items()}}
                 else:
@@ -377,16 +390,21 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
             except DashboardError as exc:
                 yield {"type": "step", "text": "Dashboard rejected" if name == "publish_dashboard" else "Query rejected",
                        "detail": str(exc)[:160], "error": True}
+                log.info("tool %s -> rejected: %s", summary, str(exc)[:200])
                 result = {"error": str(exc)[:300]}
             except Exception:  # noqa: BLE001 - provider tool arguments must never expose internal errors
                 yield {"type": "step", "text": "Dashboard rejected" if name == "publish_dashboard" else "Query rejected",
                        "detail": "The data tool failed", "error": True}
+                log.exception("tool %s -> failed", summary)
                 result = {"error": "The data tool failed"}
             context.append({"type": "function_call_output", "call_id": call_id,
                             "output": json.dumps(result, separators=(",", ":"), allow_nan=False)})
+        if round_index == MAX_ROUNDS - 2 and artifact is None:
+            context.append({"role": "user", "content": "[Night Owl] One tool round remains. Call publish_dashboard now with "
+                                                       "the data already gathered, using only returned column keys."})
         if round_index == MAX_ROUNDS - 1:
             if artifact is None:
-                raise DashboardError("dashboard reasoning limit reached")
+                raise DashboardError("The assistant ran out of steps before publishing. Ask for fewer comparisons at once, or retry.")
             break
     if artifact is not None and not text:
         yield {"type": "delta", "text": "Dashboard ready: " + artifact["spec"]["title"] + "."}
