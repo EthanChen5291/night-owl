@@ -6,9 +6,13 @@ frames_pruned/
 frames_aug/
 labels/
 labels_person/
+labels_person_v3/
+labels_v3/
 labels_aug/
 dataset/
 dataset_v2/
+dataset_v3/
+final_test/
 runs/
 events/
 *.pt
