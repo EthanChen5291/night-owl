@@ -390,7 +390,7 @@ def main() -> None:
         "train_tags": manifest["train_tags"], "val_tags": manifest["val_tags"],
         "pt_sha256": sha256(pt), "onnx_sha256": onnx_hash,
         "locked_onnx_sha256": args.expected_onnx_sha256 if test_only else None,
-        "limits": ("Same camera/table domain; an all-negative new-scene clip has undefined AP50. "
+        "limits": ("Sealed clips may still share camera, table, and capture session with training. "
                    "Static sampled frames cannot establish push-event recall or event false rate."
                    if test_only else
                    "Validation clips have guided model selection; event gate is unverified."),
