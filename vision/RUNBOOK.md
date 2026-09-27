@@ -7,11 +7,15 @@ the order of operations, with the gates. Every script has `--help`; every gate h
 
 ```
 cd vision
-uv sync --locked --python 3.12
+uv sync --locked --python 3.11
 . .venv/bin/activate
 ```
 
-Python 3.11+. `ffmpeg` is installed (`extract_frames.py` uses it; `--backend cv2` if not).
+The lock pins the CPU evaluator's observed NumPy 2.4.6, OpenCV Python 5.0.0.93,
+PyTorch 2.14.0, TorchVision 0.29.0, Ultralytics 8.4.163, and ONNX Runtime 1.22.1.
+ONNX 1.19.0 and ONNX Slim 0.1.76 match Modal's export dependencies. Python 3.11
+matches the training container; Modal trains with its own PyTorch 2.8.0 image.
+`ffmpeg` is installed (`extract_frames.py` uses it; `--backend cv2` if not).
 Working data lives here and is gitignored: `clips/`, `frames/`, `frames_pruned/`, `labels/`,
 `frames_aug/`, `labels_aug/`, `dataset/`, `runs/`, `*.pt`, `*.onnx`, `pi/wheels/`.
 
@@ -113,6 +117,9 @@ the old `0.4` side-view cutoff excludes 10 of 17 reviewed rat boxes in `zoom15_b
 reviewed frames are 8 seconds apart, so replaying them at 15 fps would invent consecutive
 detections. Use the original video for timing. `zoom15_b` and `table_c` have rat-presence
 anchors, but no verified push times or separate negatives reel yet; their replay is exploratory.
+`frames/_sources.csv` records nominal sample times (`index / extraction_fps`), not the decoded
+source frame timestamps. Do not turn those times into push labels or use them to judge a
+subsecond event; inspect the original video at its decoded timestamp.
 
 To show a saved clip through the actual Pi detector path and local map, start the API with the
 same minimum confidence used by the detector, then replay the original video at recorded speed:
@@ -134,6 +141,32 @@ using a segment whose rat event was observed in the full offline replay. The cur
 rank-11 September candidate H3 is `892a100d467ffff`; pass `--h3 892a100d467ffff` to make a
 rank change visible after an accepted event. Check `/plan` again before the demo because an
 earlier rehearsal can change its rank.
+
+To verify a candidate on the unchanged reviewed validation frames, run from the repository root:
+
+```sh
+vision/.venv/bin/python vision/verify_candidate.py \
+    --dataset vision/runs/modal-rat-v2-20260926/dataset \
+    --pt vision/runs/modal-rat-v2-20260926/best.pt \
+    --onnx vision/runs/modal-rat-v2-20260926/rat.onnx \
+    --out-dir vision/runs/modal-rat-v2-20260926/diagnostics/independent
+```
+
+Replace the run paths for each candidate, while keeping the same whole held-out clips. The
+report records CPU PT/ONNX AP50 using square 416, batch 1, `rect=False`, confidence .001,
+NMS .7, and `max_det=300`. It also checks the actual Pi `Detector` at confidence .5 and
+NMS .45, plus person suppression, and writes per-frame contact sheets. The report is
+diagnostic; sampled frame detection counts do not establish event-level push recall.
+
+After the candidate ONNX hash is locked, the independent reserved set can be scored once
+with `--test-set vision/final_test/eval_dataset` in place of `--dataset`, plus
+`--expected-onnx-sha256` set to that locked hash and `--selection-dataset` pointing at the
+dataset snapshot used to train/select the model. The verifier checks split disjointness,
+reviewed-frame markers, exclusions, source recording hashes, and image/label fingerprints
+before scoring.
+An all-negative clip has undefined AP50; its unmatched rat detections are reported as counts.
+Use an original video replay for event counts because the sampled test frames lack continuous
+timing.
 
 ## 6. Ship to the node
 

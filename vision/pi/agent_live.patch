@@ -1,0 +1,32 @@
+# Base agent.py SHA256: 756d75843c4eff2a83fad1c563848a646f584b7df2fe2130c4c6db31f8eb7e78
+--- agent.py
++++ agent.py
+@@ -328,7 +328,18 @@
+ recorder = Recorder()
+ uploader = Uploader()
+ streamer = Streamer()
+-cam = Camera(on_frame=(recorder.write, streamer.push))
++# Disabled unless OWL_DETECT_SOCKET is set. The bridge uses stdlib only and
++# does not wait for detector inference in the camera callback.
++handoff = None
++try:
++    from live_bridge import from_env
++    handoff = from_env()
++except Exception as e:
++    log("detector handoff disabled:", type(e).__name__, e)
++callbacks = (recorder.write, streamer.push)
++if handoff is not None:
++    callbacks += (handoff,)
++cam = Camera(on_frame=callbacks)
+ wake = threading.Event()
+ last_motion = None
+ motion_seen = False  # latched between syncs so short motion isn't missed
+@@ -482,6 +493,8 @@
+     try:
+         main()
+     finally:
++        if handoff is not None:
++            handoff.close()
+         streamer.set(False)
+         recorder.stop()
+         cam.stop()

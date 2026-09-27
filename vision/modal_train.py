@@ -182,12 +182,13 @@ def raw_onnx_parity(best: Path, onnx: Path, dataset: Path) -> dict:
 def check_image() -> dict:
     """Build and import the training image without allocating a GPU."""
     import cv2
+    import numpy
     import onnx
     import onnxruntime
     import torch
     import ultralytics
 
-    versions = {"cv2": cv2.__version__, "onnx": onnx.__version__,
+    versions = {"cv2": cv2.__version__, "numpy": numpy.__version__, "onnx": onnx.__version__,
                 "onnxruntime": onnxruntime.__version__, "torch": torch.__version__,
                 "ultralytics": ultralytics.__version__}
     print(json.dumps(versions, indent=2))
@@ -195,7 +196,9 @@ def check_image() -> dict:
 
 
 @app.function(image=image, gpu="L4", cpu=4, memory=16384, timeout=GPU_SECONDS, retries=0, volumes={"/data": volume})
-def train_candidate(run_id: str, epochs: int, batch: int, expected_sha: str) -> dict:
+def train_candidate(run_id: str, epochs: int, batch: int, expected_sha: str, recipe: dict) -> dict:
+    import cv2
+    import numpy
     import platform
     import torch
     import ultralytics
@@ -222,31 +225,63 @@ def train_candidate(run_id: str, epochs: int, batch: int, expected_sha: str) -> 
     pretrained.train(
         data=str(data_yaml), imgsz=IMAGE_SIZE, epochs=epochs, batch=batch,
         device=0, workers=4, project=str(work), name="train", exist_ok=False,
-        patience=epochs, plots=False, seed=0, deterministic=True, cache=False,
-        optimizer="AdamW", lr0=0.0003, lrf=0.01,
-        hsv_h=0.0, hsv_s=0.0, hsv_v=0.15, fliplr=0.5,
-        mosaic=0.0, close_mosaic=0, scale=0.15, translate=0.05,
+        patience=recipe["patience"], plots=False, seed=0, deterministic=True, cache=False,
+        optimizer="AdamW", lr0=recipe["lr0"], lrf=0.01,
+        hsv_h=0.0, hsv_s=0.0, hsv_v=recipe["hsv_v"], fliplr=0.5,
+        mosaic=recipe["mosaic"], close_mosaic=recipe["close_mosaic"],
+        scale=recipe["scale"], translate=recipe["translate"],
+        rect=False, save_period=recipe["checkpoint_period"],
     )
-    best = work / "train" / "weights" / "best.pt"
-    if not best.is_file():
+    weights = work / "train" / "weights"
+    trainer_best = weights / "best.pt"
+    if not trainer_best.is_file():
         raise RuntimeError("training did not produce best.pt")
-    shutil.copy2(best, out / "best.pt")
     results_csv = work / "train" / "results.csv"
     epochs_completed = None
     if results_csv.is_file():
         shutil.copy2(results_csv, out / "results.csv")
         with results_csv.open(newline="") as handle:
             epochs_completed = sum(1 for _ in csv.DictReader(handle))
-    volume.commit()  # Keep the trained checkpoint if validation or export fails.
+    square_args = dict(data=str(data_yaml), imgsz=IMAGE_SIZE, batch=1, rect=False,
+                       conf=0.001, iou=0.7, max_det=300, device="cpu",
+                       plots=False, verbose=False)
+    checkpoint_rows = []
+    checkpoints = sorted(weights.glob("epoch*.pt"), key=lambda path: int(re.search(r"epoch(\d+)", path.stem).group(1)))
+    checkpoints += [trainer_best, weights / "last.pt"]
+    for checkpoint in checkpoints:
+        if not checkpoint.is_file():
+            continue
+        candidate_metrics = YOLO(str(checkpoint)).val(**square_args)
+        checkpoint_rows.append({"checkpoint": checkpoint.name,
+                                "ap50": class_ap50(candidate_metrics),
+                                "map50": float(candidate_metrics.box.map50)})
+    if not checkpoint_rows:
+        raise RuntimeError("no checkpoints available for matched-shape selection")
+    rat_best = max(checkpoint_rows, key=lambda row: (row["ap50"]["rat"] or 0.0,
+                                                     row["ap50"]["person"] or 0.0))
+    eligible = [row for row in checkpoint_rows
+                if (row["ap50"]["person"] or 0.0) >= recipe["min_person_ap50"]]
+    balanced_best = max(eligible, key=lambda row: (row["ap50"]["rat"] or 0.0,
+                                                       row["ap50"]["person"] or 0.0)) if eligible else None
+    selected = balanced_best or rat_best
+    best = weights / selected["checkpoint"]
+    shutil.copy2(best, out / "best.pt")
+    shutil.copy2(weights / rat_best["checkpoint"], out / "rat_best.pt")
+    shutil.copy2(trainer_best, out / "trainer_best.pt")
+    (out / "checkpoint_selection.json").write_text(json.dumps({
+        "objective": "highest held-out rat AP50 with person AP50 floor, square 416 batch 1 rect=False conf=0.001 iou=0.7 max_det=300",
+        "min_person_ap50": recipe["min_person_ap50"],
+        "rat_best": rat_best, "balanced_best": balanced_best,
+        "selected": selected, "evaluated": checkpoint_rows,
+        "note": "Selected on the same holdout; this is tuned validation evidence, not an untouched test."
+    }, indent=2) + "\n")
+    volume.commit()  # Keep the trained checkpoints if validation or export fails.
     model = YOLO(str(best))
     pt_metrics = model.val(data=str(data_yaml), imgsz=IMAGE_SIZE, batch=batch, device=0, plots=False, verbose=False)
     export_path = Path(model.export(format="onnx", imgsz=IMAGE_SIZE, opset=12, simplify=True, dynamic=False, device=0))
     shutil.copy2(export_path, out / "rat.onnx")
     volume.commit()  # Keep the candidate if ONNX validation fails.
     onnx_metrics = YOLO(str(out / "rat.onnx")).val(data=str(data_yaml), imgsz=IMAGE_SIZE, batch=batch, device="cpu", plots=False, verbose=False)
-    square_args = dict(data=str(data_yaml), imgsz=IMAGE_SIZE, batch=1, rect=False,
-                       conf=0.001, iou=0.7, max_det=300, device="cpu",
-                       plots=False, verbose=False)
     square_pt_metrics = YOLO(str(best)).val(**square_args)
     square_onnx_metrics = YOLO(str(out / "rat.onnx")).val(**square_args)
     parity = raw_onnx_parity(best, out / "rat.onnx", dataset)
@@ -259,22 +294,28 @@ def train_candidate(run_id: str, epochs: int, batch: int, expected_sha: str) -> 
         "run_id": run_id, "dataset": summary, "model": "yolo11n.pt",
         "pretrained_sha256": pretrained_hash, "image_size": IMAGE_SIZE,
         "epochs_requested": epochs, "epochs_completed": epochs_completed, "batch": batch, "seed": 0,
-        "training_recipe": {"patience": epochs, "optimizer": "AdamW", "lr0": 0.0003,
-                            "lrf": 0.01, "mosaic": 0.0, "scale": 0.15,
-                            "translate": 0.05, "hsv_v": 0.15, "fliplr": 0.5},
-        "packages": {"torch": torch.__version__, "ultralytics": ultralytics.__version__, "onnxruntime": onnxruntime.__version__},
+        "training_recipe": {"optimizer": "AdamW", "lrf": 0.01, "fliplr": 0.5,
+                            "rect": False, **recipe},
+        "checkpoint_selection": selected,
+        "rat_best_checkpoint": rat_best,
+        "balanced_checkpoint_found": balanced_best is not None,
+        "packages": {"torch": torch.__version__, "ultralytics": ultralytics.__version__,
+                     "onnxruntime": onnxruntime.__version__, "numpy": numpy.__version__,
+                     "cv2": cv2.__version__},
         "platform": platform.platform(), "gpu": torch.cuda.get_device_name(0),
         "pt_map50": float(pt_metrics.box.map50), "pt_ap50": pt_ap,
         "onnx_map50": float(onnx_metrics.box.map50), "onnx_ap50": onnx_ap,
-        "matched_shape": {"protocol": "square 416, batch 1, rect=False, conf=0.001, iou=0.7, max_det=300",
+        "matched_shape": {"protocol": "square 416, batch 1, rect=False, conf=0.001, iou=0.7, max_det=300, CPU",
                           "pt_map50": float(square_pt_metrics.box.map50), "pt_ap50": square_pt_ap,
                           "onnx_map50": float(square_onnx_metrics.box.map50), "onnx_ap50": square_onnx_ap},
         "rat_ap50_delta": rat_delta,
         "rat_gate_pass": square_onnx_ap["rat"] is not None and square_onnx_ap["rat"] > 0.9,
+        "person_nonregression_pass": square_onnx_ap["person"] is not None and square_onnx_ap["person"] >= recipe["min_person_ap50"],
         "onnx_parity": parity,
         "onnx_parity_pass": parity["pass"] and rat_delta is not None and rat_delta <= 0.02,
         "event_gate": "not_run; requires reviewed push times and negatives reel",
-        "artifacts_sha256": {name: sha256(out / name) for name in ("best.pt", "rat.onnx")},
+        "artifacts_sha256": {name: sha256(out / name) for name in ("best.pt", "rat_best.pt", "trainer_best.pt",
+                                                                   "checkpoint_selection.json", "rat.onnx")},
     }
     (out / "metrics.json").write_text(json.dumps(report, indent=2) + "\n")
     volume.commit()
@@ -283,9 +324,23 @@ def train_candidate(run_id: str, epochs: int, batch: int, expected_sha: str) -> 
 
 @app.local_entrypoint()
 def main(dataset: str = "vision/dataset", out: str = "vision/runs/modal-rat", epochs: int = 150,
-         batch: int = 8, dry_run: bool = False, keep_remote: bool = False):
+         batch: int = 8, lr0: float = 0.0003, patience: int = 0,
+         mosaic: float = 0.0, close_mosaic: int = 0, scale: float = 0.15,
+         translate: float = 0.05, hsv_v: float = 0.15, checkpoint_period: int = 5,
+         min_person_ap50: float = 0.84,
+         dry_run: bool = False, keep_remote: bool = False):
     if not (1 <= epochs <= MAX_EPOCHS) or not (1 <= batch <= 32):
         raise ValueError("epochs must be 1..200 and batch must be 1..32")
+    if not (0 < lr0 <= 0.01 and 0 <= patience <= epochs and
+            0 <= mosaic <= 1 and 0 <= close_mosaic <= epochs and
+            0 <= scale <= 0.5 and 0 <= translate <= 0.2 and
+            0 <= hsv_v <= 0.5 and 1 <= checkpoint_period <= 20 and
+            0 <= min_person_ap50 <= 1):
+        raise ValueError("training recipe outside bounded limits")
+    recipe = {"lr0": lr0, "patience": patience or epochs, "mosaic": mosaic,
+              "close_mosaic": close_mosaic, "scale": scale, "translate": translate,
+              "hsv_v": hsv_v, "checkpoint_period": checkpoint_period,
+              "min_person_ap50": min_person_ap50}
     source = Path(dataset).resolve()
     destination = Path(out).resolve()
     summary = validate_dataset(source)
@@ -305,7 +360,7 @@ def main(dataset: str = "vision/dataset", out: str = "vision/runs/modal-rat", ep
             batch_upload.put_directory(str(source), f"/{input_path}")
         remote_error = None
         try:
-            report = train_candidate.remote(run_id, epochs, batch, summary["dataset_sha256"])
+            report = train_candidate.remote(run_id, epochs, batch, summary["dataset_sha256"], recipe)
         except Exception as exc:
             remote_error = exc
             report = None
@@ -353,6 +408,7 @@ def main(dataset: str = "vision/dataset", out: str = "vision/runs/modal-rat", ep
             "ap50_by_class": report["matched_shape"]["onnx_ap50"],
             "map50_all": report["matched_shape"]["onnx_map50"],
             "gate_a_pass": report["rat_gate_pass"],
+            "person_nonregression_pass": report["person_nonregression_pass"],
             "onnx_parity": parity_report,
             "train_args": {"model": report["model"], "imgsz": IMAGE_SIZE,
                            "epochs": epochs, "epochs_completed": report["epochs_completed"],
