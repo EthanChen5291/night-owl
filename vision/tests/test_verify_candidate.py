@@ -3,16 +3,30 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 VISION = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(VISION))
 
 from verify_candidate import (file_pair_fingerprint, inventory, match_counts,
-                              sha256, verify_selection_disjoint,
+                              runtime_counts, sha256, verify_selection_disjoint,
                               verify_test_provenance)  # noqa: E402
 
 
 class CandidateVerificationTests(unittest.TestCase):
+    def test_runtime_counts_uses_selected_confidence(self):
+        frames = [{"clip": "short_30", "image": "short_30_00000.jpg",
+                   "width": 640, "height": 480, "gt": []}]
+        for confidence in (0.5, 0.7):
+            with self.subTest(confidence=confidence), \
+                 patch("verify_candidate.Detector") as detector_class, \
+                 patch("cv2.imread", return_value=object()):
+                detector_class.return_value.infer.return_value = []
+                result = runtime_counts(Path("/unused"), Path("model.onnx"), frames,
+                                        confidence)
+                self.assertEqual(result["short_30"]["rat_proposals"], 0)
+                self.assertEqual(detector_class.call_args.kwargs["conf"], confidence)
+
     def test_duplicate_with_higher_confidence_counts_as_false_positive(self):
         frames = [{"gt": [{"cls": 0, "xyxy": [10, 10, 30, 30]}],
                    "pred": [{"cls": 0, "conf": .7, "xyxy": [0, 0, 18, 18]},

@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import math
 import shutil
 import tempfile
 from collections import defaultdict
@@ -259,11 +260,11 @@ def predict_frames(dataset: Path, by_tag: dict[str, list[Path]], onnx: Path) -> 
     return records
 
 
-def runtime_counts(dataset: Path, onnx: Path, frames: list[dict]) -> dict:
+def runtime_counts(dataset: Path, onnx: Path, frames: list[dict], conf: float = RUNTIME_CONF) -> dict:
     import cv2
 
     detector = Detector(str(onnx), imgsz=IMGSZ, gray=True,
-                        conf=RUNTIME_CONF, iou=0.45, names=["rat", "person"])
+                        conf=conf, iou=0.45, names=["rat", "person"])
     output = {}
     for tag in sorted({f["clip"] for f in frames}):
         total = kept = dropped = tp = fp = gt_total = 0
@@ -343,7 +344,11 @@ def main() -> None:
     parser.add_argument("--selection-dataset", type=Path,
                         help="required original train/validation snapshot for --test-set overlap check")
     parser.add_argument("--out-dir", type=Path, required=True)
+    parser.add_argument("--runtime-conf", type=float, default=RUNTIME_CONF,
+                        help="Pi Detector confidence for sampled-frame runtime counts (default: 0.5)")
     args = parser.parse_args()
+    if not math.isfinite(args.runtime_conf) or not 0 < args.runtime_conf <= 1:
+        parser.error("--runtime-conf must be finite and in (0, 1]")
     dataset, pt, onnx, output = (p.resolve() for p in (args.dataset or args.test_set, args.pt, args.onnx, args.out_dir))
     test_only = args.test_set is not None
     onnx_hash = sha256(onnx)
@@ -370,10 +375,12 @@ def main() -> None:
     contact_sheets(dataset, frames, output)
     (output / "per_frame_predictions.json").write_text(json.dumps(frames, indent=2) + "\n")
     by_clip = {tag: [f for f in frames if f["clip"] == tag] for tag in by_tag}
+    runtime_key = f"runtime_conf_{args.runtime_conf:g}_floor_y_0".replace(".", "_")
     report = {
         "status": "INDEPENDENT_TEST" if test_only else "DIAGNOSTIC_ONLY",
         "protocol": {"imgsz": IMGSZ, "batch": 1, "rect": False,
                      "conf": CONF_AP, "iou": IOU_NMS, "max_det": MAX_DET, "device": "cpu"},
+        "runtime_protocol": {"conf": args.runtime_conf, "iou": 0.45, "floor_y": FLOOR_Y},
         "packages": packages,
         "dataset_manifest_sha256": sha256(dataset / "manifest.json"),
         "image_label_fingerprint": file_pair_fingerprint(dataset, set(manifest["frames"]["val"]),
@@ -389,13 +396,15 @@ def main() -> None:
                    "Validation clips have guided model selection; event gate is unverified."),
         "scores": scores,
         "threshold_counts": {
-            tag: {str(t): match_counts(records, t) for t in (0.5, 0.3, 0.1, 0.05, 0.01, 0.001)}
+            tag: {str(t): match_counts(records, t) for t in
+                  ((args.runtime_conf,) if test_only else (0.5, 0.3, 0.1, 0.05, 0.01, 0.001))}
             for tag, records in {"combined": frames, **by_clip}.items()
         },
-        "runtime_conf_0_5_floor_y_0": runtime_counts(dataset, onnx, frames),
+        runtime_key: runtime_counts(dataset, onnx, frames, args.runtime_conf),
     }
     (output / "verification_report.json").write_text(json.dumps(report, indent=2) + "\n")
-    print(json.dumps({"scores": scores, "runtime": report["runtime_conf_0_5_floor_y_0"]}, indent=2))
+    print(json.dumps({"scores": scores, "runtime_conf": args.runtime_conf,
+                      "runtime": report[runtime_key]}, indent=2))
 
 
 if __name__ == "__main__":
