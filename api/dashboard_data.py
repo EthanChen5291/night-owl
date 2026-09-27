@@ -93,8 +93,11 @@ DATASETS = {
                     "complaints_per_100k": ("Yearly complaints per 100k residents", "per 100k residents"),
                     **_ACS_METRICS},
         "notes": ["One row per ZIP code area per calendar year since 2010; the current year is partial.",
+                  "ZIP year period uses calendar years: before COVID is 2010–2019, COVID is 2020–2021 (including January–February 2020), and after COVID starts in 2022. Use borough_months for the March 2020 boundary.",
                   "income_band splits the areas into fifths by ACS median household income, Q1 lowest to Q5 highest; filter it or borough and group by year to compare trends.",
-                  "Complaints are 311 reports and inspections are city visits; neither is a count of rats."],
+                  "Complaints are 311 reports and inspections are city visits; neither is a count of rats.",
+                  "ZIP coverage includes areas with at least 1,000 ACS residents, known income, and 50 rodent complaints across the history window.",
+                  "Population and income are one ACS 5-year estimate applied to every year."],
     },
     "zips": {
         "label": "ZIP code areas before and after COVID", "dimensions": ["zip", "neighborhood", "borough", "income_band"],
@@ -111,7 +114,8 @@ DATASETS = {
                     "active_rate_post": ("Share of inspections finding rat activity, 2022–2025", "fraction")},
         "notes": ["One row per ZIP code area; use raw aggregation with sort_by and limit for rankings, for example the richest areas by median_income.",
                   "pre is the 2017–2019 yearly mean and post is 2022–2025; 2020–2021 are excluded.",
-                  "ACS top-codes median household income at $250,001."],
+                  "ACS top-codes median household income at $250,001.",
+                  "Rankings cover areas with at least 1,000 ACS residents, known income, and 50 rodent complaints across the history window."],
     },
 }
 
@@ -139,6 +143,12 @@ def catalog(store: Store | None = None) -> dict:
             history = None
         if isinstance(history, dict):
             result["history"] = {key: history.get(key) for key in ("window", "periods", "zip_windows", "acs_release")}
+            window = history.get("window")
+            last_month = window[-1] if isinstance(window, list) and window and isinstance(window[-1], str) else None
+            last_year = last_month[:4] if last_month and MONTH.fullmatch(last_month) else "unknown"
+            result["history"]["zip_periods"] = history.get("zip_periods") or {
+                "before COVID": "2010 to 2019", "COVID": "2020 to 2021 (includes January–February 2020)",
+                "after COVID": f"2022 to {last_year}" + (f" ({last_year} partial through {last_month})" if last_month and last_month[5:] != "12" else "")}
             result["history"]["income_bands"] = [{"band": b.get("band"), "min_income": b.get("min_income"), "max_income": b.get("max_income")}
                                                  for b in history.get("income_bands", []) if isinstance(b, dict)]
     return result
@@ -409,6 +419,19 @@ def run_query(store: Store, raw: Any) -> dict:
         present.sort(key=lambda row: row[sort_by].casefold() if isinstance(row[sort_by], str) else row[sort_by],
                      reverse=query["direction"] == "desc")
         output = present + missing
+    if name in HISTORY_DATASETS and aggregation == "mean":
+        row_unit = {"borough_months": "borough-month", "zip_years": "ZIP-year", "zips": "ZIP area"}[name]
+        source["notes"] = [*source["notes"],
+                           f"Means give each {row_unit} with a value equal weight. Mean inspection-positive shares are not the pooled share of inspections; mean household incomes average area medians."]
+        if not split:
+            for column in columns:
+                if column["key"] in metrics:
+                    label = column["label"]
+                    if column["key"].startswith("active_rate"):
+                        label = label.replace("Share of inspections finding rat activity", "Inspection-positive share")
+                    elif column["key"] == "median_income":
+                        label = "Area median household income (ACS)"
+                    column["label"] = f"Mean {label[:1].lower() + label[1:]} per {row_unit}"
     total = len(output)
     return {"rows": output[:query["limit"]], "columns": columns, "source": source, "total_rows": total, "query": query}
 
@@ -438,7 +461,7 @@ def render_dashboard(store: Store, raw: Any, version: Any = 1) -> dict:
         x, y = card.get("x"), card.get("y")
         if not isinstance(x, str) or x not in keys or not isinstance(y, list) or len(y) > MAX_SERIES or any(not isinstance(k, str) or k not in keys for k in y) or len(set(y)) != len(y):
             wanted = [x] + (y if isinstance(y, list) else [])
-            missing = [str(k)[:40] for k in wanted if k not in keys]
+            missing = [str(k)[:40] for k in wanted if not isinstance(k, str) or k not in keys]
             raise DashboardError(f"card '{ident}': x and up to {MAX_SERIES} distinct y keys must be columns of its own query result; "
                                  f"missing {', '.join(missing) or 'none'}; returned {', '.join(c['key'] for c in result['columns'])}")
         if kind != "table" and not y:

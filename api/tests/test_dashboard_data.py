@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+import pytest
 
 from dashboard_data import run_query
 from main import create_app
@@ -95,6 +96,20 @@ def test_render_validates_chart_fields_units_and_empty_metric(tmp_path):
                                             "query": query("events", ["records"], "count", group_by="day"),
                                             "x": "day", "y": ["records"]}]}
         assert client.post("/dashboards/render", json={"spec": empty_metric}).status_code == 400
+
+
+@pytest.mark.parametrize("x,y", [([], ["score_b"]), ("borough", [{}]), ("borough", [[]])])
+def test_render_reports_malformed_card_columns_as_client_error(tmp_path, x, y):
+    spec = {"title": "Borough risk", "description": "Current snapshot", "cards": [{
+        "id": "risk", "title": "Mean risk", "kind": "bar",
+        "query": query("cells", ["score_b"], "mean", group_by="borough"),
+        "x": x, "y": y}]}
+    with TestClient(create_app(data_dir=REPO, events_file=tmp_path / "events.jsonl")) as client:
+        response = client.post("/dashboards/render", json={"spec": spec})
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "card 'risk'" in detail
+    assert "returned borough, score_b" in detail
 
 
 def test_history_datasets_filter_pivot_and_rank(tmp_path):

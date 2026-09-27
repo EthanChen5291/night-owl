@@ -83,12 +83,17 @@ borough_months (one row per borough per month since 2010), zip_years (one row pe
 initial inspections and ACS income. Use borough_months for borough trends and COVID comparisons, zip_years for
 income-band or neighborhood trends, and zips with sort_by and limit for rankings. "Richest" or "poorest" areas mean
 ZIP code areas ranked by ACS median household income; the only cities are NYC boroughs and ZIP code areas.
+The borough_months COVID period starts in March 2020. The zip_years COVID period covers calendar years 2020–2021,
+including January–February 2020; use borough_months when the March boundary matters.
 Use filters to narrow rows (for example filters {"borough": ["Bronx", "Manhattan"]} or {"period": "after COVID"}).
 To put several boroughs, periods or income bands on one chart, set split_by to that dimension with one metric;
 each value becomes its own y column. Use mean for rates such as complaints_per_100k and active_rate and sum for
-counts; periods differ in length, so compare mean monthly values. 311 complaints and inspection findings are not rat
-counts, so say which one a chart shows. Model B estimates active rat signs conditional on inspection. Event counts
-include queued detections, including rejected ones.
+counts; periods differ in length, so compare mean monthly values. Mean rates give each source row equal weight:
+call these mean borough-month or ZIP-year rates, never a pooled inspection share or population-wide rate.
+Mean median_income is an average of area medians, not the median income of all households in the group.
+ZIP rankings cover the eligible areas described in the catalog, not every NYC ZIP code.
+311 complaints and inspection findings are not rat counts, so say which one a chart shows. Model B estimates
+active rat signs conditional on inspection. Event counts include queued detections, including rejected ones.
 In publish_dashboard, each card's x and y must be column keys returned by that card's own query (a pivot returns
 the split values as keys; a ranking must list its sort_by field in metrics). If a card is rejected, fix only that
 card and publish again.
