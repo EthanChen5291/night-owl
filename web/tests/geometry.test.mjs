@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildExtrusions, buildFlat, geometryTransfers, packGeometry, unpackGeometry } from '../src/city/tileGeometry.ts'
+import { buildExtrusions, buildFlat, geometryTransfers, packGeometry, tintBuildingGeometry, unpackGeometry } from '../src/city/tileGeometry.ts'
 
 const building = {
   id: 'lot-1', h3: '892a100d467ffff', height: 12,
@@ -48,4 +48,20 @@ test('short rings are skipped and a collinear roof does not keep unused indices'
   assert.equal(walls.count, 24)
   assert.equal(roof.count, geometry.index.count - walls.count)
   assert.deepEqual(snapshot(unpackGeometry(packGeometry(geometry))), snapshot(geometry))
+})
+
+test('worker-painted day and night colours survive transfer as normalized 16-bit attributes', () => {
+  const ranges = []
+  const geometry = buildExtrusions([building], ranges, [12.8, 13.6])
+  tintBuildingGeometry(geometry, ranges, {
+    colours: { [building.h3]: '#ff0000' },
+    day: { facades: [0, 0, 0], buildingTint: 1, tintLift: 0 },
+    night: { facades: [0x0000ff, 0x0000ff, 0x0000ff], buildingTint: 0, tintLift: 0 },
+  })
+  const packed = packGeometry(geometry)
+  const copy = unpackGeometry(structuredClone(packed, { transfer: geometryTransfers(packed) }))
+  assert.equal(copy.getAttribute('color').normalized, true)
+  assert.equal(copy.getAttribute('colorNight').normalized, true)
+  assert.deepEqual(Array.from(copy.getAttribute('color').array.slice(0, 3)), [65535, 0, 0])
+  assert.equal(copy.getAttribute('colorNight').array[2] > 0, true)
 })

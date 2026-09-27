@@ -103,7 +103,7 @@ export default function App() {
   const [placing, setPlacing] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
   const [owlsOpen, setOwlsOpen] = useState(true)
-  const [chartOpen, setChartOpen] = useState(true)
+  const [chartOpen, setChartOpen] = useState(false)
   const [agentShown, setAgentShown] = useState(false) // the assistant button is out: the owls and the chart make room
 
   const seenRef = useRef<Set<string>>(new Set())
@@ -537,12 +537,15 @@ export default function App() {
     },
     [index, projector],
   )
-  /** Select an owl; the camera glides there, or all the way in (`close`) until the 3D pin shows. */
+  /** Select an owl; enter its borough from the city, then glide close enough to see its 3D pin. */
   const selectOwl = useCallback((id: string | null, close = false) => {
-    setSelected(id)
     const o = id ? owlsRef.current.find((x) => x.id === id) : null
-    if (o) setFocus({ lat: o.lat, lon: o.lon, distance: close ? 300 : undefined, seq: ++seqRef.current })
-  }, [])
+    const owlArea = o && !noBake ? areaOfOwl(o) : null
+    const enteringArea = !!owlArea && owlArea !== area
+    if (enteringArea) setArea(owlArea)
+    setSelected(id)
+    if (o) setFocus({ lat: o.lat, lon: o.lon, distance: close || enteringArea || area === null ? 300 : undefined, seq: ++seqRef.current })
+  }, [area, areaOfOwl, noBake, setArea])
   /** Place an owl on a spot option: on its street tree, with the model's mount address. */
   const placeSpot = useCallback((spot: Spot) => {
     const addr = spot.mount_address.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()) // the model shouts; the bake's addresses are title case
@@ -811,7 +814,7 @@ export default function App() {
         />
         <ModeBar mode={mode} onMode={setMode} preset={preset} onPreset={setPreset} />
         <Header source={cellsSource} cells={cells} onPick={goToPlace} />
-        <Legend mode={mode} lifted={chartOpen} />
+        {area && <Legend mode={mode} lifted={chartOpen} />}
 
         {!activeArea && areas.length > 0 && <AreaPicker areas={areas} hovered={hover?.areaId ?? null} onPick={setArea} />}
 

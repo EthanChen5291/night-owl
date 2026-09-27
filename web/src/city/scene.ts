@@ -7,8 +7,10 @@ import { makeProjector, type LatLon, type Projector } from './projection'
 import { FACADE_TILE_M, facadeTextures } from './facade'
 import { pointInRing, type AddressIndex } from './addresses'
 import { BuildingOcclusionIndex } from './occlusion'
-import { installBuildingTheme, installFieldTheme } from './themeMaterials'
-import { buildFlat, unpackGeometry, type BuildingRange, type TileGeometryReply, type TileGeometryRequest } from './tileGeometry'
+import { buildHexPrism } from './hexGeometry'
+import { installBuildingTheme } from './themeMaterials'
+import { buildFlat, tintBuildingGeometry, unpackGeometry, type BuildingRange, type TileGeometryReply, type TileGeometryRequest } from './tileGeometry'
+import type { FlatLayersReply } from './flatLayers.worker'
 
 // No React in here. App owns the data; Scene.tsx owns the lifecycle; this class owns three.js.
 // Coordinates: local metres, x east, y north (from the projector); mapped to three.js x / -z.
@@ -20,7 +22,7 @@ export interface SceneCallbacks {
 }
 
 interface HexEntry {
-  mesh: THREE.Mesh<THREE.ExtrudeGeometry, THREE.MeshStandardMaterial>
+  mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
   targetHeight: number
   targetColour: THREE.Color
   flashUntil: number
@@ -28,7 +30,8 @@ interface HexEntry {
 
 interface TileMeshes {
   area: string | null
-  occlusion: BuildingOcclusionIndex
+  occlusion: BuildingOcclusionIndex | null
+  footprints: Building[]
   group: THREE.Group
   buildings: THREE.Mesh | null
   ranges: BuildingRange[]
@@ -69,6 +72,7 @@ interface AreaMarker {
   label: THREE.Sprite
   centre: THREE.Vector3
   outline: [number, number][] // local metres, for which cells belong to it
+  bounds: { minX: number; minY: number; maxX: number; maxY: number }
 }
 
 /** The band drawn around a searched hexagon once the camera has landed on it. */
@@ -115,10 +119,9 @@ const BADGE_RADIUS = 12 // metres, at close range; it grows sublinearly with dis
 const NODE_PINK = 0xf3b4c4
 const NODE_YELLOW = 0xffd54a
 const BOUNCE_MS = 650
-// markers draw after the prisms so the glass never tints them (the red stays red); the far badge skips the depth test,
-// the close pin keeps it (buildings in front of it hide it) and the prisms do not write depth, so they never hide the pin
+// Markers draw after the prisms; the far badge skips depth testing, while the close pin sits among buildings.
 const MARKER_ORDER = 1
-const HEX_PICK_DISTANCE = 1000 // closer than this the prisms are scenery: not hoverable, not clickable, the street underneath is
+const HEX_PICK_DISTANCE = 1000 // closer than this, let streets and buildings receive the pointer
 const CITY_DISTANCE = 36_000
 const CITY_POLAR = 0.42 // near top-down: the citywide view is a map, not a skyline
 const AREA_DISTANCE = 3600
@@ -148,8 +151,6 @@ interface Look {
   windows: number
   windowColour: number
   hexOpacity: number
-  /** the citywide 2D colour field: every cell colour is pulled `mix` of the way to `neutral` so the map stays calm */
-  field: { neutral: number; mix: number; opacity: number }
   /** the search locator band and the halo either side of it: ink on paper by day, the flash's warm white on dark by night */
   locator: { band: number; edge: number }
   area: { fill: number; rim: number; ink: string }
@@ -172,7 +173,6 @@ const LOOKS: Record<Preset, Look> = {
     windows: 0,
     windowColour: 0xffffff,
     hexOpacity: 0.56,
-    field: { neutral: 0xe6e4de, mix: 0.12, opacity: 0.9 },
     locator: { band: 0x16202b, edge: 0xffffff },
     area: { fill: 0xffffff, rim: 0xffffff, ink: '#16202b' },
   },
@@ -192,7 +192,6 @@ const LOOKS: Record<Preset, Look> = {
     windows: 0.3,
     windowColour: 0xdfe7f7, // lit windows read as a pale cool white, so the skyline stays blue-grey, not amber
     hexOpacity: 0.8,
-    field: { neutral: 0x171b26, mix: 0.25, opacity: 0.84 },
     locator: { band: 0xfff0b0, edge: 0x1b202a },
     area: { fill: 0x9fc4ff, rim: 0xbfd8ff, ink: '#e6e8ef' },
   },
@@ -216,27 +215,35 @@ export class CityScene {
   private lastView = { x: NaN, z: NaN, wide: false, t: 0 }
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private hexes = new Map<string, HexEntry>()
+  private pendingHexes: Cell[] = []
+  private pendingAreaHexes: string[] = []
+  private pendingPriorityHexes = 0
+  private hexBuildHandle: number | null = null
+  private hexBuildKind: 'idle' | 'frame' | 'timeout' | null = null
   private visibleHexes: HexEntry[] = []
   private visibleHexMeshes: THREE.Object3D[] = []
   private hexGroup = new THREE.Group()
-  private field: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null // the citywide 2D colour map
-  private fieldCellByFace: string[] = []
-  private fieldNeutral = { value: new THREE.Color() }
-  private fieldMix = { value: 0 }
   private buildingTheme: ReturnType<typeof installBuildingTheme>
   private preset: Preset | null = null
   private planGroup = new THREE.Group()
-  private cityLayerGroup = new THREE.Group() // citywide land / parks / water: the map under the colour field
+  private cityLayerGroup = new THREE.Group() // citywide land / parks / water
   private areaLayerGroup = new THREE.Group() // the active area's own ground: the only land drawn inside an area
   private cityLayerMeshes = new Map<FlatLayer, THREE.Mesh>()
+  private cityLayerWorker: Worker | null = null
+  private cityLayerRequestId = 0
+  private pendingCityLayers: CityLayers | null = null
   private areaLayerMeshes = new Map<FlatLayer, THREE.Mesh>()
+  private areaLayerWorker: Worker | null = null
+  private areaLayerRequestId = 0
+  private pendingAreaLayers: CityLayers | null = null
   private tileGroup = new THREE.Group()
   private tiles = new Map<string, TileMeshes>()
   private tileWorker: Worker | null = null
   private tileRequestId = 0
   private tileInFlight: number | null = null
   private tileWorkerFailures = 0
-  private tileRequests = new Map<string, { id: number; area: string | null; buildings: Building[]; roads: Poly[]; trees: Tree[] }>()
+  private tileRequests = new Map<string, { id: number; area: string | null; buildings: Building[]; roads: Poly[]; trees: Tree[]; tintRevision: number }>()
+  private tintRevision = 0
   private nodeGroup = new THREE.Group()
   private nodes = new Map<string, NodeMarker>()
   private selectedNode: string | null = null
@@ -310,7 +317,7 @@ export class CityScene {
       new THREE.MeshStandardMaterial({ color: LOOKS.day.layers.ground, roughness: 0.9, metalness: 0 }),
     )
     this.ground.rotation.x = -Math.PI / 2
-    this.ground.position.y = -0.5
+    this.ground.position.y = -3
     this.ground.receiveShadow = true
     this.scene.add(this.ground)
 
@@ -390,19 +397,16 @@ export class CityScene {
     this.invalidate()
   }
 
-  /** Rebuild (or update) the hex prisms from the contract cells. Geometry is reused across updates. */
+  /** Build or recolour the original raised hexagons from the contract data. */
   setCells(cells: Cell[], mode: Mode) {
+    this.tintRevision++
     this.mode = mode
     const seen = new Set<string>()
     for (const cell of cells) {
       this.cells.set(cell.h3, cell)
       seen.add(cell.h3)
-      let entry = this.hexes.get(cell.h3)
-      if (!entry) {
-        entry = this.makeHex(cell)
-        this.hexes.set(cell.h3, entry)
-        this.hexGroup.add(entry.mesh)
-      }
+      const entry = this.hexes.get(cell.h3)
+      if (!entry) continue
       entry.targetHeight = heightFor(mode, cell)
       entry.targetColour.set(colourFor(mode, cell))
     }
@@ -415,8 +419,11 @@ export class CityScene {
         this.cells.delete(h3)
       }
     }
+    for (const h3 of this.cells.keys()) if (!seen.has(h3)) this.cells.delete(h3)
+    this.pendingHexes = cells.filter((cell) => !this.hexes.has(cell.h3))
+    this.prioritizePendingHexes()
+    this.scheduleHexBuild()
     this.applyAreaVisibility()
-    this.rebuildField()
     this.retintBuildings()
     this.invalidate()
   }
@@ -424,13 +431,13 @@ export class CityScene {
   setMode(mode: Mode) {
     if (mode === this.mode) return
     this.mode = mode
+    this.tintRevision++
     for (const [h3, entry] of this.hexes) {
       const cell = this.cells.get(h3)
       if (!cell) continue
       entry.targetHeight = heightFor(mode, cell)
       entry.targetColour.set(colourFor(mode, cell))
     }
-    this.rebuildField()
     this.retintBuildings()
     this.invalidate()
   }
@@ -460,16 +467,13 @@ export class CityScene {
     this.renderer.shadowMap.needsUpdate = true
     this.renderer.toneMappingExposure = L.exposure
     this.ground.material.color.set(L.layers.ground)
-    for (const [name, mesh] of this.cityLayerMeshes) (mesh.material as THREE.MeshStandardMaterial).color.set(L.layers[name])
+    for (const [name, mesh] of this.cityLayerMeshes) (mesh.material as THREE.MeshBasicMaterial).color.set(L.layers[name]).multiplyScalar(preset === 'night' ? 2 : 1)
     for (const [name, mesh] of this.areaLayerMeshes) (mesh.material as THREE.MeshStandardMaterial).color.set(L.layers[name])
     this.roadMaterial.color.set(L.layers.roads)
     this.treeMaterial.color.set(L.layers.trees)
     this.wallMaterial.emissiveIntensity = L.windows
     this.wallMaterial.emissive.set(L.windowColour)
     for (const [h3, entry] of this.hexes) entry.mesh.material.opacity = h3 === this.hovered ? Math.min(1, L.hexOpacity + 0.15) : L.hexOpacity
-    this.fieldNeutral.value.setHex(L.field.neutral)
-    this.fieldMix.value = L.field.mix
-    if (this.field) this.field.material.opacity = L.field.opacity
     for (const site of this.sites) {
       site.chip.material.map?.dispose()
       site.chip.material.map = textTexture(site.chip.userData.text as string, L.area.ink)
@@ -530,7 +534,7 @@ export class CityScene {
     group.clear()
   }
 
-  /** Same family as the owl badge: a squat translucent disc with a rim, drawn over the buildings but under the prism glass. */
+  /** Same family as the owl badge: a squat translucent disc with a rim. */
   private makeSite(lat: number, lon: number, text: string, style: { disc: number; rim: number; pulse: boolean }): SiteMarker {
     const [x, y] = this.projector.xy(lat, lon)
     const over = { transparent: true, depthTest: false, depthWrite: false } as const
@@ -598,7 +602,7 @@ export class CityScene {
     }
     const edge = hexBand(1.05, 0.79, this.look.locator.edge)
     const band = hexBand(1, 0.84, this.look.locator.band)
-    edge.renderOrder = MARKER_ORDER + 2 // over the prisms and the markers, never hidden by a building
+    edge.renderOrder = MARKER_ORDER + 2 // above map fills and markers, never hidden by a building
     band.renderOrder = MARKER_ORDER + 3
     const group = new THREE.Group()
     group.add(edge, band)
@@ -655,7 +659,12 @@ export class CityScene {
       const pos = orbitPosition(target, distance, p, az)
       const from = { east: pos.x, north: -pos.z, height: pos.y }
       const to = { east: aim.x, north: -aim.z, height: aim.y }
-      for (const tile of this.tiles.values()) if (tile.occlusion.blocks(from, to)) return false
+      for (const tile of this.tiles.values()) {
+        const sphere = tile.buildings?.geometry.boundingSphere
+        if (!sphere || Math.hypot(sphere.center.x - target.x, sphere.center.y + target.z) > sphere.radius + distance + 20) continue
+        tile.occlusion ??= new BuildingOcclusionIndex(tile.footprints)
+        if (tile.occlusion.blocks(from, to)) return false
+      }
       return true
     }
     for (const p of [polar, 0.5, 0.35]) {
@@ -667,19 +676,97 @@ export class CityScene {
     return { polar: 0.25, azimuth }
   }
 
-  /** Citywide flat layers (land, parks, water): the map under the colour field, hidden inside an area. */
+  /** Citywide flat layers (land, parks, water). */
   setCityLayers(layers: CityLayers) {
-    this.buildLayers(this.cityLayerGroup, this.cityLayerMeshes, layers)
-    this.invalidate()
+    this.pendingCityLayers = layers
+    if (!this.cityLayerWorker) {
+      try {
+        this.cityLayerWorker = new Worker(new URL('./flatLayers.worker.ts', import.meta.url), { type: 'module' })
+        this.cityLayerWorker.onmessage = (event: MessageEvent<FlatLayersReply>) => {
+          if (this.disposed || event.data.id !== this.cityLayerRequestId) return
+          this.pendingCityLayers = null
+          this.replaceLayers(this.cityLayerGroup, this.cityLayerMeshes, (name) => {
+            const packed = event.data.layers[name]
+            return packed ? unpackGeometry(packed) : null
+          })
+          this.invalidate()
+        }
+        this.cityLayerWorker.onerror = () => {
+          this.cityLayerWorker?.terminate()
+          this.cityLayerWorker = null
+          const pending = this.pendingCityLayers
+          this.pendingCityLayers = null
+          if (pending && !this.disposed) {
+            this.buildLayers(this.cityLayerGroup, this.cityLayerMeshes, pending)
+            this.invalidate()
+          }
+        }
+      } catch {
+        this.buildLayers(this.cityLayerGroup, this.cityLayerMeshes, layers)
+        this.pendingCityLayers = null
+        this.invalidate()
+        return
+      }
+    }
+    this.cityLayerWorker.postMessage({ id: ++this.cityLayerRequestId, layers })
   }
 
   /** The active area's own ground, the only land drawn while you are in it (null clears it). */
   setAreaLayers(layers: CityLayers | null) {
-    this.buildLayers(this.areaLayerGroup, this.areaLayerMeshes, layers ?? { land: null, parks: null, water: null })
-    this.invalidate()
+    if (!layers) {
+      this.areaLayerRequestId++
+      this.areaLayerWorker?.terminate()
+      this.areaLayerWorker = null
+      this.pendingAreaLayers = null
+      this.buildLayers(this.areaLayerGroup, this.areaLayerMeshes, { land: null, parks: null, water: null })
+      this.updateBaseMapVisibility()
+      this.invalidate()
+      return
+    }
+    this.pendingAreaLayers = layers
+    if (!this.areaLayerWorker) {
+      try {
+        this.areaLayerWorker = new Worker(new URL('./flatLayers.worker.ts', import.meta.url), { type: 'module' })
+        this.areaLayerWorker.onmessage = (event: MessageEvent<FlatLayersReply>) => {
+          if (this.disposed || event.data.id !== this.areaLayerRequestId) return
+          this.pendingAreaLayers = null
+          this.replaceLayers(this.areaLayerGroup, this.areaLayerMeshes, (name) => {
+            const packed = event.data.layers[name]
+            return packed ? unpackGeometry(packed) : null
+          })
+          this.updateBaseMapVisibility()
+          this.invalidate()
+        }
+        this.areaLayerWorker.onerror = () => {
+          this.areaLayerWorker?.terminate()
+          this.areaLayerWorker = null
+          const pending = this.pendingAreaLayers
+          this.pendingAreaLayers = null
+          if (pending && !this.disposed) {
+            this.buildLayers(this.areaLayerGroup, this.areaLayerMeshes, pending)
+            this.updateBaseMapVisibility()
+            this.invalidate()
+          }
+        }
+      } catch {
+        this.buildLayers(this.areaLayerGroup, this.areaLayerMeshes, layers)
+        this.pendingAreaLayers = null
+        this.updateBaseMapVisibility()
+        this.invalidate()
+        return
+      }
+    }
+    this.areaLayerWorker.postMessage({ id: ++this.areaLayerRequestId, layers })
   }
 
   private buildLayers(group: THREE.Group, meshes: Map<FlatLayer, THREE.Mesh>, layers: CityLayers) {
+    this.replaceLayers(group, meshes, (name) => {
+      const polys = layers[name]
+      return polys?.length ? buildFlat(polys) : null
+    })
+  }
+
+  private replaceLayers(group: THREE.Group, meshes: Map<FlatLayer, THREE.Mesh>, geometryFor: (name: FlatLayer) => THREE.BufferGeometry | null) {
     for (const mesh of meshes.values()) {
       group.remove(mesh)
       mesh.geometry.dispose()
@@ -688,23 +775,23 @@ export class CityScene {
     meshes.clear()
     const L = this.look
     FLAT_LAYERS.forEach((name, i) => {
-      const polys = layers[name]
-      if (!polys || polys.length === 0) return
-      const geometry = buildFlat(polys)
+      const geometry = geometryFor(name)
       if (!geometry) return
-      const material = new THREE.MeshStandardMaterial({
-        color: L.layers[name],
-        roughness: name === 'water' ? 0.35 : 1,
-        metalness: 0,
+      const city = group === this.cityLayerGroup
+      const common = {
+        color: new THREE.Color(L.layers[name]).multiplyScalar(city && this.preset === 'night' ? 2 : 1),
         polygonOffset: true, // stack the coplanar layers without z-fighting
         polygonOffsetFactor: -(i + 1) * 2,
         polygonOffsetUnits: -(i + 1) * 2,
-      })
+      }
+      const material = city
+        ? new THREE.MeshBasicMaterial({ ...common, toneMapped: false })
+        : new THREE.MeshStandardMaterial({ ...common, roughness: name === 'water' ? 0.35 : 1, metalness: 0 })
       const mesh = new THREE.Mesh(geometry, material)
       mesh.rotation.x = -Math.PI / 2
-      mesh.position.y = -0.4
+      mesh.position.y = city ? -2 : -0.4
       mesh.renderOrder = -20 + i
-      mesh.receiveShadow = true
+      mesh.receiveShadow = !city
       meshes.set(name, mesh)
       group.add(mesh)
     })
@@ -726,6 +813,11 @@ export class CityScene {
     for (const [id, request] of this.tileRequests) {
       if (!tiles.has(id) || request.area !== this.activeArea) this.tileRequests.delete(id)
     }
+    if (this.tileInFlight !== null && ![...this.tileRequests.values()].some((request) => request.id === this.tileInFlight)) {
+      this.tileWorker?.terminate()
+      this.tileWorker = null
+      this.tileInFlight = null
+    }
     for (const [id, tile] of tiles) {
       if (this.tiles.has(id) || this.tileRequests.has(id)) continue
       const mine = (h3: string) => !this.activeArea || this.areaOfCell(h3) === this.activeArea
@@ -735,7 +827,7 @@ export class CityScene {
         return mine(latLngToCell(lat, lon, 9))
       })
       const trees = tile.trees.filter((t) => mine(t.h3))
-      this.tileRequests.set(id, { id: ++this.tileRequestId, area: this.activeArea, buildings, roads, trees })
+      this.tileRequests.set(id, { id: ++this.tileRequestId, area: this.activeArea, buildings, roads, trees, tintRevision: this.tintRevision })
     }
     this.startNextTile()
     if (changed) {
@@ -764,7 +856,14 @@ export class CityScene {
     }
     const [tileId, tile] = next
     this.tileInFlight = tile.id
-    const request: TileGeometryRequest = { id: tile.id, tileId, buildings: tile.buildings, roads: tile.roads, facadeTileM: FACADE_TILE_M }
+    const colours: Record<string, string> = {}
+    for (const building of tile.buildings) {
+      const cell = this.cells.get(building.h3)
+      if (cell && !(building.h3 in colours)) colours[building.h3] = colourFor(this.mode, cell)
+    }
+    tile.tintRevision = this.tintRevision
+    const request: TileGeometryRequest = { id: tile.id, tileId, buildings: tile.buildings, roads: tile.roads, facadeTileM: FACADE_TILE_M,
+      tint: { colours, day: LOOKS.day, night: LOOKS.night } }
     this.tileWorker.postMessage(request)
   }
 
@@ -804,10 +903,10 @@ export class CityScene {
     const trees = request.trees.length ? buildTrees(request.trees, this.treeMaterial) : null
     if (trees) group.add(trees)
     const entry = { group, buildings, ranges: data.ranges, roads, trees,
-      area: request.area, occlusion: new BuildingOcclusionIndex(request.buildings) }
+      area: request.area, occlusion: null, footprints: request.buildings }
     this.tileGroup.add(group)
     this.tiles.set(data.tileId, entry)
-    this.retintTile(entry)
+    if (request.tintRevision !== this.tintRevision) this.retintTile(entry)
     this.renderer.shadowMap.needsUpdate = true
     this.invalidate()
   }
@@ -845,24 +944,31 @@ export class CityScene {
       label.renderOrder = 20
       label.userData = { name: a.name, areaId: a.id, aspect: tex.image.width / tex.image.height }
       this.areaGroup.add(fill, rim, label)
-      this.areas.set(a.id, { fill, rim, label, centre: new THREE.Vector3(cx, 0, -cy), outline: a.outline })
+      const xs = a.outline.map(([x]) => x)
+      const ys = a.outline.map(([, y]) => y)
+      this.areas.set(a.id, { fill, rim, label, centre: new THREE.Vector3(cx, 0, -cy), outline: a.outline,
+        bounds: { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) } })
     }
     this.cellArea.clear()
     this.applyAreaVisibility()
     this.invalidate()
   }
 
-  /** Which area each r7 tile belongs to (tiles.json): inside an area only that area's prisms stand. */
+  /** Which area each r7 tile belongs to (tiles.json). */
   setTileAreas(tileAreas: Record<string, string | null | undefined>) {
     this.tileAreas = tileAreas
     this.cellArea.clear()
+    this.prioritizePendingHexes()
     this.applyAreaVisibility()
     this.invalidate()
   }
 
   /** Fly into an area (or out to the city with null). `immediate` snaps, for the first frame. */
   setActiveArea(id: string | null, immediate = false) {
+    const enteringFromCity = !immediate && this.activeArea === null && id !== null
+    const returningToCity = !immediate && this.activeArea !== null && id === null
     this.activeArea = id
+    this.prioritizePendingHexes()
     this.keysEnabled = id !== null
     this.keys.clear()
     this.applyAreaVisibility()
@@ -879,6 +985,25 @@ export class CityScene {
       this.controls.update()
       this.renderer.shadowMap.needsUpdate = true
       this.invalidate()
+      return
+    }
+    if (enteringFromCity && a) {
+      // The overview has already shown where the borough is. Start its entry near the destination,
+      // then settle a little closer instead of animating a 36 km zoom across the whole map.
+      this.controls.target.copy(target)
+      this.camera.position.copy(orbitPosition(target, distance * 1.12, 0.95, azimuth))
+      this.controls.update()
+      this.renderer.shadowMap.needsUpdate = true
+      this.fly(target, p1, 360)
+      return
+    }
+    if (returningToCity) {
+      // Start at the overview and settle the last stretch instead of sweeping out from street level.
+      this.controls.target.copy(target)
+      this.camera.position.copy(orbitPosition(target, CITY_DISTANCE * 0.92, CITY_POLAR, azimuth))
+      this.controls.update()
+      this.renderer.shadowMap.needsUpdate = true
+      this.fly(target, p1, 240)
       return
     }
     this.fly(target, p1, a ? 1000 : 1200)
@@ -920,6 +1045,13 @@ export class CityScene {
 
   dispose() {
     this.disposed = true
+    this.areaLayerWorker?.terminate()
+    this.areaLayerWorker = null
+    this.pendingAreaLayers = null
+    this.cityLayerWorker?.terminate()
+    this.cityLayerWorker = null
+    this.pendingCityLayers = null
+    this.cancelHexBuild()
     this.tileWorker?.terminate()
     this.tileWorker = null
     this.tileInFlight = null
@@ -954,9 +1086,86 @@ export class CityScene {
 
   // ---------------------------------------------------------------- internals
 
+  /** Put the selected borough's pending cells at the end of the stack, where construction starts. */
+  private prioritizePendingHexes() {
+    this.pendingPriorityHexes = 0
+    if (!this.activeArea || this.pendingHexes.length === 0) {
+      this.cancelHexBuild()
+      return
+    }
+    const other: Cell[] = []
+    const selected: Cell[] = []
+    for (const cell of this.pendingHexes) {
+      if (this.tileAreas[cellToParent(cell.h3, 7)] === this.activeArea) selected.push(cell)
+      else other.push(cell)
+    }
+    this.pendingHexes = [...other, ...selected]
+    this.pendingPriorityHexes = selected.length
+    this.cancelHexBuild()
+  }
+
+  private cancelHexBuild() {
+    if (this.hexBuildHandle == null) return
+    if (this.hexBuildKind === 'frame') cancelAnimationFrame(this.hexBuildHandle)
+    else if (this.hexBuildKind === 'idle' && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(this.hexBuildHandle)
+    else clearTimeout(this.hexBuildHandle)
+    this.hexBuildHandle = null
+    this.hexBuildKind = null
+  }
+
+  /** Build visible borough prisms across short frames; finish offscreen cells when the browser is idle. */
+  private scheduleHexBuild() {
+    if (this.disposed || this.hexBuildHandle !== null || (this.pendingHexes.length === 0 && this.pendingAreaHexes.length === 0)) return
+    const build = (deadline?: IdleDeadline) => {
+      this.hexBuildHandle = null
+      this.hexBuildKind = null
+      const start = performance.now()
+      let built = 0
+      while (this.pendingHexes.length && (this.pendingPriorityHexes > 0 || this.pendingAreaHexes.length === 0) && performance.now() - start < 4 && (!deadline || deadline.didTimeout || deadline.timeRemaining() > 1)) {
+        const h3 = this.pendingHexes.pop()!.h3
+        if (this.pendingPriorityHexes > 0) this.pendingPriorityHexes--
+        const cell = this.cells.get(h3)
+        if (this.hexes.has(h3) || !cell) continue
+        this.areaOfCell(h3)
+        const entry = this.makeHex(cell)
+        this.hexes.set(h3, entry)
+        this.hexGroup.add(entry.mesh)
+        if (entry.mesh.visible && this.activeArea) {
+          this.visibleHexes.push(entry)
+          this.visibleHexMeshes.push(entry.mesh)
+        }
+        built++
+      }
+      while (this.pendingAreaHexes.length && performance.now() - start < 4 && (!deadline || deadline.didTimeout || deadline.timeRemaining() > 1)) {
+        const h3 = this.pendingAreaHexes.pop()!
+        const entry = this.hexes.get(h3)
+        if (!entry) continue
+        const area = this.areaOfCell(h3)
+        if (this.activeArea && (area === null || area === this.activeArea)) {
+          entry.mesh.visible = true
+          this.visibleHexes.push(entry)
+          this.visibleHexMeshes.push(entry.mesh)
+        }
+        built++
+      }
+      if (built) this.invalidate()
+      this.scheduleHexBuild()
+    }
+    if (this.activeArea && (this.pendingPriorityHexes > 0 || this.pendingAreaHexes.length > 0)) {
+      this.hexBuildKind = 'frame'
+      this.hexBuildHandle = requestAnimationFrame(() => build())
+    } else if (typeof window.requestIdleCallback === 'function') {
+      this.hexBuildKind = 'idle'
+      this.hexBuildHandle = window.requestIdleCallback(build, { timeout: 1000 })
+    } else {
+      this.hexBuildKind = 'timeout'
+      this.hexBuildHandle = setTimeout(() => build(), 0) as unknown as number
+    }
+  }
+
   /**
-   * Citywide: the flat map (citywide ground + colour field), every borough's fill, rim and name tag.
-   * Inside an area: only that area's ground, its tiles and the prisms; the other boroughs keep their name tags so a click flies there.
+   * Citywide: coast, borough fills, rims and name tags.
+   * Inside an area: detailed ground, tiles and coloured prisms; the other boroughs keep their name tags.
    */
   private applyAreaVisibility() {
     const inArea = !!this.activeArea
@@ -965,23 +1174,31 @@ export class CityScene {
       a.rim.visible = !inArea
       a.label.visible = id !== this.activeArea
     }
-    this.cityLayerGroup.visible = !inArea
     this.areaLayerGroup.visible = inArea
     this.hexGroup.visible = inArea
     this.visibleHexes = []
     this.visibleHexMeshes = []
+    this.pendingAreaHexes = []
     if (inArea) for (const [h3, entry] of this.hexes) {
-      entry.mesh.visible = this.hexVisible(h3)
+      const area = this.cellArea.get(h3)
+      entry.mesh.visible = area !== undefined && (area === null || area === this.activeArea)
       if (entry.mesh.visible) {
         this.visibleHexes.push(entry)
         this.visibleHexMeshes.push(entry.mesh)
-      }
+      } else if (area === undefined) this.pendingAreaHexes.push(h3)
     }
-    if (this.field) this.field.visible = !inArea
+    else if (!inArea) for (const h3 of this.hexes.keys()) if (!this.cellArea.has(h3)) this.pendingAreaHexes.push(h3)
+    this.updateBaseMapVisibility()
+    this.scheduleHexBuild()
     this.invalidate()
   }
 
-  /** A prism stands only inside its own area; a cell no area claims (open water) shows everywhere. */
+  /** Keep the city coast around the detailed borough map. */
+  private updateBaseMapVisibility() {
+    this.cityLayerGroup.visible = true
+  }
+
+  /** Risk cells appear only inside the active borough. */
   private hexVisible(h3: string): boolean {
     if (!this.activeArea) return false
     const a = this.areaOfCell(h3)
@@ -995,7 +1212,7 @@ export class CityScene {
     const [cx, cy] = this.projector.xy(...cellToLatLng(h3))
     let area: string | null = null
     for (const [id, a] of this.areas) {
-      if (pointInRing(cx, cy, a.outline)) {
+      if (cx >= a.bounds.minX && cx <= a.bounds.maxX && cy >= a.bounds.minY && cy <= a.bounds.maxY && pointInRing(cx, cy, a.outline)) {
         area = id
         break
       }
@@ -1003,79 +1220,6 @@ export class CityScene {
     if (area === null) area = this.tileAreas[cellToParent(h3, 7)] ?? null
     this.cellArea.set(h3, area)
     return area
-  }
-
-  /**
-   * The citywide 2D colour map: one flat mesh over every cell, vertex-coloured. Each hex corner takes the mean of the cells
-   * that share it, so the field reads as a smooth gradient rather than a honeycomb; colours are muted towards the look's neutral.
-   */
-  private rebuildField() {
-    this.fieldCellByFace = []
-    if (this.field) {
-      this.scene.remove(this.field)
-      this.field.geometry.dispose()
-      this.field.material.dispose()
-      this.field = null
-    }
-    if (this.cells.size === 0) return
-    const L = this.look
-    const cornerKey = (lat: number, lon: number) => `${lat.toFixed(6)},${lon.toFixed(6)}`
-    const corners = new Map<string, { r: number; g: number; b: number; n: number }>()
-    const rings: { cell: Cell; ring: [number, number][]; colour: THREE.Color }[] = []
-    let nVerts = 0
-    let nIdx = 0
-    for (const cell of this.cells.values()) {
-      const ring = cellToBoundary(cell.h3)
-      const colour = new THREE.Color(colourFor(this.mode, cell))
-      rings.push({ cell, ring, colour })
-      for (const [lat, lon] of ring) {
-        const k = cornerKey(lat, lon)
-        const c = corners.get(k) ?? { r: 0, g: 0, b: 0, n: 0 }
-        c.r += colour.r
-        c.g += colour.g
-        c.b += colour.b
-        c.n++
-        corners.set(k, c)
-      }
-      nVerts += ring.length + 1
-      nIdx += ring.length * 3
-    }
-    const pos = new Float32Array(nVerts * 3)
-    const col = new Float32Array(nVerts * 3)
-    const idx = new Uint32Array(nIdx)
-    let v = 0
-    let k = 0
-    for (const { cell, ring, colour } of rings) {
-      const [cx, cy] = this.projector.xy(...cellToLatLng(cell.h3))
-      const centre = v
-      pos.set([cx, 0, -cy], v * 3)
-      col.set([colour.r, colour.g, colour.b], v * 3)
-      v++
-      ring.forEach(([lat, lon], i) => {
-        const [x, y] = this.projector.xy(lat, lon)
-        const c = corners.get(cornerKey(lat, lon))!
-        pos.set([x, 0, -y], v * 3)
-        col.set([c.r / c.n, c.g / c.n, c.b / c.n], v * 3)
-        idx[k++] = centre
-        idx[k++] = centre + 1 + i
-        idx[k++] = centre + 1 + ((i + 1) % ring.length)
-        this.fieldCellByFace.push(cell.h3)
-        v++
-      })
-    }
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3))
-    g.setIndex(new THREE.BufferAttribute(idx, 1))
-    g.computeBoundingSphere()
-    // no depth test: from 36 km up a metre above the land is below depth precision, so it is ordered after the ground instead
-    const material = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: L.field.opacity, depthWrite: false, depthTest: false, toneMapped: false })
-    installFieldTheme(material, this.fieldNeutral, this.fieldMix)
-    this.field = new THREE.Mesh(g, material)
-    this.field.position.y = 0.6
-    this.field.renderOrder = -8
-    this.field.visible = !this.activeArea
-    this.scene.add(this.field)
   }
 
   private fly(target: THREE.Vector3, position: THREE.Vector3, duration: number) {
@@ -1140,7 +1284,7 @@ export class CityScene {
   private makeNodeMarker(node: OwlNode, i: number): NodeMarker {
     const group = new THREE.Group()
     const flat = { transparent: true, side: THREE.DoubleSide, depthWrite: false } as const
-    // over = never hidden by a building (no depth test) yet under the prism glass (drawn before it): reads as ground level
+    // The far badge remains visible above buildings at a distance.
     const over = { transparent: true, depthTest: false, depthWrite: false } as const
     // the badge: a squat, fully red cylinder, like a map app's marker
     const badge = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.22, 40), new THREE.MeshBasicMaterial({ color: NODE_RED, fog: false, toneMapped: false, ...over }))
@@ -1171,7 +1315,7 @@ export class CityScene {
     gloss.position.set(-2.6, 31.4, 2.6)
     ;[base, post, head, gloss].forEach((m, k) => {
       m.castShadow = true
-      m.renderOrder = MARKER_ORDER + 0.6 + k * 0.1 // still before the prism, so its glass tints the pin like the buildings
+      m.renderOrder = MARKER_ORDER + 0.6 + k * 0.1
     })
     contact.renderOrder = MARKER_ORDER + 0.55
     // the ghost: the same shape drawn only where something is in front of it (depth test reversed), faint, so a pin
@@ -1216,14 +1360,8 @@ export class CityScene {
   private makeHex(cell: Cell): HexEntry {
     const ring = cellToBoundary(cell.h3).map(([lat, lon]) => this.projector.xy(lat, lon))
     const [cx, cy] = this.projector.xy(...cellToLatLng(cell.h3))
-    const shape = new THREE.Shape()
-    ring.forEach(([x, y], i) => {
-      // shape is built around the cell centre so scale.z (the extrude axis) animates the height in place
-      if (i === 0) shape.moveTo(x - cx, y - cy)
-      else shape.lineTo(x - cx, y - cy)
-    })
-    shape.closePath()
-    const geometry = new THREE.ExtrudeGeometry(shape, { depth: 1, bevelEnabled: false })
+    // Geometry stays centred on the cell so scale.z raises it from street level.
+    const geometry = buildHexPrism(ring.map(([x, y]) => [x - cx, y - cy]))
     const material = new THREE.MeshStandardMaterial({
       color: colourFor(this.mode, cell),
       roughness: 0.6,
@@ -1236,10 +1374,11 @@ export class CityScene {
     const mesh = new THREE.Mesh(geometry, material)
     mesh.rotation.x = -Math.PI / 2
     mesh.position.set(cx, 0, -cy)
-    mesh.scale.z = 1
+    const height = heightFor(this.mode, cell)
+    mesh.scale.z = height
     mesh.userData = { h3: cell.h3 }
     mesh.visible = this.hexVisible(cell.h3)
-    return { mesh, targetHeight: heightFor(this.mode, cell), targetColour: new THREE.Color(material.color), flashUntil: 0 }
+    return { mesh, targetHeight: height, targetColour: new THREE.Color(material.color), flashUntil: 0 }
   }
 
   private retintBuildings() {
@@ -1248,26 +1387,12 @@ export class CityScene {
 
   private retintTile(t: TileMeshes) {
     if (!t.buildings) return
-    const geometry = t.buildings.geometry
-    const day = geometry.getAttribute('color') as THREE.BufferAttribute
-    let night = geometry.getAttribute('colorNight') as THREE.BufferAttribute | undefined
-    if (!night) {
-      night = new THREE.BufferAttribute(new Float32Array(day.count * 3), 3)
-      geometry.setAttribute('colorNight', night)
+    const colours: Record<string, string> = {}
+    for (const range of t.ranges) {
+      const cell = this.cells.get(range.h3)
+      if (cell && !(range.h3 in colours)) colours[range.h3] = colourFor(this.mode, cell)
     }
-    const tmp = new THREE.Color()
-    const base = new THREE.Color()
-    const white = new THREE.Color(0xffffff)
-    for (const [look, attribute] of [[LOOKS.day, day], [LOOKS.night, night]] as const) {
-      for (const range of t.ranges) {
-        base.set(look.facades[range.band]).multiplyScalar(range.shade)
-        const cell = this.cells.get(range.h3)
-        if (cell) tmp.set(colourFor(this.mode, cell)).lerp(white, look.tintLift).lerp(base, 1 - look.buildingTint)
-        else tmp.copy(base)
-        for (let i = range.start; i < range.start + range.count; i++) attribute.setXYZ(i, tmp.r, tmp.g, tmp.b)
-      }
-      attribute.needsUpdate = true
-    }
+    tintBuildingGeometry(t.buildings.geometry, t.ranges, { colours, day: LOOKS.day, night: LOOKS.night })
   }
 
   private handlePointerMove = (e: PointerEvent) => {
@@ -1383,16 +1508,11 @@ export class CityScene {
           info = { ...base, kind: 'plan', planRank: plan.rank, lat: plan.lat, lon: plan.lon, h3: plan.h3 }
         }
       }
-      // 2. the hex under the pointer (the prisms only stand inside an area; citywide the flat field carries the cell;
-      //    close in they are glass over the street and no longer the thing you point at)
+      // 2. the coloured prism under the pointer (inside a borough only).
       const dist = this.camera.position.distanceTo(this.controls.target)
       if (!info && this.activeArea && dist > HEX_PICK_DISTANCE) {
         const hits = this.raycaster.intersectObjects(this.visibleHexMeshes, false)
         if (hits.length) hexHit = hits[0].object.userData.h3 as string
-      }
-      if (!info && !this.activeArea && this.field) {
-        const fieldHit = this.raycaster.intersectObject(this.field, false)[0]
-        if (typeof fieldHit?.faceIndex === 'number') hexHit = this.fieldCellByFace[fieldHit.faceIndex] ?? null
       }
       if (!info && !hexHit && !this.activeArea && base?.h3 && this.cells.has(base.h3)) hexHit = base.h3
       // 3. the boroughs: name tags always (except the one you are in), their shapes in the citywide view
@@ -1493,6 +1613,7 @@ export class CityScene {
       ).add(this.controls.target)
       if (s >= 1) {
         this.flight = null
+        this.updateBaseMapVisibility()
         this.controls.enabled = true
         this.pointerDirty = true // what is under the still pointer has changed
       }

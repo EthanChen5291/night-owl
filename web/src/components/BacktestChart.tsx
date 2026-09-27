@@ -62,7 +62,7 @@ function BacktestChart({ data, open, onToggle, wide }: Props) {
         </div>
         {data === undefined && <div className="muted">loading…</div>}
         {data === null && <div className="muted">Track record not available right now.</div>}
-        {data && (
+        {data && open && (
           <div className="chart">
             <ResponsiveContainer width="100%" height={150}>
               <LineChart data={data.series} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>

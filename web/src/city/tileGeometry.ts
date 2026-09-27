@@ -13,7 +13,8 @@ export interface BuildingRange {
 export interface PackedGeometry {
   position: Float32Array
   normal: Float32Array | null
-  color: Float32Array | null
+  color: Float32Array | Uint16Array | null
+  colorNight: Uint16Array | null
   uv: Float32Array | null
   index: Uint16Array | Uint32Array | null
   groups: { start: number; count: number; materialIndex: number }[]
@@ -26,6 +27,13 @@ export interface TileGeometryRequest {
   buildings: Building[]
   roads: Poly[]
   facadeTileM: [number, number]
+  tint: { colours: Record<string, string>; day: BuildingTint; night: BuildingTint }
+}
+
+export interface BuildingTint {
+  facades: [number, number, number]
+  buildingTint: number
+  tintLift: number
 }
 
 export type TileGeometryReply =
@@ -33,13 +41,14 @@ export type TileGeometryReply =
   | { id: number; tileId: string; ok: false; error: string }
 
 export function packGeometry(geometry: THREE.BufferGeometry): PackedGeometry {
-  const attribute = (name: string) => geometry.getAttribute(name)?.array as Float32Array | undefined
+  const attribute = (name: string) => geometry.getAttribute(name)?.array as Float32Array | Uint16Array | undefined
   const sphere = geometry.boundingSphere
   return {
-    position: attribute('position')!,
-    normal: attribute('normal') ?? null,
+    position: attribute('position') as Float32Array,
+    normal: (attribute('normal') as Float32Array | undefined) ?? null,
     color: attribute('color') ?? null,
-    uv: attribute('uv') ?? null,
+    colorNight: (attribute('colorNight') as Uint16Array | undefined) ?? null,
+    uv: (attribute('uv') as Float32Array | undefined) ?? null,
     index: (geometry.getIndex()?.array as Uint16Array | Uint32Array | undefined) ?? null,
     groups: geometry.groups.map(({ start, count, materialIndex }) => ({ start, count, materialIndex: materialIndex ?? 0 })),
     sphere: sphere ? { center: [sphere.center.x, sphere.center.y, sphere.center.z], radius: sphere.radius } : null,
@@ -50,7 +59,8 @@ export function unpackGeometry(packed: PackedGeometry): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(packed.position, 3))
   if (packed.normal) geometry.setAttribute('normal', new THREE.BufferAttribute(packed.normal, 3))
-  if (packed.color) geometry.setAttribute('color', new THREE.BufferAttribute(packed.color, 3))
+  if (packed.color) geometry.setAttribute('color', new THREE.BufferAttribute(packed.color, 3, packed.color instanceof Uint16Array))
+  if (packed.colorNight) geometry.setAttribute('colorNight', new THREE.BufferAttribute(packed.colorNight, 3, true))
   if (packed.uv) geometry.setAttribute('uv', new THREE.BufferAttribute(packed.uv, 2))
   if (packed.index) geometry.setIndex(new THREE.BufferAttribute(packed.index, 1))
   for (const { start, count, materialIndex } of packed.groups) geometry.addGroup(start, count, materialIndex)
@@ -63,7 +73,7 @@ export function unpackGeometry(packed: PackedGeometry): THREE.BufferGeometry {
 
 export function geometryTransfers(packed: PackedGeometry | null): Transferable[] {
   if (!packed) return []
-  return [packed.position, packed.normal, packed.color, packed.uv, packed.index]
+  return [packed.position, packed.normal, packed.color, packed.colorNight, packed.uv, packed.index]
     .filter((array): array is Float32Array | Uint16Array | Uint32Array => array !== null)
     .map((array) => array.buffer)
 }
@@ -113,7 +123,7 @@ export function buildExtrusions(buildings: Building[], ranges: BuildingRange[], 
   }
   const pos = new Float32Array(nVerts * 3)
   const nor = new Float32Array(nVerts * 3)
-  const col = new Float32Array(nVerts * 3)
+  const col = new Uint16Array(nVerts * 3)
   const uv = new Float32Array(nVerts * 2)
   const IndexArray = nVerts > 65_535 ? Uint32Array : Uint16Array
   const roofIdx = new IndexArray(nRoof)
@@ -186,11 +196,45 @@ export function buildExtrusions(buildings: Building[], ranges: BuildingRange[], 
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3))
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3))
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3, true))
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
   g.setIndex(new THREE.BufferAttribute(index, 1))
   g.addGroup(0, nWall, 0) // walls: facade material
   g.addGroup(nWall, kr, 1) // roofs: plain
   g.computeBoundingSphere()
   return g
+}
+
+/** Fill both lighting palettes before a tile crosses back to the main thread. */
+export function tintBuildingGeometry(geometry: THREE.BufferGeometry, ranges: BuildingRange[], tint: TileGeometryRequest['tint']) {
+  const day = geometry.getAttribute('color') as THREE.BufferAttribute
+  let night = geometry.getAttribute('colorNight') as THREE.BufferAttribute | undefined
+  if (!night) {
+    night = new THREE.BufferAttribute(new Uint16Array(day.count * 3), 3, true)
+    geometry.setAttribute('colorNight', night)
+  }
+  const white = new THREE.Color(0xffffff)
+  const base = new THREE.Color()
+  const out = new THREE.Color()
+  const cellColours = new Map<string, THREE.Color>()
+  for (const [h3, hex] of Object.entries(tint.colours)) cellColours.set(h3, new THREE.Color(hex))
+  for (const [look, attribute] of [[tint.day, day], [tint.night, night]] as const) {
+    const values = attribute.array as Uint16Array
+    for (const range of ranges) {
+      base.set(look.facades[range.band]).multiplyScalar(range.shade)
+      const cell = cellColours.get(range.h3)
+      if (cell) out.copy(cell).lerp(white, look.tintLift).lerp(base, 1 - look.buildingTint)
+      else out.copy(base)
+      const r = Math.round(Math.min(1, out.r) * 65535)
+      const g = Math.round(Math.min(1, out.g) * 65535)
+      const b = Math.round(Math.min(1, out.b) * 65535)
+      const end = (range.start + range.count) * 3
+      for (let i = range.start * 3; i < end; i += 3) {
+        values[i] = r
+        values[i + 1] = g
+        values[i + 2] = b
+      }
+    }
+    attribute.needsUpdate = true
+  }
 }
