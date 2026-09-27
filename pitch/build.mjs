@@ -5,12 +5,22 @@ import { Presentation, PresentationFile } from '@oai/artifact-tool';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const WORKSPACE = path.resolve(import.meta.dirname);
-const SKILL_DIR = '/Users/utsavsharma/.codex/plugins/cache/openai-primary-runtime/presentations/26.923.10815/skills/presentations';
-const PYTHON = '/Users/utsavsharma/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3';
+const SKILL_DIR = process.env.PRESENTATIONS_SKILL_DIR;
+const PYTHON = process.env.PRESENTATIONS_PYTHON || 'python3';
 const TMP = path.join(WORKSPACE, '.build');
 const OUT = path.join(WORKSPACE, 'out');
-const version = process.env.DECK_VERSION || 'v20';
+const version = process.env.DECK_VERSION;
+if (!SKILL_DIR) throw new Error('Set PRESENTATIONS_SKILL_DIR to the installed presentations skill directory');
+if (!/^v\d+$/.test(version || '')) throw new Error('Set DECK_VERSION to a new version, such as v21');
 const FINAL = path.join(OUT, `night-owl-three-minute-pitch-${version}.pptx`);
+const finalExists = await fs.lstat(FINAL).then(
+  () => true,
+  error => {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  },
+);
+if (finalExists) throw new Error(`Output already exists: ${FINAL}. Use a new DECK_VERSION.`);
 const { applyPresentationChartFont, finalizePresentation } = await import(
   pathToFileURL(path.join(SKILL_DIR, 'container_tools/artifact_tool_utils.mjs')).href
 );
@@ -26,7 +36,7 @@ const font = 'Helvetica Neue';
 const c = {
   navy: '#102635', ink: '#18313D', teal: '#087E83', mint: '#AEE5D2',
   coral: '#D96C50', paper: '#F8F8F2', pale: '#E6ECE8', muted: '#52656B',
-  white: '#FFFFFF', sand: '#F2E8D8',
+  white: '#FFFFFF',
 };
 const p = Presentation.create({slideSize:{width:1280,height:720}});
 

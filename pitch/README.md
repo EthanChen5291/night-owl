@@ -8,6 +8,6 @@ One successful event does not establish detector reliability. The [fixed formal 
 
 The deck reads [backtest data](../model/out/backtest.json) and [cell scores](../model/out/cells.json) when it builds. Slide 3 is an editable PowerPoint chart. The 19.5% versus 15.2% result compares monthly active-sign shares of inspected lots in the top 50 cells **that were swept**. It does not count rats citywide or measure a deployment effect.
 
-To rebuild, use the bundled Codex presentation runtime: set `RUNTIME_NODE_MODULES` to its Node package directory, link it as `pitch/node_modules`, and run `node pitch/build.mjs` from the repository root. Set a new `DECK_VERSION` for a later edition, then check the rendered slides and the spoken numbers.
+To build a later edition, use the bundled Codex presentation runtime. Link its Node package directory as `pitch/node_modules`. Set `PRESENTATIONS_SKILL_DIR` to the installed presentations skill directory, `PRESENTATIONS_PYTHON` to the bundled Python executable, and `DECK_VERSION` to a new value such as `v21`; then run `node pitch/build.mjs` from the repository root. The script refuses an existing output file. Check the rendered slides and spoken numbers before sharing a new deck.
 
 The [V5 development montage](v5-montage.md) and [V4 training clip](training-demo.md) are dated. Their closing captions predate fresh testing. If shown, explain the later failed event test and fresh box-test limit.

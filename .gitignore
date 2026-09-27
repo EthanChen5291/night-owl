@@ -1,4 +1,4 @@
-# Barn Owl — snapshot repo
+# Night Owl
 
 # secrets
 .env
@@ -40,12 +40,11 @@ dist/
 # OS
 .DS_Store
 
-# model pipeline (Sanjavan): raw data lives outside the repo, intermediates never committed
+# model pipeline: raw data and intermediates
 data/processed/
 *.geojson
 *.duckdb
 *.pkl
-__pycache__/
 .ipynb_checkpoints/
 
 # city bake for the web app (regenerate with city/build_city.py)

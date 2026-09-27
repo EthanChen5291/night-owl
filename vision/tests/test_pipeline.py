@@ -3,6 +3,7 @@ import json
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 from pathlib import Path
 
@@ -10,7 +11,7 @@ VISION = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(VISION))
 sys.path.insert(0, str(VISION / "pi"))
 
-from detect import Det, EventGate, post_event  # noqa: E402
+from detect import Det, EventGate, main as detect_main, post_event  # noqa: E402
 from eval_events import score_pushes  # noqa: E402
 from make_dataset import check_label, main as make_dataset  # noqa: E402
 from promote_model import main as promote  # noqa: E402
@@ -19,6 +20,81 @@ from train_model import sha256  # noqa: E402
 
 
 class EventTests(unittest.TestCase):
+    def test_missing_explicit_model_never_uses_local_fallback_or_camera(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            script_dir = root / "pi"
+            script_dir.mkdir()
+            (script_dir / "rat.onnx").write_bytes(b"different model")
+            (script_dir / "world_rat_person.onnx").write_bytes(b"old fallback")
+            missing = root / "missing" / "rat.onnx"
+            with patch("detect.__file__", str(script_dir / "detect.py")), \
+                 patch("detect.Detector") as detector, \
+                 patch("camera.frames_from_args") as frames, \
+                 patch("detect.post_event") as post, \
+                 patch("sys.stderr", new_callable=io.StringIO) as err:
+                self.assertEqual(detect_main(["--model", str(missing), "--post"]), 2)
+            self.assertIn(f"no model: {missing}", err.getvalue())
+            detector.assert_not_called()
+            frames.assert_not_called()
+            post.assert_not_called()
+
+    def test_bare_model_name_resolves_beside_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            script_dir = Path(tmp) / "pi"
+            script_dir.mkdir()
+            model = script_dir / "sample-model.onnx"
+            model.write_bytes(b"test model")
+            with patch("detect.__file__", str(script_dir / "detect.py")), \
+                 patch("detect.Detector") as detector, \
+                 patch("detect.Led"), \
+                 patch("camera.frames_from_args", return_value=iter([])), \
+                 patch("sys.stderr", new_callable=io.StringIO) as err, \
+                 patch("sys.stdout", new_callable=io.StringIO):
+                self.assertEqual(detect_main(["--model", model.name]), 0)
+            self.assertIn(f"resolved bare model name {model.name} to {model.resolve()}", err.getvalue())
+            self.assertEqual(detector.call_args.args[0], str(model.resolve()))
+
+    def test_standalone_posts_only_with_explicit_post_flag(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            model = Path(tmp) / "rat.onnx"
+            model.write_bytes(b"test model")
+            rat = Det("rat", .9, .1, .5, .1, .1)
+            body = {"ts": "2026-09-27T00:00:00Z", "conf": .9,
+                    "bbox": [.1, .5, .1, .1], "crop_b64": ""}
+            frame = SimpleNamespace(gray="gray", bgr="bgr", has_color=True, ts=1.0)
+            args = ["--model", str(model), "--max-frames", "1", "--quiet"]
+            with patch("detect.Detector") as detector, \
+                 patch("detect.EventGate") as gate_class, \
+                 patch("detect.Led"), \
+                 patch("detect.make_event", return_value=body), \
+                 patch("camera.frames_from_args", return_value=iter([frame])) as frames, \
+                 patch("detect.post_event", return_value=(True, "accepted")) as post, \
+                 patch("sys.stdout", new_callable=io.StringIO):
+                detector.return_value.names = ["rat", "person"]
+                detector.return_value.imgsz = 416
+                detector.return_value.infer.return_value = [rat]
+                gate_class.return_value.update.return_value = (rat, 3)
+                gate_class.return_value.n_events = 1
+                gate_class.return_value.hits = []
+                self.assertEqual(detect_main(args), 0)
+                post.assert_not_called()
+                frames.assert_called_once()
+
+                frames.reset_mock(return_value=True)
+                frames.return_value = iter([frame])
+                self.assertEqual(detect_main(args + ["--no-post"]), 0)
+                post.assert_not_called()
+
+                frames.reset_mock(return_value=True)
+                frames.return_value = iter([frame])
+                self.assertEqual(detect_main(args + ["--post", "--api", "http://127.0.0.1:8000"]), 0)
+                post.assert_called_once_with("http://127.0.0.1:8000", body)
+
+                with self.assertRaises(SystemExit):
+                    detect_main(args + ["--post", "--no-post"])
+                self.assertEqual(post.call_count, 1)
+
     def test_http_success_without_acceptance_is_not_score_update(self):
         for accepted in (True, False):
             response = io.BytesIO(json.dumps({"ok": True, "accepted": accepted}).encode())
@@ -93,6 +169,38 @@ class DataTests(unittest.TestCase):
             self.assertEqual(manifest["train_tags"], ["train_a"])
             self.assertEqual(manifest["val_tags"], ["val_b"])
             self.assertEqual((manifest["train_empty"], manifest["val_empty"]), (1, 1))
+
+            sentinel = out / "keep.txt"
+            sentinel.write_text("old output")
+            build_args = ["--frames", str(frames), "--labels", str(labels),
+                          "--out", str(out), "--val-tags", "val_b", "--color"]
+            with patch("sys.stderr", new_callable=io.StringIO) as err:
+                self.assertEqual(make_dataset(build_args), 2)
+            self.assertIn("output already exists", err.getvalue())
+            self.assertEqual(sentinel.read_text(), "old output")
+            self.assertEqual(make_dataset(build_args + ["--replace"]), 0)
+            self.assertFalse(sentinel.exists())
+            self.assertEqual(json.loads((out / "manifest.json").read_text()), manifest)
+
+    def test_replace_cannot_delete_source_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            frames, labels = root / "frames", root / "labels"
+            frames.mkdir()
+            labels.mkdir()
+            for tag in ("train_a", "val_b"):
+                for i in (0, 1):
+                    stem = f"{tag}_{i:05d}"
+                    (frames / f"{stem}.jpg").write_bytes(b"test frame")
+                    (labels / f"{stem}.txt").write_text("0 0.5 0.5 0.2 0.2\n" if i == 0 else "")
+            stems = [p.stem for p in frames.glob("*.jpg")]
+            (labels / "_reviewed.txt").write_text("".join(f"{stem}\tkeep\n" for stem in stems))
+            with patch("sys.stderr", new_callable=io.StringIO) as err:
+                self.assertEqual(make_dataset(["--frames", str(frames), "--labels", str(labels),
+                                               "--out", str(root), "--val-tags", "val_b",
+                                               "--color", "--replace"]), 2)
+            self.assertIn("contains a source directory", err.getvalue())
+            self.assertEqual(len(list(frames.glob("*.jpg"))), 4)
 
     def test_promotion_requires_both_gates_for_same_model(self):
         with tempfile.TemporaryDirectory() as tmp:
