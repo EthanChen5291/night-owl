@@ -96,6 +96,7 @@ export default function App() {
   const [logsOpen, setLogsOpen] = useState(false)
   const [owlsOpen, setOwlsOpen] = useState(true)
   const [chartOpen, setChartOpen] = useState(true)
+  const [agentShown, setAgentShown] = useState(false) // the assistant button is out: the owls and the chart make room
 
   const seenRef = useRef<Set<string>>(new Set())
   const primedRef = useRef(false) // first queue load does not flash
@@ -670,7 +671,7 @@ export default function App() {
   const hoveredArea = hover?.areaId ? areas.find((a) => a.id === hover.areaId) : undefined
 
   return (
-    <div className={`app ${placing ? 'placing' : ''} ${hover && (hover.kind === 'node' || hover.kind === 'plan' || hover.kind === 'spot' || hover.kind === 'area') ? 'hot' : ''}`}>
+    <div className={`app ${placing ? 'placing' : ''} ${agentShown ? 'agent-shown' : ''} ${hover && (hover.kind === 'node' || hover.kind === 'plan' || hover.kind === 'spot' || hover.kind === 'area') ? 'hot' : ''}`}>
       <main className="stage">
         {ready && (
           <Scene
@@ -748,7 +749,7 @@ export default function App() {
         />
         {logsOpen && <LogsDrawer events={events} nodes={owlsHere} cells={cellByH3} selected={selectedOwl?.id ?? null} onClose={() => setLogsOpen(false)} onSelect={selectOwl} />}
         <BacktestChart data={backtest} open={chartOpen} onToggle={() => setChartOpen((o) => !o)} wide={!owlsOpen} />
-        <AgentChat tools={agentTools} />
+        <AgentChat tools={agentTools} onShown={setAgentShown} />
       </main>
     </div>
   )

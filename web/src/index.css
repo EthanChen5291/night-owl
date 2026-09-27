@@ -202,10 +202,11 @@ button { font: inherit; color: inherit; }
 
 /* ---------- owls (right) ---------- */
 .nodes {
-  position: absolute; top: 64px; right: 12px; bottom: 80px; width: 272px; padding: 10px 12px; z-index: 5; display: flex; flex-direction: column; /* ends above the assistant button */
-  transition: transform 0.45s var(--ease);
+  position: absolute; top: 64px; right: 12px; bottom: 12px; width: 272px; padding: 10px 12px; z-index: 5; display: flex; flex-direction: column;
+  transition: transform 0.45s var(--ease), bottom 0.4s var(--ease);
 }
 .nodes.collapsed { transform: translateX(calc(100% + 12px)); }
+.app.agent-shown .nodes { bottom: 80px; } /* lifts clear of the assistant button while it is out */
 .nodes-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .nodes-title { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 14px; }
 .nodes-body { overflow-y: auto; flex: 1; min-height: 0; }
@@ -250,9 +251,10 @@ button { font: inherit; color: inherit; }
 
 /* ---------- backtest strip (bottom, overlays the stage) ---------- */
 .backtest {
-  position: absolute; left: 12px; right: 296px; bottom: 12px; z-index: 5; padding: 12px 14px 8px; transition: transform 0.45s var(--ease), right 0.45s var(--ease);
+  position: absolute; left: 12px; right: 296px; bottom: 12px; z-index: 5; padding: 12px 14px 8px; transition: transform 0.45s var(--ease), right 0.4s var(--ease);
 }
-.backtest.wide { right: 80px; } /* clear of the assistant button */
+.backtest.wide { right: 12px; }
+.app.agent-shown .backtest.wide { right: 80px; } /* clear of the assistant button */
 .backtest.collapsed { transform: translateY(calc(100% + 12px)); }
 .kpis { display: flex; gap: 8px; margin-bottom: 6px; }
 .kpi { display: flex; flex-direction: column; gap: 2px; padding: 6px 12px; border-radius: var(--r-sm); background: var(--row); min-width: 110px; }
@@ -269,16 +271,21 @@ button { font: inherit; color: inherit; }
 @media (max-width: 1100px) {
   .modebar { top: 64px; }
   .nodes { top: 116px; }
-  .backtest { right: 80px; }
+  .backtest { right: 12px; }
+  .app.agent-shown .backtest { right: 80px; }
 }
 
 /* ---------- assistant (bottom right): a glass button, and the chat panel that grows out of it ---------- */
 .agent-fab {
   position: absolute; right: 12px; bottom: 12px; z-index: 13; width: 56px; height: 56px; border-radius: 50%; padding: 0; cursor: pointer;
-  display: grid; place-items: center; color: var(--ink); transition: transform 0.25s var(--ease), background 0.2s, color 0.2s;
+  display: grid; place-items: center; color: var(--ink);
+  /* hidden: parked past the right edge; .shown glides it in (the corner hover, an open chat, or a touch screen) */
+  transform: translateX(84px); opacity: 0; pointer-events: none;
+  transition: transform 0.45s var(--ease), opacity 0.3s, background 0.2s, color 0.2s;
 }
-.agent-fab:hover { transform: translateY(-2px) scale(1.04); }
-.agent-fab:active { transform: scale(0.96); }
+.agent-fab.shown { transform: none; opacity: 1; pointer-events: auto; }
+.agent-fab.shown:hover { transform: translateY(-2px) scale(1.04); }
+.agent-fab.shown:active { transform: scale(0.96); }
 .agent-fab.open { background: var(--active); color: var(--active-ink); }
 .agent-fab::after { /* a soft accent glow so the one entry point reads as the assistant */
   content: ''; position: absolute; inset: -1px; border-radius: 50%; pointer-events: none;

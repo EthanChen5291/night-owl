@@ -43,8 +43,13 @@ function load(): { items: Item[]; history: WireMessage[] } {
   return { items: [], history: [] }
 }
 
-export default function AgentChat({ tools }: { tools: ClientTools }) {
+const CORNER = 150 // px from the bottom-right corner that wakes the button
+
+export default function AgentChat({ tools, onShown }: { tools: ClientTools; onShown?: (shown: boolean) => void }) {
   const [open, setOpen] = useState(false)
+  const [near, setNear] = useState(false)
+  // no hover on touch screens: there the button just stays out
+  const [touch] = useState(() => typeof matchMedia !== 'undefined' && matchMedia('(hover: none)').matches)
   const [items, setItems] = useState<Item[]>(() => load().items)
   const historyRef = useRef<WireMessage[]>(load().history)
   const [input, setInput] = useState('')
@@ -76,6 +81,35 @@ export default function AgentChat({ tools }: { tools: ClientTools }) {
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 250)
   }, [open])
+
+  // the button hides off the right edge until the pointer comes into the bottom-right corner. A window listener
+  // rather than an invisible hit area, so nothing in that corner (the Owls panel) stops taking clicks.
+  useEffect(() => {
+    let frame = 0
+    let hideTimer: ReturnType<typeof setTimeout> | undefined
+    const onMove = (e: PointerEvent) => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        const inside = e.clientX >= window.innerWidth - CORNER && e.clientY >= window.innerHeight - CORNER
+        clearTimeout(hideTimer)
+        if (inside) setNear(true)
+        else hideTimer = setTimeout(() => setNear(false), 350) // a short grace so a wobble on the edge doesn't flicker
+      })
+    }
+    const onLeave = () => {
+      clearTimeout(hideTimer)
+      hideTimer = setTimeout(() => setNear(false), 350)
+    }
+    window.addEventListener('pointermove', onMove, { passive: true })
+    document.addEventListener('pointerleave', onLeave)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerleave', onLeave)
+      cancelAnimationFrame(frame)
+      clearTimeout(hideTimer)
+    }
+  }, [])
 
   // Esc closes the lightbox, then the panel
   useEffect(() => {
@@ -181,6 +215,9 @@ export default function AgentChat({ tools }: { tools: ClientTools }) {
     setInput('')
     inputRef.current?.focus()
   }
+
+  const shown = open || near || busy || touch
+  useEffect(() => onShown?.(shown), [shown, onShown])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -295,7 +332,13 @@ export default function AgentChat({ tools }: { tools: ClientTools }) {
         <div className="agent-foot muted">Answers come from the model and live node data. Grok can make mistakes.</div>
       </section>
 
-      <button className={`agent-fab panel ${open ? 'open' : ''}`} onClick={() => setOpen((o) => !o)} title={open ? 'Close assistant' : 'Ask Barn Owl'} aria-expanded={open}>
+      <button
+        className={`agent-fab panel ${open ? 'open' : ''} ${shown ? 'shown' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        onFocus={() => setNear(true)}
+        title={open ? 'Close assistant' : 'Ask Barn Owl'}
+        aria-expanded={open}
+      >
         <span className="fab-icon chat">
           <ChatIcon size={22} />
         </span>
