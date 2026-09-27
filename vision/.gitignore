@@ -7,12 +7,15 @@ frames_aug/
 labels/
 labels_person/
 labels_person_v3/
+labels_person_v4/
 labels_v3/
 labels_aug/
 dataset/
 dataset_v2/
 dataset_v3/
+dataset_v4/
 final_test/
+v4_test/
 runs/
 events/
 *.pt
