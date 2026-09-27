@@ -5,10 +5,10 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
   "numpy>=1.26,<3",
   "opencv-python>=4.8,<5",
-  "ultralytics>=8.3.200,<8.4",
-  "onnxruntime>=1.18,<2",
-  "onnx>=1.16,<2",
-  "onnxslim>=0.1.60,<1",
+  "ultralytics==8.4.163",
+  "onnxruntime==1.22.1",
+  "onnx==1.19.0",
+  "onnxslim==0.1.76",
 ]
 
 [tool.uv]

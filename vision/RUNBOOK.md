@@ -7,11 +7,14 @@ the order of operations, with the gates. Every script has `--help`; every gate h
 
 ```
 cd vision
-uv sync --locked --python 3.12
+uv sync --locked --python 3.11
 . .venv/bin/activate
 ```
 
-Python 3.11+. `ffmpeg` is installed (`extract_frames.py` uses it; `--backend cv2` if not).
+The lock pins Ultralytics 8.4.163, ONNX Runtime 1.22.1, ONNX 1.19.0, and ONNX Slim
+0.1.76, matching the local CPU validation protocol and Modal export. Python 3.11
+matches the training container.
+`ffmpeg` is installed (`extract_frames.py` uses it; `--backend cv2` if not).
 Working data lives here and is gitignored: `clips/`, `frames/`, `frames_pruned/`, `labels/`,
 `frames_aug/`, `labels_aug/`, `dataset/`, `runs/`, `*.pt`, `*.onnx`, `pi/wheels/`.
 
@@ -134,6 +137,22 @@ using a segment whose rat event was observed in the full offline replay. The cur
 rank-11 September candidate H3 is `892a100d467ffff`; pass `--h3 892a100d467ffff` to make a
 rank change visible after an accepted event. Check `/plan` again before the demo because an
 earlier rehearsal can change its rank.
+
+To verify a candidate on the unchanged reviewed validation frames, run from the repository root:
+
+```sh
+vision/.venv/bin/python vision/verify_candidate.py \
+    --dataset vision/runs/modal-rat-v2-20260926/dataset \
+    --pt vision/runs/modal-rat-v2-20260926/best.pt \
+    --onnx vision/runs/modal-rat-v2-20260926/rat.onnx \
+    --out-dir vision/runs/modal-rat-v2-20260926/diagnostics/independent
+```
+
+Replace the run paths for each candidate, while keeping the same whole held-out clips. The
+report records CPU PT/ONNX AP50 using square 416, batch 1, `rect=False`, confidence .001,
+NMS .7, and `max_det=300`. It also checks the actual Pi `Detector` at confidence .5 and
+NMS .45, plus person suppression, and writes per-frame contact sheets. The report is
+diagnostic; sampled frame detection counts do not establish event-level push recall.
 
 ## 6. Ship to the node
 
