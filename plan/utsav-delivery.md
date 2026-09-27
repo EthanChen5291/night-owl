@@ -53,7 +53,7 @@ Work starts from current `origin/main` in managed worktrees. The original checko
 ## Handoff artifacts
 
 - Editable five-slide deck: `pitch/out/barn-owl-three-minute-pitch-v8.pptx`; three-minute script: `pitch/script.md`.
-- Local model bundle in the model worktree: `vision/runs/rat-litroom-candidate-20260926.zip` (25,624,707 bytes). SHA256: `69f3cbbea58d3516cbe7d7859c609665cd1e6df042f16cd701d2ed4edd05e411`. Includes the reviewed dataset, ONNX and PyTorch candidate, metrics, Pi runtime, checksums, and recorded replay evidence. Large training artifacts are ignored by Git.
+- Model bundle tracked on both delivery branches: `vision/artifacts/rat-litroom-candidate-20260926.zip` (25,624,707 bytes). SHA256: `69f3cbbea58d3516cbe7d7859c609665cd1e6df042f16cd701d2ed4edd05e411`. Includes the reviewed dataset, ONNX and PyTorch candidate, metrics, Pi runtime, checksums, and recorded replay evidence. This handoff ZIP is tracked in Git at Utsav's request. Generated training runs remain ignored. See `vision/artifacts/README.md` for extraction and verification.
 - Recorded replay evidence in the model worktree: `vision/events/v2_live_demo/`, including `before.json`, `after.json`, `replay_report.json`, the plush crop, and `frontend.png`.
 - Physical handoff: extract the bundle and follow its README for a room-lit, no-POST Pi check. Then measure the 20 timed pushes and three-minute negative reel described in `vision/RUNBOOK.md`. The overall box gate currently fails, so the candidate must not be represented as formally promoted or validated on live rats.
 - Ethan's conversation is monitored every five minutes with a read-only background reader. No messages are sent.
