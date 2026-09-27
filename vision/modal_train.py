@@ -182,12 +182,13 @@ def raw_onnx_parity(best: Path, onnx: Path, dataset: Path) -> dict:
 def check_image() -> dict:
     """Build and import the training image without allocating a GPU."""
     import cv2
+    import numpy
     import onnx
     import onnxruntime
     import torch
     import ultralytics
 
-    versions = {"cv2": cv2.__version__, "onnx": onnx.__version__,
+    versions = {"cv2": cv2.__version__, "numpy": numpy.__version__, "onnx": onnx.__version__,
                 "onnxruntime": onnxruntime.__version__, "torch": torch.__version__,
                 "ultralytics": ultralytics.__version__}
     print(json.dumps(versions, indent=2))
@@ -196,6 +197,8 @@ def check_image() -> dict:
 
 @app.function(image=image, gpu="L4", cpu=4, memory=16384, timeout=GPU_SECONDS, retries=0, volumes={"/data": volume})
 def train_candidate(run_id: str, epochs: int, batch: int, expected_sha: str, recipe: dict) -> dict:
+    import cv2
+    import numpy
     import platform
     import torch
     import ultralytics
@@ -296,7 +299,9 @@ def train_candidate(run_id: str, epochs: int, batch: int, expected_sha: str, rec
         "checkpoint_selection": selected,
         "rat_best_checkpoint": rat_best,
         "balanced_checkpoint_found": balanced_best is not None,
-        "packages": {"torch": torch.__version__, "ultralytics": ultralytics.__version__, "onnxruntime": onnxruntime.__version__},
+        "packages": {"torch": torch.__version__, "ultralytics": ultralytics.__version__,
+                     "onnxruntime": onnxruntime.__version__, "numpy": numpy.__version__,
+                     "cv2": cv2.__version__},
         "platform": platform.platform(), "gpu": torch.cuda.get_device_name(0),
         "pt_map50": float(pt_metrics.box.map50), "pt_ap50": pt_ap,
         "onnx_map50": float(onnx_metrics.box.map50), "onnx_ap50": onnx_ap,
