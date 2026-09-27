@@ -46,6 +46,10 @@ so starting the server later flips the feed to live without a reload.
 The scene renders the ground, the hex prisms, the plan pins and the owls without any city bake.
 Everything else comes from `web/public/city/` (gitignored), three bakes in `city/`:
 
+To install the existing 220-tile bake, run `python3 web/scripts/install_city_bake.py` from the
+repository root with GitHub CLI access to this repo. The script pins the `city-bake-v1` release
+asset by SHA-256, checks its paths and manifests, and leaves any existing bake untouched.
+
 | File | From | Drawn as |
 |---|---|---|
 | `land.json`, `parks.json`, `water.json` `[{id, ring}]` | `build_city.py` (citywide, once) | the citywide map under the colour field; hidden inside an area |
