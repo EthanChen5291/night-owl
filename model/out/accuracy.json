@@ -1,0 +1,16 @@
+{
+  "model_b": {
+    "pairwise_accuracy": 0.63,
+    "top20_capture_of_rats_found": 0.317,
+    "rows": 37579,
+    "outcome": "rat activity on a swept lot"
+  },
+  "model_a": {
+    "pairwise_accuracy": 0.87,
+    "baseline_last12m_complaints": 0.842,
+    "top20_capture_of_complaints": 0.752,
+    "rows": 694720,
+    "outcome": "at least one rat complaint in the cell-month"
+  },
+  "method": "5-fold spatial CV by community district (held-out districts never seen in training)"
+}

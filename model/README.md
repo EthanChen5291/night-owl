@@ -1,9 +1,9 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 17:15** (Q&A, research, data sources, glossary, ethics, future work).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 23:31** (plain-language accuracy for Models A and B).
 
 **Contents:** [In one minute](#in-one-minute) · [The models](#the-models) · [Architecture](#architecture) ·
-[For teammates](#for-teammates-start-here) · [Headline results](#headline-results) · [Honest limits](#honest-limits-say-these-before-a-judge-does) ·
+[For teammates](#for-teammates-start-here) · [Headline results](#headline-results) · [Accuracy](#model-accuracy-plain-language) · [Honest limits](#honest-limits-say-these-before-a-judge-does) ·
 [Q&A for judges](#qa-for-judges) · [Pipeline](#pipeline) · [Key decisions](#key-decisions) ·
 [Research](#research-and-sources-we-relied-on) · [Data sources](#data-sources) · [Glossary](#glossary) ·
 [Ethics](#ethics-and-privacy) · [Future work](#future-work)
@@ -195,6 +195,22 @@ About 5 minutes on an M-series Mac (the backtests are the slow part).
 
 Backtests are scored **only on cells DOHMH actually swept that month**. Silent blocks are rarely
 inspected, so scoring on "any inspection found rats" grades the model on where DOHMH goes, not where rats are.
+
+## Model accuracy (plain language)
+
+From `accuracy_report.py` → `out/accuracy.json`, 5-fold spatial CV on community districts the model never saw.
+"Pairwise accuracy" is AUC in plain words: how often the model ranks a place **with** the outcome above a place
+without it (50% = coin flip). We don't quote a plain "accuracy %": only ~10% of swept lots have rats, so a model
+that always says "no rats" would score ~90% and be useless.
+
+| Model | Pairwise accuracy | Baseline | Top 20% of places hold |
+|---|---|---|---|
+| **Model A** (any rat complaint in the cell-month) | **87%** | last year's complaints: 84% | **75%** of all complaints |
+| **Model B** (rats found on a swept lot) | **63%** | coin flip 50%, logistic 57% | **32%** of rats found (random: 20%, so ~1.6×) |
+
+Why A scores higher: complaints follow habit (areas that called keep calling), while B predicts real rats from
+physical features alone, a much harder target. That gap is itself the point: complaints track who calls, not where
+rats are. The stronger evidence is still the backtest (28% more rats than complaint-based picks, 108 of 119 months).
 
 ## Why our picks find more rats
 
