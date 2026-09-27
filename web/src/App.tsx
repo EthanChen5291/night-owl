@@ -4,6 +4,7 @@ import { fetchBacktest, fetchCells, fetchPlacements, fetchPlan, fetchPublic, fet
 import { AddressIndex, offBuilding, pointInRing } from './city/addresses'
 import { centroid, makeProjector } from './city/projection'
 import { TileCache, wantedTiles } from './city/tiles'
+import AgentChat, { type ClientTools } from './components/AgentChat'
 import AreaPicker from './components/AreaPicker'
 import BacktestChart from './components/BacktestChart'
 import CellPopup from './components/CellPopup'
@@ -14,7 +15,7 @@ import Legend from './components/Legend'
 import LogsDrawer from './components/LogsDrawer'
 import ModeBar from './components/ModeBar'
 import NodesPanel from './components/NodesPanel'
-import Scene from './components/Scene'
+import Scene, { sceneHandle } from './components/Scene'
 import Toolbar from './components/Toolbar'
 import { activityRate, eventKey, loadOwls, newOwl, saveOwls } from './owls'
 import type {
@@ -533,6 +534,36 @@ export default function App() {
   const onHover = useCallback((info: HoverInfo | null) => setHover(info), [])
   const onView = useCallback((v: ViewInfo) => setView(v), [])
 
+  // ---- the assistant's browser-side tools: what only this page knows
+  const agentState = useRef<() => unknown>(() => null)
+  useEffect(() => {
+    agentState.current = () => ({
+      borough: activeArea ? activeArea.name : null,
+      citywide_view: !area,
+      map_mode: { a: 'what the city sees (Model A: predicted 311 complaints)', b: "what's there (Model B: rat risk)", silence: 'silence (B minus A)' }[mode],
+      lighting: preset,
+      month,
+      camera: view ? { lat: +view.lat.toFixed(5), lon: +view.lon.toFixed(5), distance_m: Math.round(view.distance) } : null,
+      pinned_hexagon: pinnedCell ? { h3: pinnedCell.h3, address: pinned?.addr ?? null, neighborhood: pinnedCell.neighborhood ?? null } : null,
+      owls_placed: owls.map((o) => ({
+        id: o.id,
+        node_id: o.nodeId,
+        address: o.addr,
+        lat: +o.lat.toFixed(5),
+        lon: +o.lon.toFixed(5),
+        h3: o.h3,
+        sightings: sightings.get(o.id)?.length ?? 0,
+        selected: o.id === selected,
+      })),
+      panels: { owls_open: owlsOpen, logs_open: logsOpen, backtest_open: chartOpen },
+      suggested_sites_in_view: planHere.length,
+    })
+  })
+  const agentTools = useMemo<ClientTools>(
+    () => ({ get_app_state: () => agentState.current(), screenshot_map: () => sceneHandle.current?.screenshot() ?? null }),
+    [],
+  )
+
   const selectedOwl = selected ? owls.find((o) => o.id === selected) : undefined
   const hoveredOwl = hover?.nodeId ? owls.find((o) => o.id === hover.nodeId) : undefined
   const hoveredArea = hover?.areaId ? areas.find((a) => a.id === hover.areaId) : undefined
@@ -616,6 +647,7 @@ export default function App() {
         />
         {logsOpen && <LogsDrawer events={events} nodes={owlsHere} cells={cellByH3} selected={selectedOwl?.id ?? null} onClose={() => setLogsOpen(false)} onSelect={selectOwl} />}
         <BacktestChart data={backtest} open={chartOpen} onToggle={() => setChartOpen((o) => !o)} wide={!owlsOpen} />
+        <AgentChat tools={agentTools} />
       </main>
     </div>
   )

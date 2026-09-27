@@ -486,6 +486,19 @@ export class CityScene {
   }
 
   /** Glide the orbit target to a point, keeping the current distance and angle (or dolly to `distance`). */
+  /** A JPEG of the current view for the assistant. Renders once more first: the drawing buffer is only
+   *  guaranteed until the frame is composited, and copying it in the same task catches it. */
+  screenshot(maxWidth = 1280): string {
+    this.renderer.render(this.scene, this.camera)
+    const src = this.renderer.domElement
+    const scale = Math.min(1, maxWidth / src.width)
+    const out = document.createElement('canvas')
+    out.width = Math.round(src.width * scale)
+    out.height = Math.round(src.height * scale)
+    out.getContext('2d')?.drawImage(src, 0, 0, out.width, out.height)
+    return out.toDataURL('image/jpeg', 0.82)
+  }
+
   focusLatLon(lat: number, lon: number, distance?: number) {
     const [x, y] = this.projector.xy(lat, lon)
     const target = new THREE.Vector3(x, 0, -y)

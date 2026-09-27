@@ -152,3 +152,38 @@ export const SearchIcon = ({ size, ...r }: P) => (
     <path d="m15.5 15.5 4.5 4.5" />
   </svg>
 )
+
+/** The assistant: a speech bubble with three dots. */
+export const ChatIcon = ({ size, ...r }: P) => (
+  <svg {...base(size, r)}>
+    <path d="M20 12.2c0 3.9-3.6 7-8 7-1.2 0-2.3-.2-3.3-.6L4 20l1.3-3.6C4.5 15.2 4 13.8 4 12.2 4 8.3 7.6 5.2 12 5.2s8 3.1 8 7z" />
+    <circle cx="8.5" cy="12.2" r=".9" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12.2" r=".9" fill="currentColor" stroke="none" />
+    <circle cx="15.5" cy="12.2" r=".9" fill="currentColor" stroke="none" />
+  </svg>
+)
+
+export const SendIcon = ({ size, ...r }: P) => (
+  <svg {...base(size, r)}>
+    <path d="M12 19V5M6 11l6-6 6 6" />
+  </svg>
+)
+
+export const StopIcon = ({ size, ...r }: P) => (
+  <svg {...base(size, r)}>
+    <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" />
+  </svg>
+)
+
+export const NewChatIcon = ({ size, ...r }: P) => (
+  <svg {...base(size, r)}>
+    <path d="M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6" />
+    <path d="M18 15v6M15 18h6" />
+  </svg>
+)
+
+export const CheckIcon = ({ size, ...r }: P) => (
+  <svg {...base(size, r)}>
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </svg>
+)

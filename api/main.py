@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
+from agent import mount_agent
 from store import Store
 
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -162,6 +163,8 @@ def create_app(data_dir: Path | None = None, events_file: Path | None = None) ->
 
         return StreamingResponse(gen(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    mount_agent(app, store)  # POST /agent/chat: the Grok assistant (api/agent.py)
 
     @app.exception_handler(json.JSONDecodeError)
     async def _bad_json(_: Request, exc: Exception):

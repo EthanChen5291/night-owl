@@ -28,6 +28,9 @@ interface Props {
   onView: SceneCallbacks['onView']
 }
 
+/** The live scene, for callers outside React's data flow (the assistant's map screenshot). */
+export const sceneHandle: { current: CityScene | null } = { current: null }
+
 /** The only component that touches three.js. Owns one CityScene for the life of the canvas. */
 export default function Scene(props: Props) {
   const { centre, cells, mode, preset, plan, showPlan, spots, cityLayers, areaLayers, tiles, areas, tileAreas, activeArea, nodes, selectedNode, index, flash, focus } = props
@@ -46,10 +49,12 @@ export default function Scene(props: Props) {
       onView: (view) => cbRef.current.onView(view),
     })
     sceneRef.current = scene
+    sceneHandle.current = scene
     if (import.meta.env.DEV) (window as unknown as { __barnowl?: CityScene }).__barnowl = scene // the screenshot scripts ask it where things are
     return () => {
       scene.dispose()
       sceneRef.current = null
+      if (sceneHandle.current === scene) sceneHandle.current = null
     }
     // the centre is fixed for the life of the app (recentring would rebuild everything)
     // eslint-disable-next-line react-hooks/exhaustive-deps
