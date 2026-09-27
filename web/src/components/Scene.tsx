@@ -51,7 +51,6 @@ function Scene(props: Props) {
     })
     sceneRef.current = scene
     sceneHandle.current = scene
-    if (import.meta.env.DEV) (window as unknown as { __barnowl?: CityScene }).__barnowl = scene // the screenshot scripts ask it where things are
     return () => {
       scene.dispose()
       sceneRef.current = null
@@ -86,9 +85,6 @@ function Scene(props: Props) {
     sceneRef.current?.setAreaLayers(areaLayers)
   }, [areaLayers])
   useEffect(() => {
-    sceneRef.current?.setTiles(tiles)
-  }, [tiles])
-  useEffect(() => {
     sceneRef.current?.setAreas(areas)
   }, [areas])
   useEffect(() => {
@@ -98,6 +94,9 @@ function Scene(props: Props) {
     sceneRef.current?.setActiveArea(activeArea, firstArea.current)
     firstArea.current = false
   }, [activeArea, areas])
+  useEffect(() => {
+    sceneRef.current?.setTiles(tiles)
+  }, [tiles, activeArea])
   useEffect(() => {
     sceneRef.current?.setNodes(nodes, selectedNode)
   }, [nodes, selectedNode])

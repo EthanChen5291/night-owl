@@ -67,3 +67,51 @@ export class TileCache {
     return p
   }
 }
+
+/** Keep cached tiles visible immediately and batch nearby responses into one map update. */
+export function streamTiles(
+  cache: Pick<TileCache, 'get' | 'load'>,
+  wanted: string[],
+  onChange: (tiles: Map<string, Tile>, pending: number) => void,
+  delayMs = 40,
+): () => void {
+  let active = true
+  let timer: ReturnType<typeof setTimeout> | null = null
+  const resident = new Map<string, Tile>()
+  const missing: string[] = []
+  for (const id of wanted) {
+    const tile = cache.get(id)
+    if (tile) resident.set(id, tile)
+    else missing.push(id)
+  }
+  let pending = missing.length
+  const apply = () => {
+    if (!active) return
+    const tiles = new Map<string, Tile>()
+    for (const id of wanted) {
+      const tile = resident.get(id)
+      if (tile) tiles.set(id, tile)
+    }
+    onChange(tiles, pending)
+  }
+  const schedule = () => {
+    if (timer !== null) return
+    timer = setTimeout(() => {
+      timer = null
+      apply()
+    }, delayMs)
+  }
+  apply()
+  for (const id of missing) {
+    void cache.load(id).then((tile) => {
+      if (!active) return
+      if (tile) resident.set(id, tile)
+      pending--
+      schedule()
+    })
+  }
+  return () => {
+    active = false
+    if (timer !== null) clearTimeout(timer)
+  }
+}

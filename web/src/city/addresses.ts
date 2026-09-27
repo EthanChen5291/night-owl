@@ -1,4 +1,4 @@
-import type { Building, Tree } from '../types'
+import type { Building, Tile, Tree } from '../types'
 
 // Answers "what is at x, y?" in local metres without touching three.js: a coarse grid over the
 // district's buildings (point-in-footprint) and street trees (nearest pit, which carries the
@@ -16,8 +16,24 @@ export interface Hit {
 }
 
 export class AddressIndex {
+  private static tileIndexes = new WeakMap<Tile, AddressIndex>()
   private buildings = new Map<string, Building[]>()
   private trees = new Map<string, Tree[]>()
+  private parts: AddressIndex[] | null = null
+
+  static fromTiles(tiles: Iterable<Tile>): AddressIndex {
+    const index = new AddressIndex(null, null)
+    index.parts = []
+    for (const tile of tiles) {
+      let part = AddressIndex.tileIndexes.get(tile)
+      if (!part) {
+        part = new AddressIndex(tile.buildings, tile.trees)
+        AddressIndex.tileIndexes.set(tile, part)
+      }
+      index.parts.push(part)
+    }
+    return index
+  }
 
   constructor(buildings: Building[] | null, trees: Tree[] | null) {
     for (const b of buildings ?? []) {
@@ -51,10 +67,18 @@ export class AddressIndex {
   }
 
   get empty(): boolean {
+    if (this.parts) return this.parts.every((part) => part.empty)
     return this.buildings.size === 0 && this.trees.size === 0
   }
 
   buildingAt(x: number, y: number): Building | null {
+    if (this.parts) {
+      for (const part of this.parts) {
+        const building = part.buildingAt(x, y)
+        if (building) return building
+      }
+      return null
+    }
     const list = this.buildings.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`)
     if (!list) return null
     for (const b of list) if (pointInRing(x, y, b.footprint)) return b
@@ -62,6 +86,14 @@ export class AddressIndex {
   }
 
   nearestTree(x: number, y: number, maxM = 60): { tree: Tree; dist: number } | null {
+    if (this.parts) {
+      let best: { tree: Tree; dist: number } | null = null
+      for (const part of this.parts) {
+        const hit = part.nearestTree(x, y, maxM)
+        if (hit && (!best || hit.dist < best.dist)) best = hit
+      }
+      return best
+    }
     const gx = Math.floor(x / CELL)
     const gy = Math.floor(y / CELL)
     const reach = Math.ceil(maxM / CELL)

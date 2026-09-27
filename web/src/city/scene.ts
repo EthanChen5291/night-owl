@@ -1,12 +1,13 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { cellToBoundary, cellToLatLng, cellToParent, latLngToCell } from 'h3-js'
 import { colourFor, heightFor } from '../colours'
 import type { Area, Building, Cell, CityLayers, HoverInfo, Mode, OwlNode, PlanNode, Poly, Preset, Spot, Tile, Tree, ViewInfo } from '../types'
 import { makeProjector, type LatLon, type Projector } from './projection'
 import { FACADE_TILE_M, facadeTextures } from './facade'
 import { pointInRing, type AddressIndex } from './addresses'
+import { BuildingOcclusionIndex } from './occlusion'
+import { buildFlat, unpackGeometry, type BuildingRange, type TileGeometryReply, type TileGeometryRequest } from './tileGeometry'
 
 // No React in here. App owns the data; Scene.tsx owns the lifecycle; this class owns three.js.
 // Coordinates: local metres, x east, y north (from the projector); mapped to three.js x / -z.
@@ -24,15 +25,9 @@ interface HexEntry {
   flashUntil: number
 }
 
-interface BuildingRange {
-  h3: string
-  start: number // first vertex index
-  count: number
-  band: 0 | 1 | 2 // low / mid / tall, picks the facade colour
-  shade: number // per-building variation, ~0.9..1.1
-}
-
 interface TileMeshes {
+  area: string | null
+  occlusion: BuildingOcclusionIndex
   group: THREE.Group
   buildings: THREE.Mesh | null
   ranges: BuildingRange[]
@@ -201,73 +196,6 @@ const LOOKS: Record<Preset, Look> = {
 
 const smoothstep = (t: number) => t * t * (3 - 2 * t)
 
-/** Development-only CPU and renderer counters, enabled with ?perf=1. */
-export class PerfOverlay {
-  private element = document.createElement('pre')
-  private frameMs = new Float32Array(120)
-  private renderMs = new Float32Array(120)
-  private frames = 0
-  private lastUpdate = performance.now()
-  private lastFrameCount = 0
-  private lastStats = ''
-  private active = false
-  private latest = { calls: 0, triangles: 0, hexes: 0, tiles: 0, geometries: 0, textures: 0 }
-
-  constructor() {
-    this.element.id = 'city-perf'
-    this.element.setAttribute('aria-label', 'City scene performance')
-    this.element.style.cssText = 'position:fixed;top:140px;left:8px;z-index:10000;margin:0;padding:8px 10px;background:rgba(0,0,0,.82);color:#fff;font:12px/1.45 monospace;pointer-events:none;white-space:pre'
-    document.body.appendChild(this.element)
-  }
-
-  sample(now: number, frameMs: number, renderMs: number, calls: number, triangles: number, hexes: number, tiles: number, geometries: number, textures: number) {
-    const index = this.frames % this.frameMs.length
-    this.frameMs[index] = frameMs
-    this.renderMs[index] = renderMs
-    this.frames++
-    this.latest = { calls, triangles, hexes, tiles, geometries, textures }
-    const elapsed = now - this.lastUpdate
-    if (elapsed < 1000) return
-    this.lastStats = this.formatStats()
-    const fps = (this.frames - this.lastFrameCount) * 1000 / elapsed
-    this.element.textContent = `scene frames ${this.frames}  fps ${fps.toFixed(1)}\n` + this.lastStats
-    this.lastUpdate = now
-    this.lastFrameCount = this.frames
-  }
-
-  private formatStats() {
-    const count = Math.min(this.frames, this.frameMs.length)
-    const summary = (samples: Float32Array) => {
-      const sorted = Array.from(samples.subarray(0, count)).sort((a, b) => a - b)
-      const mean = sorted.reduce((sum, value) => sum + value, 0) / count
-      return `${mean.toFixed(1)} / ${sorted[Math.ceil(count * 0.95) - 1].toFixed(1)} ms`
-    }
-    return `CPU frame mean/p95 ${summary(this.frameMs)}\n` +
-      `CPU render mean/p95 ${summary(this.renderMs)}\n` +
-      `draw calls ${this.latest.calls}  triangles ${this.latest.triangles}\n` +
-      `hexes ${this.latest.hexes}  tiles ${this.latest.tiles}\n` +
-      `GPU geometries ${this.latest.geometries}  textures ${this.latest.textures}`
-  }
-
-  resume() {
-    if (this.active) return
-    this.active = true
-    this.lastUpdate = performance.now()
-    this.lastFrameCount = this.frames
-    this.element.textContent = `scene rendering  frames ${this.frames}\n${this.lastStats}`
-  }
-
-  idle(state = 'idle') {
-    this.active = false
-    if (this.frames > 0) this.lastStats = this.formatStats()
-    this.element.textContent = `scene ${state}  frames ${this.frames}  fps 0\n${this.lastStats}`
-  }
-
-  dispose() {
-    this.element.remove()
-  }
-}
-
 export class CityScene {
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
@@ -296,6 +224,11 @@ export class CityScene {
   private areaLayerMeshes = new Map<FlatLayer, THREE.Mesh>()
   private tileGroup = new THREE.Group()
   private tiles = new Map<string, TileMeshes>()
+  private tileWorker: Worker | null = null
+  private tileRequestId = 0
+  private tileInFlight: number | null = null
+  private tileWorkerFailures = 0
+  private tileRequests = new Map<string, { id: number; area: string | null; buildings: Building[]; roads: Poly[]; trees: Tree[] }>()
   private nodeGroup = new THREE.Group()
   private nodes = new Map<string, NodeMarker>()
   private selectedNode: string | null = null
@@ -333,10 +266,10 @@ export class CityScene {
   private raf = 0
   private urgentFrame = false
   private animationFrameDue = 0
+  private updatingControls = false
   private viewReportTimer: ReturnType<typeof setTimeout> | null = null
   private disposed = false
   private canvas: HTMLCanvasElement
-  private perf: PerfOverlay | null = null
 
   constructor(canvas: HTMLCanvasElement, centre: LatLon, callbacks: SceneCallbacks) {
     this.loop = this.loop.bind(this)
@@ -361,7 +294,7 @@ export class CityScene {
     this.controls.maxPolarAngle = Math.PI * 0.47
     this.controls.minDistance = 150
     this.controls.maxDistance = 40_000
-    this.controls.addEventListener('change', this.invalidate)
+    this.controls.addEventListener('change', this.handleControlsChange)
     this.controls.target.set(0, 0, 0)
     this.camera.position.copy(orbitPosition(this.controls.target, CITY_DISTANCE, CITY_POLAR, 0.35))
 
@@ -381,6 +314,7 @@ export class CityScene {
     this.hemi = new THREE.HemisphereLight(0x3a4a7a, 0x0a0a10, 0.5)
     // sun from the south-west so the faces the opening camera sees are lit; it follows the camera target
     this.key = new THREE.DirectionalLight(0xffb070, 1.6)
+    this.key.position.set(-3200, 4600, 2800)
     this.key.shadow.mapSize.set(4096, 4096)
     const sc = this.key.shadow.camera
     sc.left = sc.bottom = -4200
@@ -417,7 +351,6 @@ export class CityScene {
     window.addEventListener('resize', this.resize)
     document.addEventListener('visibilitychange', this.handleVisibility)
     this.resize()
-    if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('perf') === '1') this.perf = new PerfOverlay()
     this.invalidate()
   }
 
@@ -425,8 +358,12 @@ export class CityScene {
 
   private scheduleFrame() {
     if (this.disposed || document.hidden || this.raf) return
-    this.perf?.resume()
     this.raf = requestAnimationFrame(this.loop)
+  }
+
+  private handleControlsChange = () => {
+    // Damping and programmed flights already schedule their next frame.
+    if (!this.updatingControls) this.invalidate()
   }
 
   private invalidate() {
@@ -692,26 +629,19 @@ export class CityScene {
     const azimuth = Math.atan2(current.x, current.z)
     const view = distance && distance <= 400 ? this.clearApproach(target, distance, 0.66, azimuth) : { polar: 0.95, azimuth }
     const p1 = distance ? orbitPosition(target, distance, view.polar, view.azimuth) : target.clone().add(current)
-    this.fly(target, p1, distance ? 1700 : 1200)
+    const travel = this.camera.position.distanceTo(p1)
+    this.fly(target, p1, THREE.MathUtils.clamp(Math.sqrt(travel) * 18, 450, 1200))
   }
 
-  /**
-   * An orbit angle from which a pin standing at `target` is not behind a building: try the current azimuth first, then
-   * swing left and right in 30 deg steps, then look down more steeply; a ray from each candidate camera to the pin's post
-   * must clear every loaded building mesh. Falls back to nearly straight down.
-   */
+  /** Try nearby viewing angles until the camera-to-pin line clears the loaded buildings. */
   private clearApproach(target: THREE.Vector3, distance: number, polar: number, azimuth: number): { polar: number; azimuth: number } {
-    const meshes = [...this.tiles.values()].map((t) => t.buildings).filter((m): m is THREE.Mesh => m !== null)
     const aim = target.clone().setY(12)
     const clear = (p: number, az: number) => {
       const pos = orbitPosition(target, distance, p, az)
-      const dir = aim.clone().sub(pos)
-      const len = dir.length()
-      this.raycaster.set(pos, dir.normalize())
-      this.raycaster.far = len - 10
-      const blocked = this.raycaster.intersectObjects(meshes, false).length > 0
-      this.raycaster.far = Infinity
-      return !blocked
+      const from = { east: pos.x, north: -pos.z, height: pos.y }
+      const to = { east: aim.x, north: -aim.z, height: aim.y }
+      for (const tile of this.tiles.values()) if (tile.occlusion.blocks(from, to)) return false
+      return true
     }
     for (const p of [polar, 0.5, 0.35]) {
       for (let k = 0; k < 12; k++) {
@@ -765,11 +695,12 @@ export class CityScene {
     })
   }
 
-  /** The streamed tiles: add what is new, drop what left. Each tile is one building mesh, one road mesh, one canopy. */
+  /** Build incoming tile geometry in a worker; discard replies for tiles that left the view. */
   setTiles(tiles: Map<string, Tile>) {
+    if (this.disposed) return
     let changed = false
     for (const [id, t] of this.tiles) {
-      if (tiles.has(id)) continue
+      if (tiles.has(id) && t.area === this.activeArea) continue
       changed = true
       this.tileGroup.remove(t.group)
       t.buildings?.geometry.dispose()
@@ -777,51 +708,93 @@ export class CityScene {
       t.trees?.geometry.dispose()
       this.tiles.delete(id)
     }
+    for (const [id, request] of this.tileRequests) {
+      if (!tiles.has(id) || request.area !== this.activeArea) this.tileRequests.delete(id)
+    }
     for (const [id, tile] of tiles) {
-      if (this.tiles.has(id)) continue
-      changed = true
-      // a tile on a river holds both banks: only the active area's side is built (tiles are rebuilt on every area switch)
+      if (this.tiles.has(id) || this.tileRequests.has(id)) continue
       const mine = (h3: string) => !this.activeArea || this.areaOfCell(h3) === this.activeArea
-      const buildingList = tile.buildings.filter((b) => mine(b.h3))
-      const roadList = tile.roads.filter((r) => {
+      const buildings = tile.buildings.filter((b) => mine(b.h3))
+      const roads = tile.roads.filter((r) => {
         const { lat, lon } = this.projector.latLon(...ringCentre(r.ring))
         return mine(latLngToCell(lat, lon, 9))
       })
-      const treeList = tile.trees.filter((t) => mine(t.h3))
-      const group = new THREE.Group()
-      let buildings: THREE.Mesh | null = null
-      const ranges: BuildingRange[] = []
-      if (buildingList.length) {
-        buildings = new THREE.Mesh(buildExtrusions(buildingList, ranges), [this.wallMaterial, this.roofMaterial])
-        buildings.rotation.x = -Math.PI / 2 // shape (x, y=north, z=up) -> three (x, y=up, -z)
-        buildings.castShadow = true
-        buildings.receiveShadow = true
-        group.add(buildings)
-      }
-      let roads: THREE.Mesh | null = null
-      const roadGeometry = roadList.length ? buildFlat(roadList) : null
-      if (roadGeometry) {
-        roads = new THREE.Mesh(roadGeometry, this.roadMaterial)
-        roads.rotation.x = -Math.PI / 2
-        roads.position.y = -0.4
-        roads.renderOrder = -18
-        roads.receiveShadow = true
-        group.add(roads)
-      }
-      let trees: THREE.InstancedMesh | null = null
-      if (treeList.length) {
-        trees = buildTrees(treeList, this.treeMaterial)
-        group.add(trees)
-      }
-      this.tileGroup.add(group)
-      const entry = { group, buildings, ranges, roads, trees }
-      this.tiles.set(id, entry)
-      this.retintTile(entry)
+      const trees = tile.trees.filter((t) => mine(t.h3))
+      this.tileRequests.set(id, { id: ++this.tileRequestId, area: this.activeArea, buildings, roads, trees })
     }
+    this.startNextTile()
     if (changed) {
       this.renderer.shadowMap.needsUpdate = true
       this.invalidate()
     }
+  }
+
+  private startNextTile() {
+    if (this.disposed || this.tileInFlight !== null || this.tileWorkerFailures >= 2) return
+    const next = this.tileRequests.entries().next().value
+    if (!next) return
+    if (!this.tileWorker) {
+      this.tileWorker = new Worker(new URL('./tileGeometry.worker.ts', import.meta.url), { type: 'module' })
+      this.tileWorker.onmessage = (event: MessageEvent<TileGeometryReply>) => this.receiveTile(event.data)
+      this.tileWorker.onerror = () => {
+        this.tileWorker?.terminate()
+        this.tileWorker = null
+        this.tileInFlight = null
+        if (++this.tileWorkerFailures < 2) this.startNextTile()
+        else {
+          this.tileRequests.clear()
+          console.error('Map tile worker failed to load')
+        }
+      }
+    }
+    const [tileId, tile] = next
+    this.tileInFlight = tile.id
+    const request: TileGeometryRequest = { id: tile.id, tileId, buildings: tile.buildings, roads: tile.roads, facadeTileM: FACADE_TILE_M }
+    this.tileWorker.postMessage(request)
+  }
+
+  private receiveTile(data: TileGeometryReply) {
+    if (this.disposed || data.id !== this.tileInFlight) return
+    this.tileInFlight = null
+    const request = this.tileRequests.get(data.tileId)
+    if (!request || request.id !== data.id || request.area !== this.activeArea) {
+      if (request?.id === data.id) this.tileRequests.delete(data.tileId)
+      this.startNextTile()
+      return
+    }
+    this.tileRequests.delete(data.tileId)
+    this.startNextTile()
+    if (!data.ok) {
+      console.error('Unable to build map tile', data.tileId, data.error)
+      return
+    }
+    const group = new THREE.Group()
+    let buildings: THREE.Mesh | null = null
+    if (data.buildings) {
+      buildings = new THREE.Mesh(unpackGeometry(data.buildings), [this.wallMaterial, this.roofMaterial])
+      buildings.rotation.x = -Math.PI / 2
+      buildings.castShadow = true
+      buildings.receiveShadow = true
+      group.add(buildings)
+    }
+    let roads: THREE.Mesh | null = null
+    if (data.roads) {
+      roads = new THREE.Mesh(unpackGeometry(data.roads), this.roadMaterial)
+      roads.rotation.x = -Math.PI / 2
+      roads.position.y = -0.4
+      roads.renderOrder = -18
+      roads.receiveShadow = true
+      group.add(roads)
+    }
+    const trees = request.trees.length ? buildTrees(request.trees, this.treeMaterial) : null
+    if (trees) group.add(trees)
+    const entry = { group, buildings, ranges: data.ranges, roads, trees,
+      area: request.area, occlusion: new BuildingOcclusionIndex(request.buildings) }
+    this.tileGroup.add(group)
+    this.tiles.set(data.tileId, entry)
+    this.retintTile(entry)
+    this.renderer.shadowMap.needsUpdate = true
+    this.invalidate()
   }
 
   /** Area (borough) fills, coastlines and labels for the citywide view. */
@@ -929,17 +902,12 @@ export class CityScene {
     this.invalidate()
   }
 
-  /** Client-pixel position of an area's name tag (dev screenshot scripts click these). */
-  tagAt(id: string): { x: number; y: number } | null {
-    const a = this.areas.get(id)
-    if (!a || !a.label.visible) return null
-    const v = a.label.position.clone().project(this.camera)
-    const rect = this.canvas.getBoundingClientRect()
-    return { x: rect.left + ((v.x + 1) / 2) * rect.width, y: rect.top + ((1 - v.y) / 2) * rect.height }
-  }
-
   dispose() {
     this.disposed = true
+    this.tileWorker?.terminate()
+    this.tileWorker = null
+    this.tileInFlight = null
+    this.tileRequests.clear()
     cancelAnimationFrame(this.raf)
     if (this.viewReportTimer !== null) clearTimeout(this.viewReportTimer)
     this.canvas.removeEventListener('pointermove', this.handlePointerMove)
@@ -951,9 +919,7 @@ export class CityScene {
     window.removeEventListener('blur', this.handleBlur)
     window.removeEventListener('resize', this.resize)
     document.removeEventListener('visibilitychange', this.handleVisibility)
-    this.perf?.dispose()
-    this.perf = null
-    this.controls.removeEventListener('change', this.invalidate)
+    this.controls.removeEventListener('change', this.handleControlsChange)
     this.controls.dispose()
     for (const a of this.areas.values()) a.label.material.map?.dispose()
     for (const site of this.sites) site.chip.material.map?.dispose()
@@ -1335,7 +1301,6 @@ export class CityScene {
       cancelAnimationFrame(this.raf)
       this.raf = 0
       this.keys.clear()
-      this.perf?.idle('hidden')
     } else if (!this.disposed && !this.raf) {
       this.lastFrame = performance.now()
       this.invalidate()
@@ -1482,7 +1447,6 @@ export class CityScene {
     }
     // Decorative pulses top out near 60 rendered frames/s on high-refresh displays.
     this.animationFrameDue = urgent ? now + 1000 / 60 : Math.max(this.animationFrameDue + 1000 / 60, now + 1000 / 120)
-    const frameStart = this.perf ? performance.now() : 0
     const dt = Math.min(0.05, (now - this.lastFrame) / 1000)
     this.lastFrame = now
     // camera flight
@@ -1499,7 +1463,9 @@ export class CityScene {
       }
     }
     this.applyKeys(dt)
+    this.updatingControls = true
     const controlsChanged = this.controls.update()
+    this.updatingControls = false
     if (this.pointerDirty) this.pick()
     // the search locator starts when the flight lands: wide and bright, then it shrinks onto the cell, holds and fades
     if (this.locator) {
@@ -1536,12 +1502,15 @@ export class CityScene {
       }
     }
     const dist = this.camera.position.distanceTo(this.controls.target)
-    // the sun and its shadow box follow the target so shadows exist wherever you fly
-    if (this.key.target.position.x !== this.controls.target.x || this.key.target.position.z !== this.controls.target.z) {
+    // The shadow box spans 8.4 km. Move it in 512 m steps so ordinary camera
+    // motion reuses the map instead of redrawing every building into it each frame.
+    const shadowX = Math.round(this.controls.target.x / 512) * 512
+    const shadowZ = Math.round(this.controls.target.z / 512) * 512
+    if (this.key.target.position.x !== shadowX || this.key.target.position.z !== shadowZ) {
       this.renderer.shadowMap.needsUpdate = true
+      this.key.target.position.set(shadowX, 0, shadowZ)
+      this.key.position.set(shadowX - 3200, 4600, shadowZ + 2800)
     }
-    this.key.target.position.set(this.controls.target.x, 0, this.controls.target.z)
-    this.key.position.set(this.controls.target.x - 3200, 4600, this.controls.target.z + 2800)
     // name tags sit on their borough and keep a constant size on screen (so they shrink in world terms as you close in),
     // bigger in the citywide view
     const labelK = this.activeArea ? LABEL_SCALE.area : LABEL_SCALE.city
@@ -1626,8 +1595,8 @@ export class CityScene {
       m.ring.material.uniforms.sweep.value = m.sweepT
       m.hit.scale.set(Math.max(badgeR * 1.6, 18), Math.max(30, pinScale * 34), Math.max(badgeR * 1.6, 18))
       m.group.position.y = 0.5 + hop * badgeR * 0.9
-      if (oldPinVisible !== m.pin.visible || Math.abs(oldPinScaleX - m.pin.scale.x) > 0.0001 ||
-          Math.abs(oldPinScaleY - m.pin.scale.y) > 0.0001 || Math.abs(oldPinY - m.group.position.y) > 0.0001) {
+      if (oldPinVisible !== m.pin.visible || (m.pin.visible && (Math.abs(oldPinScaleX - m.pin.scale.x) > 0.0001 ||
+          Math.abs(oldPinScaleY - m.pin.scale.y) > 0.0001 || Math.abs(oldPinY - m.group.position.y) > 0.0001))) {
         this.renderer.shadowMap.needsUpdate = true
       }
       m.rings.forEach((ring, k) => {
@@ -1650,18 +1619,9 @@ export class CityScene {
       fog.far = this.look.fog[1] * s
     }
     this.reportView(now, dist)
-    const renderStart = this.perf ? performance.now() : 0
     this.renderer.render(this.scene, this.camera)
-    if (this.perf) {
-      const end = performance.now()
-      const info = this.renderer.info
-      this.perf.sample(end, end - frameStart, end - renderStart, info.render.calls, info.render.triangles,
-        this.hexes.size, this.tiles.size, info.memory.geometries, info.memory.textures)
-    }
     if (this.flight || this.keys.size > 0 || this.locator || hexAnimating || controlsChanged || this.nodes.size > 0 || this.spots.length > 0) {
       this.scheduleFrame()
-    } else if (!this.raf) {
-      this.perf?.idle()
     }
   }
 }
@@ -1722,26 +1682,6 @@ function hashId(id: string): number {
   let h = 2166136261
   for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619)
   return ((h >>> 0) % 1000) / 1000
-}
-
-/** Every ring as a triangulated flat shape in shape space (x east, y north), merged into one geometry. */
-function buildFlat(polys: Poly[]): THREE.BufferGeometry | null {
-  const parts: THREE.BufferGeometry[] = []
-  for (const p of polys) {
-    if (p.ring.length < 3) continue
-    const shape = new THREE.Shape()
-    p.ring.forEach(([x, y], i) => (i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y)))
-    shape.closePath()
-    const g = new THREE.ShapeGeometry(shape)
-    g.deleteAttribute('uv')
-    parts.push(g)
-  }
-  if (parts.length === 0) return null
-  const merged = mergeGeometries(parts, false)
-  for (const g of parts) g.dispose()
-  if (!merged) return null
-  merged.computeBoundingSphere()
-  return merged
 }
 
 /** One low-poly canopy per tree, instanced: thousands of trees in one draw call. */
@@ -1818,106 +1758,4 @@ function sweepMaterial(): THREE.ShaderMaterial {
     depthWrite: false,
     side: THREE.DoubleSide,
   })
-}
-
-
-/**
- * Extrude every footprint into one indexed BufferGeometry: roof cap + walls, no bottom cap.
- * Built in shape space (x east, y north, z up); the mesh is rotated -90deg about x afterwards.
- * Walls get UVs in facade tiles (u along the wall, v up) and go in material group 0; roofs in group 1.
- * `ranges` receives the vertex range of each building so its colour can be updated per mode.
- */
-function buildExtrusions(buildings: Building[], ranges: BuildingRange[]): THREE.BufferGeometry {
-  let nVerts = 0
-  let nRoof = 0
-  let nWall = 0
-  for (const b of buildings) {
-    const n = b.footprint.length
-    if (n < 3) continue
-    nVerts += n + 4 * n
-    nRoof += (n - 2) * 3
-    nWall += 6 * n
-  }
-  const pos = new Float32Array(nVerts * 3)
-  const nor = new Float32Array(nVerts * 3)
-  const col = new Float32Array(nVerts * 3)
-  const uv = new Float32Array(nVerts * 2)
-  const IndexArray = nVerts > 65_535 ? Uint32Array : Uint16Array
-  const roofIdx = new IndexArray(nRoof)
-  const wallIdx = new IndexArray(nWall)
-  const [tileU, tileV] = FACADE_TILE_M
-  let v = 0
-  let kr = 0
-  let kw = 0
-  for (const b of buildings) {
-    const pts = b.footprint
-    const n = pts.length
-    if (n < 3) continue
-    const h = Math.max(1, b.height || 3)
-    const start = v
-    // enforce counter-clockwise so the walls face outward
-    const ccw = THREE.ShapeUtils.isClockWise(pts.map(([x, y]) => new THREE.Vector2(x, y))) ? [...pts].reverse() : pts
-    // roof cap
-    const tri = THREE.ShapeUtils.triangulateShape(
-      ccw.map(([x, y]) => new THREE.Vector2(x, y)),
-      [],
-    )
-    for (let i = 0; i < n; i++) {
-      pos.set([ccw[i][0], ccw[i][1], h], (v + i) * 3)
-      nor.set([0, 0, 1], (v + i) * 3)
-    }
-    for (const [a, b2, c] of tri) {
-      roofIdx[kr++] = v + a
-      roofIdx[kr++] = v + b2
-      roofIdx[kr++] = v + c
-    }
-    v += n
-    // walls, 4 verts per edge for flat normals and a continuous facade u along the perimeter
-    let along = 0
-    for (let i = 0; i < n; i++) {
-      const [x0, y0] = ccw[i]
-      const [x1, y1] = ccw[(i + 1) % n]
-      const dx = x1 - x0
-      const dy = y1 - y0
-      const len = Math.hypot(dx, dy) || 1
-      const nx = dy / len
-      const ny = -dx / len
-      const base = v
-      const u0 = along / tileU
-      const u1 = (along + len) / tileU
-      const v1 = h / tileV
-      pos.set([x0, y0, 0, x1, y1, 0, x1, y1, h, x0, y0, h], base * 3)
-      uv.set([u0, 0, u1, 0, u1, v1, u0, v1], base * 2)
-      for (let j = 0; j < 4; j++) nor.set([nx, ny, 0], (base + j) * 3)
-      wallIdx[kw++] = base
-      wallIdx[kw++] = base + 1
-      wallIdx[kw++] = base + 2
-      wallIdx[kw++] = base
-      wallIdx[kw++] = base + 2
-      wallIdx[kw++] = base + 3
-      v += 4
-      along += len
-    }
-    ranges.push({
-      h3: b.h3,
-      start,
-      count: v - start,
-      band: h < 15 ? 0 : h < 45 ? 1 : 2,
-      shade: 0.88 + 0.24 * hashId(b.id),
-    })
-  }
-  // a degenerate roof (collinear points) triangulates to fewer triangles than n-2: trim the unused slots
-  const index = new IndexArray(nWall + kr)
-  index.set(wallIdx, 0)
-  index.set(roofIdx.subarray(0, kr), nWall)
-  const g = new THREE.BufferGeometry()
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3))
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3))
-  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
-  g.setIndex(new THREE.BufferAttribute(index, 1))
-  g.addGroup(0, nWall, 0) // walls: facade material
-  g.addGroup(nWall, kr, 1) // roofs: plain
-  g.computeBoundingSphere()
-  return g
 }

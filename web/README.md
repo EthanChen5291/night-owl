@@ -9,6 +9,7 @@ pnpm --dir web install --frozen-lockfile
 pnpm --dir web dev
 pnpm --dir web build
 pnpm --dir web lint
+pnpm dlx --allow-build esbuild tsx@4.23.15 --test web/tests/*.test.mjs
 ```
 
 Open `http://localhost:5173`. Run `./api/run.sh` separately for server data. `web/vite.config.ts` proxies `/api` to `http://localhost:8000` and removes the prefix. Change that target if the API runs elsewhere.
@@ -49,16 +50,6 @@ The city bake supplies ground polygons, borough outlines, buildings, roads, and 
 Placed owls are kept in browser `localStorage`. The first placed owl uses `node_id=demo-01` for the stage fixture. A live event from an unknown node creates a map owl at its H3 cell. A fixture event does not. An accepted event can change a cell without moving a plan pin if that cell is outside the planner's candidate pool.
 
 The optional assistant can inspect the current map, take a screenshot, and drive map controls. Its answers may also use model files and queued events. Check the map's source labels and the underlying evidence before treating an answer as a measurement.
-
-## Performance checks
-
-Run `pnpm dlx react-doctor@latest . --verbose` from `web/` for static React diagnostics. Check each finding against the code; the score is not a frame-rate benchmark.
-
-From the repository root, run `pnpm dlx --allow-build esbuild tsx@4.23.15 --test web/tests/scene.test.mjs` for render-loop regression tests. They cover idle rendering, visibility and disposal, animation scheduling, and the performance meter without creating a WebGL context.
-
-In development, open `http://localhost:5173/?perf=1` to show render counts, CPU frame times, draw calls, and triangles. Compare the same borough, camera, lighting, and viewport after tiles finish loading. CPU timings exclude GPU execution and browser compositing. The meter is excluded from production builds.
-
-The rendering changes follow the Three.js guides on [rendering on demand](https://threejs.org/manual/en/rendering-on-demand.html) and [shadow-map updates](https://threejs.org/docs/pages/WebGLRenderer.html). Building geometry is already merged by tile and trees use instancing, as described in [optimizing many objects](https://threejs.org/manual/en/optimize-lots-of-objects.html).
 
 ## Main files
 

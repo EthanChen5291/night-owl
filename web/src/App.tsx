@@ -3,7 +3,7 @@ import { cellToLatLng, cellToParent, latLngToCell } from 'h3-js'
 import { fetchBacktest, fetchCells, fetchPlacements, fetchPlan, fetchPublic, fetchQueue } from './api'
 import { AddressIndex, offBuilding, pointInRing } from './city/addresses'
 import { centroid, makeProjector } from './city/projection'
-import { TileCache, wantedTiles } from './city/tiles'
+import { TileCache, streamTiles, wantedTiles } from './city/tiles'
 import { sceneHandle } from './city/sceneHandle'
 import AgentChat, { type ClientTools } from './components/AgentChat'
 import AreaPicker from './components/AreaPicker'
@@ -262,38 +262,24 @@ export default function App() {
   }, [area])
   const areaLayers = loadedAreaLayers?.area === area ? loadedAreaLayers.layers : null
 
-  // ---- tiles stream around the camera target, only the active area's: the wanted set changes as the view moves, the cache fills it
+  // ---- stream tiles only when the camera's wanted tile set changes
+  const wantedTileKey = useMemo(
+    () => tilesManifest && view ? wantedTiles(tilesManifest, view.lat, view.lon, view.distance, area).sort().join(',') : null,
+    [tilesManifest, view, area],
+  )
   useEffect(() => {
-    if (!tilesManifest || !view) return
+    if (wantedTileKey === null) return
     const cache = cacheRef.current
     if (!cache) return
-    const wanted = wantedTiles(tilesManifest, view.lat, view.lon, view.distance, area)
-    let alive = true
-    const apply = () => {
-      if (!alive) return
-      const next = new Map<string, Tile>()
-      for (const id of wanted) {
-        const t = cache.get(id)
-        if (t) next.set(id, t)
-      }
+    const wanted = wantedTileKey ? wantedTileKey.split(',') : []
+    return streamTiles(cache, wanted, (next, pending) => {
       setTiles((prev) => {
         if (prev.size === next.size && [...next.keys()].every((k) => prev.has(k))) return prev
         return next
       })
-    }
-    apply()
-    const missing = wanted.filter((id) => !cache.get(id))
-    setPendingTiles(missing.length)
-    for (const id of missing) {
-      void cache.load(id).then(() => {
-        apply()
-        setPendingTiles((n) => Math.max(0, n - 1))
-      })
-    }
-    return () => {
-      alive = false
-    }
-  }, [tilesManifest, view, area])
+      setPendingTiles(pending)
+    })
+  }, [wantedTileKey])
 
   // ---- the opened suggested hexagon's spot options (A, B, C), fetched once per cell
   useEffect(() => {
@@ -467,9 +453,7 @@ export default function App() {
   const activeArea = areas.find((a) => a.id === area) ?? null
   const index = useMemo(() => {
     if (tiles.size === 0) return null
-    const buildings = [...tiles.values()].flatMap((t) => t.buildings)
-    const trees = [...tiles.values()].flatMap((t) => t.trees)
-    return new AddressIndex(buildings, trees)
+    return AddressIndex.fromTiles(tiles.values())
   }, [tiles])
   const cellByH3 = useMemo(() => new Map(cells.map((c) => [c.h3, c])), [cells])
   // suggested sites of the borough you are in (by their r7 tile's area); nothing citywide
