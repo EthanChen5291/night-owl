@@ -1,0 +1,100 @@
+{
+  "objective": "V6: Ultralytics trainer-best selected on unchanged V5 whole-clip validation only; square 416 batch 1 rect=False conf=0.001 iou=0.7 max_det=300",
+  "selection_mode": "v6",
+  "v6_criteria": {
+    "zoom15_b_rat_ap50_min": 0.9597368421052629,
+    "table_c_rat_ap50_min": 0.9355263157894737,
+    "table_c_person_ap50_min": 0.8198886243779862,
+    "new_room_014327_rat_ap50_min": 0.9308064516129032,
+    "new_room_014327_person_ap50_min": 0.754068048579497,
+    "old_combined_rat_ap50_min": 0.9518695014662756,
+    "old_combined_person_ap50_min": 0.8077389545320582
+  },
+  "selection_pass": false,
+  "min_person_ap50": 0.8077389545320582,
+  "rat_best": {
+    "checkpoint": "best.pt",
+    "ap50": {
+      "rat": 0.9645754900174829,
+      "person": 0.7393082795553148
+    },
+    "map50": 0.8519418847863989,
+    "development_clips": {
+      "zoom15_b": {
+        "rat": 0.995,
+        "person": null
+      },
+      "table_c": {
+        "rat": 0.8917272727272726,
+        "person": 0.8005130249867092
+      },
+      "new_room_014327": {
+        "rat": 0.965,
+        "person": 0.763164165422954
+      },
+      "old_combined": {
+        "rat": 0.9684844720496892,
+        "person": 0.7416455766455766
+      }
+    },
+    "v6_criteria_pass": false
+  },
+  "balanced_best": null,
+  "selected": {
+    "checkpoint": "best.pt",
+    "ap50": {
+      "rat": 0.9645754900174829,
+      "person": 0.7393082795553148
+    },
+    "map50": 0.8519418847863989,
+    "development_clips": {
+      "zoom15_b": {
+        "rat": 0.995,
+        "person": null
+      },
+      "table_c": {
+        "rat": 0.8917272727272726,
+        "person": 0.8005130249867092
+      },
+      "new_room_014327": {
+        "rat": 0.965,
+        "person": 0.763164165422954
+      },
+      "old_combined": {
+        "rat": 0.9684844720496892,
+        "person": 0.7416455766455766
+      }
+    },
+    "v6_criteria_pass": false
+  },
+  "evaluated": [
+    {
+      "checkpoint": "best.pt",
+      "ap50": {
+        "rat": 0.9645754900174829,
+        "person": 0.7393082795553148
+      },
+      "map50": 0.8519418847863989,
+      "development_clips": {
+        "zoom15_b": {
+          "rat": 0.995,
+          "person": null
+        },
+        "table_c": {
+          "rat": 0.8917272727272726,
+          "person": 0.8005130249867092
+        },
+        "new_room_014327": {
+          "rat": 0.965,
+          "person": 0.763164165422954
+        },
+        "old_combined": {
+          "rat": 0.9684844720496892,
+          "person": 0.7416455766455766
+        }
+      },
+      "v6_criteria_pass": false
+    }
+  ],
+  "note": "If selection_pass=false, trainer-best is a failed diagnostic candidate. No other checkpoint is selected. All scores use development validation, not an untouched test."
+}

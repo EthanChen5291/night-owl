@@ -1,18 +1,22 @@
-# One Modal training run
+# Modal training environment
 
-`modal_train.py` trains a candidate from `dataset/` on one L4 GPU. It runs for at most 60 minutes, with up to 4 CPUs and 16 GiB RAM. It creates an ephemeral Modal app run and no endpoint. Modal's published rates put that upper bound near $1.12 for GPU, CPU, and memory, before any storage or other charges: [pricing](https://modal.com/pricing).
+Night Owl trained the plush-rat YOLO11n candidates on one Modal L4 at a time. Each job was capped at 3,600 seconds, used at most four CPUs and 16 GiB of memory, and had zero retries. The launcher creates no serving endpoint. At [Modal's listed rates](https://modal.com/pricing), one full-hour job is about $1.12 for those GPU, CPU, and memory limits, before storage or other charges.
 
-Build `dataset/` with `make_dataset.py` after reviewing labels. The launcher checks `manifest.json`, matching images and labels, grayscale conversion, reviewed status, clip-level train/validation separation, rat boxes, and empty negative frames in each split. It accepts a dataset without person boxes but records that limit. Never mark an unreviewed label as reviewed to pass preflight.
+The current results are in [V5 results](V5_RESULTS.md), [V5 formal event results](V5_FORMAL_EVENT_RESULTS.md), and [V6 results](V6_RESULTS.md). V5 remains a supervised lit-room candidate after its formal event test failed. The V6 recovery model also failed its predeclared development regression limits. Neither was promoted to `pi/rat.onnx`; no further GPU run is queued by this document.
 
-From the repository root:
+## Inputs and reproducibility
+
+`make_dataset.py` writes grayscale images repeated across three channels, matching Pi inference. Every selected image needs a reviewed YOLO label file. An empty file means a reviewer found neither a plush rat nor a person in the full frame. The manifest records source tags and keeps whole clips in either training or validation. Keep the source video, review markers, manifest, and image/label fingerprints with each run.
+
+The generic `modal_train.py` launcher checks those inputs before upload. Run its dry preflight from the repository root with a reviewed dataset:
 
 ```sh
-/Users/utsavsharma/miniconda3/bin/modal run vision/modal_train.py --dataset vision/dataset --dry-run
-/Users/utsavsharma/miniconda3/bin/modal run vision/modal_train.py --dataset vision/dataset --out vision/runs/modal-rat --epochs 150 --batch 8
+/Users/utsavsharma/miniconda3/bin/modal run vision/modal_train.py \
+  --dataset vision/dataset_v5 --dry-run
 ```
 
-The full run uploads the dataset to a run-specific path in the `poc-rat-train-files` volume, trains YOLO11n at 416 pixels, downloads `best.pt`, `rat_best.pt`, `trainer_best.pt`, `rat.onnx`, `results.csv`, `metrics.json`, `checkpoint_selection.json`, a dataset snapshot, and a `training_report.json` compatible with `promote_model.py`, checks artifact hashes, then removes that run's remote files. The report includes PT and ONNX AP50 on identical square-416 CPU inputs, raw-output parity on held-out frames, dependency versions, and the dataset fingerprint. The ONNX file is a **candidate**. `promote_model.py` handles the event-level gate before replacing `pi/rat.onnx`.
+This checks structure; it does not recreate V5's exact training recipe. The fixed V5 recipe, starting checkpoint, resolved arguments, and hashes are in `vision/runs/modal-rat-v5-20260927/` and [V5 results](V5_RESULTS.md). The V6 launcher and its rejected result have a separate record in `vision/runs/modal-rat-v6-20260927/` and [V6 results](V6_RESULTS.md). Do not treat the generic command defaults as either run's preregistered settings.
 
-`--lr0`, `--patience`, `--mosaic`, `--scale`, `--translate`, and `--hsv-v` control bounded recipe trials. `--checkpoint-period` saves a checkpoint every 1–20 epochs. The launcher selects the highest rat AP50 checkpoint whose person AP50 meets `--min-person-ap50` (default .84), and also keeps the unconstrained rat-best and Ultralytics trainer-best checkpoints. It scores checkpoints on the same validation clips used for recipe selection, so these scores are tuned validation evidence. Reserve separate reviewed clips for an independent final estimate. The default `--patience 0` means the full requested epoch count.
+A full launcher run uploads a dataset to a run-specific path in the `poc-rat-train-files` volume, trains at square 416, and downloads the selected checkpoint, trainer and rat-best checkpoints, ONNX export, metrics, resolved arguments, checkpoint selection, dataset snapshot, and `training_report.json`. It verifies file hashes before removing remote outputs. If download or validation fails, it keeps the remote output path for recovery. `--keep-remote` also retains it deliberately.
 
-If training or export fails, the launcher downloads any artifacts already committed and keeps the remote output path for recovery. It removes that path only after a complete download and checksum check. Use `--keep-remote` for remote debugging, then remove the run paths after recovery.
+The report compares PyTorch and ONNX with the same square-416 CPU input and records raw-output parity. Checkpoint scores on repeatedly used validation clips are development evidence. The selected ONNX remains a candidate even when box AP passes; an independent whole-video event test with reviewed push intervals and a separate no-plush clip is required before promotion. V5's such test failed. [RUNBOOK.md](RUNBOOK.md) lists the current gates and replay commands.

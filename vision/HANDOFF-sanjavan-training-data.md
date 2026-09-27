@@ -1,8 +1,14 @@
-# Training-data questions for Sanjavan
+# Training-data questions for Sanjavan (historical)
 
-Written 09-25 evening, rebuilt 09-26. Each question has the context, the current default (what
-happens if nobody decides), and the decision needed. Answer inline and commit; the defaults are
-what `make_dataset.py`, `train.sh` and `pi/detect.py` do today.
+This 09-25 handoff records early phone-footage choices. Its defaults are no
+longer the current Night Owl detector recipe. The model now uses YOLO11n on
+grayscale full frames with rat and person classes. Use the [runbook](RUNBOOK.md)
+for current commands and the [V5 formal event result](V5_FORMAL_EVENT_RESULTS.md)
+for the failed no-plush test. Keep the questions below as a record, not a plan
+to relabel frozen test footage.
+
+Written 09-25 evening, rebuilt 09-26. Each question describes its context,
+default at the time, and the decision then needed.
 
 ## Data state this morning
 
