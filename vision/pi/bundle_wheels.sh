@@ -10,10 +10,6 @@
 #   PIP_WHEEL=$(find wheels -maxdepth 1 -name 'pip-*.whl' -print -quit)
 #   PYTHONPATH="$PIP_WHEEL" .venv/bin/python -m pip install --no-index --find-links wheels/ -r runtime-requirements.txt
 #
-# (use `python3 -m pip ... --break-system-packages` on Trixie if you are not in a venv; a venv is
-# cleaner: `python3 -m venv --system-site-packages ~/venv && . ~/venv/bin/activate`, the
-# --system-site-packages keeps apt's gpiozero visible).
-#
 # The version must match exactly: a cp313 wheel does not install on 3.12. That is the hour-6 risk
 # in the README; run this again with the right version if selftest.py's system section fails.
 set -euo pipefail

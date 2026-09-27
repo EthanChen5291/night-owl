@@ -21,7 +21,9 @@ Wi-Fi), so the wheels travel with the code and the camera is driven through `rpi
 The candidate can be checked without using the camera, posting to the API, or replacing the
 running Owl agent. These commands stage files under a new home-directory slot. Run them only
 after SSH is stable. Set `PI_TARGET` to the reachable Pi SSH address; the example candidate
-hash is for the expanded V3 export.
+hash is for the expanded V3 export. V3 failed the independent test because it repeatedly
+mistook a chair for the plush. Use this example only to check Pi package compatibility and
+inference speed while the next candidate is prepared; it is not a demo model.
 
 ```sh
 PI_TARGET=pi@<pi-address>
@@ -44,7 +46,7 @@ glibc 2.41, and Python 3.13.5. If its interpreter or architecture changes, rebui
 before installing. If `venv` is unavailable, stop here and arrange a separate setup step.
 
 ```sh
-ssh "$PI_TARGET" 'cd "$HOME/barn-owl-candidates/v3-3214f2a0" && sha256sum -c wheels/SHA256SUMS && sha256sum rat.onnx'
+ssh "$PI_TARGET" 'cd "$HOME/barn-owl-candidates/v3-3214f2a0" && (cd wheels && sha256sum -c SHA256SUMS) && sha256sum rat.onnx'
 # Expected model SHA256: 3214f2a0dbe1699016b8f4e8aaa8d4c7c5eb3d5e365a07f26a2efbe13114672b
 ssh "$PI_TARGET" 'cd "$HOME/barn-owl-candidates/v3-3214f2a0" && python3 -m venv --without-pip .venv && PIP_WHEEL=$(find wheels -maxdepth 1 -name "pip-*.whl" -print -quit) && PYTHONPATH="$PWD/$PIP_WHEEL" .venv/bin/python -m pip install --no-index --find-links "$PWD/wheels" -r runtime-requirements.txt'
 ssh "$PI_TARGET" 'cd "$HOME/barn-owl-candidates/v3-3214f2a0" && .venv/bin/python selftest.py --only detector --model "$PWD/rat.onnx"'
