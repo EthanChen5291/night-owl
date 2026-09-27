@@ -1,9 +1,9 @@
 """Render short Barn Owl training clips from saved, real run artifacts.
 
 Run with vision/.venv/bin/python. Requires ffmpeg on PATH. The video uses only
-V3 training history and the fixed zoom15_b validation clip, which was reused
-for model selection. It never reads the independent test recordings. V1 retains
-its historical pre-test captions; V2 adds the measured independent result.
+Saved training history and the fixed zoom15_b validation clip, which was reused
+for model selection. It never reads independent test recordings. V1 and V2
+retain the historical V3 captions; V3 uses the locked V4 candidate and report.
 """
 
 from __future__ import annotations
@@ -22,9 +22,6 @@ from ultralytics import YOLO
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN = ROOT / "vision/runs/modal-rat-v3-expanded-20260926"
-CSV = RUN / "results.csv"
-MODEL = RUN / "rat.onnx"
 CLIP = ROOT / "vision/clips/zoom15_b.mp4"
 OUT_DIR = ROOT / "pitch/out"
 W, H, FPS = 1280, 720, 15
@@ -68,11 +65,12 @@ def intro_frame(i: int, count: int, version: str) -> Image.Image:
     label(d, (84, 230), "Plush detector training", 52, MINT)
     d.rectangle((84, 340, 1180, 344), fill=TEAL)
     label(d, (84, 405), "Real training log. Recorded camera footage.", 34, INK)
-    label(d, (84, 615), f"Room-lit toy rat  |  V3 candidate  |  26 Sep 2026  |  {version.upper()}", 23, MUTED)
+    candidate = "V4" if version == "v3" else "V3"
+    label(d, (84, 615), f"Room-lit toy rat  |  {candidate} candidate  |  26 Sep 2026  |  {version.upper()}", 23, MUTED)
     return im
 
 
-def chart_frame(i: int, count: int, rows: list[dict]) -> Image.Image:
+def chart_frame(i: int, count: int, rows: list[dict], version: str) -> Image.Image:
     im, d = canvas()
     label(d, (80, 46), "150 epochs from the saved training log", 48, INK, True)
     label(d, (82, 111), "Trainer validation mAP50, both classes", 27, MINT)
@@ -95,7 +93,8 @@ def chart_frame(i: int, count: int, rows: list[dict]) -> Image.Image:
         d.line(pts, fill=TEAL, width=6, joint="curve")
     x, y = pts[-1]
     d.ellipse((x-8, y-8, x+8, y+8), fill=MINT)
-    label(d, (85, 625), "Source: results.csv from the completed V3 training run", 24, MUTED)
+    candidate = "V4" if version == "v3" else "V3"
+    label(d, (85, 625), f"Source: results.csv from the completed {candidate} training run", 24, MUTED)
     label(d, (85, 660), "Fixed validation clips were reused while tuning", 22, MUTED)
     return im
 
@@ -112,10 +111,11 @@ def fitted_crop(frame: np.ndarray, box: list[float]) -> Image.Image:
 
 
 def footage_frame(frame: np.ndarray, box: list[float] | None,
-                  conf: float | None) -> Image.Image:
+                  conf: float | None, version: str) -> Image.Image:
     im, d = canvas()
     label(d, (80, 40), "ONNX inference on recorded camera footage", 43, INK, True)
-    label(d, (82, 96), "Held-out metal-table clip used during tuning  |  room light", 23, MINT)
+    subtitle = "Metal-table validation clip used during tuning" if version == "v3" else "Held-out metal-table clip used during tuning"
+    label(d, (82, 96), f"{subtitle}  |  room light", 23, MINT)
 
     raw = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)).resize((720, 540), Image.Resampling.BILINEAR)
     im.paste(raw, (80, 145))
@@ -139,6 +139,17 @@ def footage_frame(frame: np.ndarray, box: list[float] | None,
 
 def closing_frame(i: int, count: int, version: str) -> Image.Image:
     im, d = canvas()
+    if version == "v3":
+        label(d, (80, 56), "V4 rat AP50: tuned vs reserved", 49, INK, True)
+        label(d, (82, 126), "Locked ONNX  |  square-416 box evaluation", 26, MINT)
+        label(d, (80, 225), ".958", 90, TEAL, True)
+        label(d, (81, 337), "Tuned validation  |  49 frames", 28, INK)
+        label(d, (651, 225), ".926", 90, TEAL, True)
+        label(d, (651, 337), "Reserved clips  |  59 frames", 28, INK)
+        d.rectangle((80, 475, 1190, 479), fill=GRID)
+        label(d, (81, 520), "Same camera, table, and capture session", 36, CORAL, True)
+        label(d, (81, 619), "New-room and live Pi tests pending  |  AP50 is not accuracy", 24, MUTED)
+        return im
     if version == "v2":
         label(d, (80, 56), "Rat AP50: tuned vs independent", 49, INK, True)
         label(d, (82, 126), "V3 candidate  |  fixed validation clips reused during tuning", 26, MINT)
@@ -165,16 +176,20 @@ def closing_frame(i: int, count: int, version: str) -> Image.Image:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", choices=["v1", "v2"], default="v2")
+    parser.add_argument("--version", choices=["v1", "v2", "v3"], default="v3")
     args = parser.parse_args()
+    run_name = "modal-rat-v4-20260926" if args.version == "v3" else "modal-rat-v3-expanded-20260926"
+    run = ROOT / "vision/runs" / run_name
+    csv_path = run / "results.csv"
+    model_path = run / "rat.onnx"
     out = OUT_DIR / f"barn-owl-training-demo-{args.version}.mp4"
     preview_dir = ROOT / f"pitch/.build/training-video-preview-{args.version}"
-    rows = list(csv.DictReader(CSV.open(newline="")))
+    rows = list(csv.DictReader(csv_path.open(newline="")))
     assert len(rows) == 150
     out.parent.mkdir(parents=True, exist_ok=True)
     preview_dir.mkdir(parents=True, exist_ok=True)
 
-    model = YOLO(str(MODEL), task="detect")
+    model = YOLO(str(model_path), task="detect")
     cap = cv2.VideoCapture(str(CLIP))
     if not cap.isOpened():
         raise RuntimeError(f"Cannot read {CLIP}")
@@ -200,7 +215,7 @@ def main() -> None:
     for i in range(counts["intro"]):
         emit(intro_frame(i, counts["intro"], args.version), "intro.png" if i == 0 else None)
     for i in range(counts["chart"]):
-        emit(chart_frame(i, counts["chart"], rows), "chart.png" if i == counts["chart"]-1 else None)
+        emit(chart_frame(i, counts["chart"], rows, args.version), "chart.png" if i == counts["chart"]-1 else None)
 
     for i in range(counts["footage"]):
         t = 62.0 + i / FPS
@@ -210,12 +225,13 @@ def main() -> None:
             raise RuntimeError(f"No source frame at {t:.2f}s")
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         three = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-        result = model.predict(three, imgsz=416, conf=0.35, iou=0.7, verbose=False)[0]
+        runtime_conf = 0.70 if args.version == "v3" else 0.35
+        result = model.predict(three, imgsz=416, conf=runtime_conf, iou=0.7, verbose=False)[0]
         rats = [b for b in result.boxes if int(b.cls.item()) == 0]
         best = max(rats, key=lambda b: float(b.conf.item())) if rats else None
         box = best.xyxy[0].tolist() if best is not None else None
         conf = float(best.conf.item()) if best is not None else None
-        emit(footage_frame(frame, box, conf), "footage.png" if i == 20 else None)
+        emit(footage_frame(frame, box, conf, args.version), "footage.png" if i == 20 else None)
     cap.release()
 
     for i in range(counts["close"]):
@@ -226,7 +242,7 @@ def main() -> None:
         raise RuntimeError("ffmpeg encode failed")
     assert written == total
     print(f"Wrote {out} ({total/FPS:.1f}s, {W}x{H}, {FPS}fps)")
-    for p in (CSV, MODEL, CLIP, out):
+    for p in (csv_path, model_path, CLIP, out):
         print(f"SHA256 {p.relative_to(ROOT)} {input_hash(p)}")
 
 
