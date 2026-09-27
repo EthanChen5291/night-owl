@@ -166,3 +166,27 @@ def test_history_query_rejections(tmp_path):
         for item in bad:
             response = client.post("/dashboards/query", json=item)
             assert response.status_code == 400, item
+
+
+def test_inspection_history_query_exposes_exact_chart_columns(tmp_path):
+    with TestClient(create_app(data_dir=REPO, events_file=tmp_path / "events.jsonl")) as client:
+        result = client.post("/dashboards/query", json=query(
+            "borough_months", ["n_inspections", "n_active"], "sum", group_by="month",
+            start="2025-01", end="2025-03")).json()
+        assert [column["key"] for column in result["columns"]] == ["month", "n_inspections", "n_active"]
+        assert result["chart_schema"]["suggested_x"] == "month"
+        assert result["chart_schema"]["numeric_y"] == ["n_inspections", "n_active"]
+        assert len(result["rows"]) == 3
+
+
+def test_sort_rejection_keeps_requested_measure_out_of_result(tmp_path):
+    with TestClient(create_app(data_dir=REPO, events_file=tmp_path / "events.jsonl")) as client:
+        response = client.post("/dashboards/query", json=query(
+            "zips", ["complaints_per_year_post"], "raw", group_by="neighborhood",
+            sort_by="median_income", direction="desc", limit=10))
+        assert response.status_code == 400
+        assert "add the field to metrics" in response.json()["detail"]
+        fixed = client.post("/dashboards/query", json=query(
+            "zips", ["complaints_per_year_post", "median_income"], "raw", group_by="neighborhood",
+            sort_by="median_income", direction="desc", limit=10)).json()
+        assert fixed["chart_schema"]["numeric_y"] == ["complaints_per_year_post", "median_income"]

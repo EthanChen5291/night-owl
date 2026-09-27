@@ -54,7 +54,7 @@ export interface AgentStep { text: string; detail?: string; error?: boolean }
 export type DashboardEvent =
   | { type: 'status'; text: string }
   | { type: 'step'; text: string; detail?: string; error?: boolean }
-  | { type: 'thinking'; text: string }
+  | { type: 'thinking'; text: string; round?: number }
   | { type: 'delta'; text: string }
   | { type: 'dashboard'; dashboard: DashboardArtifact }
   | { type: 'done' }

@@ -121,7 +121,19 @@ DATASETS = {
 
 
 class DashboardError(ValueError):
-    pass
+    def __init__(self, message: str, repair: dict | None = None):
+        super().__init__(message)
+        self.repair = repair
+
+
+def chart_schema(result: dict) -> dict:
+    """Exact output fields for a chart built from this query result."""
+    query = result["query"]
+    label = query.get("group_by") or ("scope" if query["aggregation"] != "raw" else None)
+    columns = result["columns"]
+    return {"query": query, "columns": columns,
+            "suggested_x": label,
+            "numeric_y": [column["key"] for column in columns if column["key"] != label]}
 
 
 def catalog(store: Store | None = None) -> dict:
@@ -266,7 +278,9 @@ def validate_query(raw: Any) -> dict:
     sort_by = raw.get("sort_by")
     if sort_by is not None and (not isinstance(sort_by, str) or (split is None and sort_by not in output_fields) or len(sort_by) > 200):
         raise DashboardError(f"sort_by must be an output column; this query returns {', '.join(sorted(output_fields))}"
-                             " (add the field to metrics to sort by it)")
+                             " (add the field to metrics to sort by it)",
+                             {"available_columns": sorted(output_fields), "requested_sort_by": sort_by[:200] if isinstance(sort_by, str) else None,
+                              "hint": "Add the sort field to metrics, or sort by a returned column."})
     return {"dataset": dataset, **({"group_by": group} if group is not None else {}),
             **({"split_by": split} if split is not None else {}),
             "metrics": metrics, "aggregation": aggregation,
@@ -412,7 +426,9 @@ def run_query(store: Store, raw: Any) -> dict:
     keys = {column["key"] for column in columns}
     sort_by = query.get("sort_by") or (group if group else None)
     if sort_by is not None and sort_by not in keys:
-        raise DashboardError(f"sort_by must be an output column; this query returns {', '.join(column['key'] for column in columns)}")
+        raise DashboardError(f"sort_by must be an output column; this query returns {', '.join(column['key'] for column in columns)}",
+                             {"available_columns": [column["key"] for column in columns], "requested_sort_by": sort_by,
+                              "hint": "Use one of these exact returned columns as sort_by."})
     if sort_by:
         present = [row for row in output if row.get(sort_by) is not None]
         missing = [row for row in output if row.get(sort_by) is None]
@@ -433,7 +449,9 @@ def run_query(store: Store, raw: Any) -> dict:
                         label = "Area median household income (ACS)"
                     column["label"] = f"Mean {label[:1].lower() + label[1:]} per {row_unit}"
     total = len(output)
-    return {"rows": output[:query["limit"]], "columns": columns, "source": source, "total_rows": total, "query": query}
+    result = {"rows": output[:query["limit"]], "columns": columns, "source": source, "total_rows": total, "query": query}
+    result["chart_schema"] = chart_schema(result)
+    return result
 
 
 def render_dashboard(store: Store, raw: Any, version: Any = 1) -> dict:
@@ -456,28 +474,36 @@ def render_dashboard(store: Store, raw: Any, version: Any = 1) -> dict:
         kind = card.get("kind")
         if kind not in ("bar", "line", "scatter", "table", "metric"):
             raise DashboardError("invalid chart kind")
-        result = run_query(store, card.get("query"))
+        try:
+            result = run_query(store, card.get("query"))
+        except DashboardError as exc:
+            raise DashboardError(f"card '{ident}': {exc}",
+                                 {"card_id": ident, **(exc.repair or {})}) from exc
         keys = {c["key"] for c in result["columns"]}
         x, y = card.get("x"), card.get("y")
         if not isinstance(x, str) or x not in keys or not isinstance(y, list) or len(y) > MAX_SERIES or any(not isinstance(k, str) or k not in keys for k in y) or len(set(y)) != len(y):
             wanted = [x] + (y if isinstance(y, list) else [])
             missing = [str(k)[:40] for k in wanted if not isinstance(k, str) or k not in keys]
             raise DashboardError(f"card '{ident}': x and up to {MAX_SERIES} distinct y keys must be columns of its own query result; "
-                                 f"missing {', '.join(missing) or 'none'}; returned {', '.join(c['key'] for c in result['columns'])}")
+                                 f"missing {', '.join(missing) or 'none'}; returned {', '.join(c['key'] for c in result['columns'])}",
+                                 {"card_id": ident, **result["chart_schema"]})
         if kind != "table" and not y:
-            raise DashboardError("chart requires a y metric")
+            raise DashboardError(f"card '{ident}': chart requires a y metric", {"card_id": ident, **result["chart_schema"]})
         if kind == "metric" and len(y) != 1:
-            raise DashboardError("metric card requires one y metric")
+            raise DashboardError(f"card '{ident}': metric card requires one y metric", {"card_id": ident, **result["chart_schema"]})
         label_key = result["query"].get("group_by") or ("scope" if result["query"]["aggregation"] != "raw" else None)
         numeric = keys - {label_key}
         if any(k not in numeric for k in y) or (kind == "scatter" and x not in numeric):
-            raise DashboardError(f"card '{ident}': chart y and scatter x must be numeric metrics, not the {label_key} column")
+            raise DashboardError(f"card '{ident}': chart y and scatter x must be numeric metrics, not the {label_key} column",
+                                 {"card_id": ident, **result["chart_schema"]})
         if kind in ("bar", "line") and len({next(c["unit"] for c in result["columns"] if c["key"] == k) for k in y}) > 1:
-            raise DashboardError(f"card '{ident}': chart y metrics must share a unit; use separate cards")
+            raise DashboardError(f"card '{ident}': chart y metrics must share a unit; use separate cards",
+                                 {"card_id": ident, **result["chart_schema"]})
         if kind == "metric" and len(result["rows"]) != 1:
-            raise DashboardError("metric card needs a single result row")
+            raise DashboardError(f"card '{ident}': metric card needs a single result row",
+                                 {"card_id": ident, **result["chart_schema"]})
         if x in y:
-            raise DashboardError("chart x and y must differ")
+            raise DashboardError(f"card '{ident}': chart x and y must differ", {"card_id": ident, **result["chart_schema"]})
         cleaned.append({"id": ident, "title": _text(card.get("title"), "card title", 120), "kind": kind,
                         "query": result["query"], "x": x, "y": y,
                         **({"description": _text(card["description"], "card description", 400)} if "description" in card else {})})

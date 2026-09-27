@@ -320,3 +320,119 @@ def test_query_budget_skips_extra_queries_but_still_publishes(tmp_path, monkeypa
     # The provider sees one shared input list, so filter to the query outputs of the first round.
     outputs = [item for item in inputs[1]["input"] if item.get("type") == "function_call_output" and item["call_id"].startswith("q")]
     assert len(outputs) == dashboard_agent.MAX_QUERIES + 2 and "budget" in outputs[-1]["output"] and "rows" in outputs[0]["output"]
+
+
+def test_inspection_history_recovers_from_sort_and_card_columns(tmp_path, monkeypatch):
+    monkeypatch.setenv("XAI_API_KEY", "mock-only")
+    dashboard_agent._hits.clear()
+    valid_query = {"dataset": "borough_months", "group_by": "month", "metrics": ["n_inspections", "n_active"],
+                   "aggregation": "sum", "start": "2025-01", "end": "2025-03"}
+    bad_query = {**valid_query, "sort_by": "active_rate"}
+    bad_spec = {"title": "Inspection results over time", "description": "Observed monthly inspections and findings",
+                "cards": [{"id": "inspections", "title": "Inspections", "kind": "line", "query": valid_query,
+                           "x": "year", "y": ["n_inspections", "n_active"]}]}
+    good_spec = {**bad_spec, "cards": [{**bad_spec["cards"][0], "x": "month"}]}
+    rounds = iter([
+        ({"output": [{"type": "function_call", "name": "query_data", "call_id": "q1",
+                      "arguments": json.dumps({"query": bad_query})}]}, "I will check the data."),
+        ({"output": [{"type": "function_call", "name": "query_data", "call_id": "q2",
+                      "arguments": json.dumps({"query": valid_query})}]}, "The corrected query is ready."),
+        ({"output": [{"type": "function_call", "name": "publish_dashboard", "call_id": "p1",
+                      "arguments": json.dumps({"spec": bad_spec})}]}, "Publishing now."),
+        ({"output": [{"type": "function_call", "name": "publish_dashboard", "call_id": "p2",
+                      "arguments": json.dumps({"spec": good_spec})}]}, "Repairing the axes."),
+        ({"output": [{"type": "message", "content": [{"type": "output_text", "text": "Monthly inspection results are ready."}]}]},
+         "Monthly inspection results are ready."),
+    ])
+    inputs = []
+
+    def provider(body, emit):
+        inputs.append(body)
+        response, prose = next(rounds)
+        emit("delta", prose)
+        return response
+
+    monkeypatch.setattr(dashboard_agent, "_provider", provider)
+    with TestClient(create_app(data_dir=REPO, events_file=tmp_path / "events.jsonl")) as client:
+        events = frames(client.post("/dashboards/chat", json={"message": "Show how inspection results changed over time"}))
+    q_error = json.loads(next(item["output"] for item in inputs[1]["input"]
+                              if item.get("type") == "function_call_output" and item.get("call_id") == "q1"))
+    assert q_error["repair"]["available_columns"] == ["month", "n_active", "n_inspections"]
+    q_success = json.loads(next(item["output"] for item in inputs[2]["input"]
+                                if item.get("type") == "function_call_output" and item.get("call_id") == "q2"))
+    assert q_success["chart_schema"]["suggested_x"] == "month"
+    assert q_success["chart_schema"]["numeric_y"] == ["n_inspections", "n_active"]
+    p_error = json.loads(next(item["output"] for item in inputs[3]["input"]
+                              if item.get("type") == "function_call_output" and item.get("call_id") == "p1"))
+    assert p_error["repair"]["card_id"] == "inspections"
+    assert [column["key"] for column in p_error["repair"]["columns"]] == ["month", "n_inspections", "n_active"]
+    assert [event["type"] for event in events].count("dashboard") == 1
+    assert "Publishing now." not in "".join(event["text"] for event in events if event["type"] == "delta")
+    assert [event["round"] for event in events if event["type"] == "thinking"] == [1, 2, 3, 4]
+    assert events[-1]["type"] == "done" and not any(event["type"] == "error" for event in events)
+
+
+def test_failed_publish_cannot_end_with_false_success(tmp_path, monkeypatch):
+    monkeypatch.setenv("XAI_API_KEY", "mock-only")
+    dashboard_agent._hits.clear()
+    bad_spec = {**SPEC, "cards": [{**SPEC["cards"][0], "x": "month"}]}
+    responses = iter([
+        {"output": [{"type": "function_call", "name": "publish_dashboard", "call_id": "p1",
+                     "arguments": json.dumps({"spec": bad_spec})}]},
+        {"output": [{"type": "message", "content": [{"type": "output_text", "text": "Published the dashboard."}]}]},
+    ])
+
+    def provider(_body, emit):
+        emit("delta", "Published the dashboard.")
+        return next(responses)
+
+    monkeypatch.setattr(dashboard_agent, "_provider", provider)
+    with TestClient(create_app(data_dir=REPO, events_file=tmp_path / "events.jsonl")) as client:
+        events = frames(client.post("/dashboards/chat", json={"message": "Show inspection history"}))
+    assert not any(event["type"] == "dashboard" for event in events)
+    assert not any(event["type"] == "delta" for event in events)
+    assert any(event["type"] == "error" and "could not publish" in event["text"] for event in events)
+    assert events[-1]["type"] == "done"
+
+
+def test_repeated_publish_rejection_exhausts_rounds_without_final_answer(tmp_path, monkeypatch):
+    monkeypatch.setenv("XAI_API_KEY", "mock-only")
+    dashboard_agent._hits.clear()
+    bad_spec = {**SPEC, "cards": [{**SPEC["cards"][0], "x": "month"}]}
+    calls = 0
+
+    def provider(_body, emit):
+        nonlocal calls
+        calls += 1
+        emit("delta", "Publishing now.")
+        return {"output": [{"type": "function_call", "name": "publish_dashboard", "call_id": f"p{calls}",
+                            "arguments": json.dumps({"spec": bad_spec})}]}
+
+    monkeypatch.setattr(dashboard_agent, "_provider", provider)
+    with TestClient(create_app(data_dir=REPO, events_file=tmp_path / "events.jsonl")) as client:
+        events = frames(client.post("/dashboards/chat", json={"message": "Show inspection history"}))
+    assert calls == dashboard_agent.MAX_ROUNDS
+    assert dashboard_agent.MAX_QUERIES == 20
+    assert sum(event["type"] == "step" and event.get("error", False) for event in events) == calls
+    assert not any(event["type"] in ("dashboard", "delta") for event in events)
+    assert events[-2]["type"] == "error" and events[-1]["type"] == "done"
+
+
+def test_malformed_publish_json_cannot_end_with_false_success(tmp_path, monkeypatch):
+    monkeypatch.setenv("XAI_API_KEY", "mock-only")
+    dashboard_agent._hits.clear()
+    responses = iter([
+        {"output": [{"type": "function_call", "name": "publish_dashboard", "call_id": "p1", "arguments": "{"}]},
+        {"output": [{"type": "message", "content": [{"type": "output_text", "text": "Published the dashboard."}]}]},
+    ])
+
+    def provider(_body, emit):
+        emit("delta", "Published the dashboard.")
+        return next(responses)
+
+    monkeypatch.setattr(dashboard_agent, "_provider", provider)
+    with TestClient(create_app(data_dir=REPO, events_file=tmp_path / "events.jsonl")) as client:
+        events = frames(client.post("/dashboards/chat", json={"message": "Show inspection history"}))
+    assert any(event["type"] == "step" and event.get("error") for event in events)
+    assert not any(event["type"] in ("dashboard", "delta") for event in events)
+    assert events[-2]["type"] == "error" and events[-1]["type"] == "done"

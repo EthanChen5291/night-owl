@@ -78,13 +78,16 @@ PUBLISH_TOOL = {
 
 SYSTEM = """You build editable Night Owl dashboards from the supplied catalog and tool results. Never invent numbers.
 First use query_data to inspect relevant data, then publish_dashboard with 1–6 valid cards. Use the exact column keys
-from the query results for x and y. Explain the result briefly after publishing, naming what each chart measures.
+from each query's chart_schema for x and y. Explain the result briefly after publishing, naming what each chart measures.
 Datasets: cells and sites are one model month with no dates. backtest is a monthly citywide validation series.
 borough_months (one row per borough per month since 2010), zip_years (one row per ZIP code area per year) and zips
 (one row per ZIP code area comparing 2017–2019 with 2022–2025) come from NYC Open Data 311 rodent complaints, DOHMH
 initial inspections and ACS income. Use borough_months for borough trends and COVID comparisons, zip_years for
 income-band or neighborhood trends, and zips with sort_by and limit for rankings. "Richest" or "poorest" areas mean
 ZIP code areas ranked by ACS median household income; the only cities are NYC boroughs and ZIP code areas.
+For how inspection results changed over time, use borough_months or zip_years with n_inspections, n_active,
+or active_rate. The backtest precision fields measure how selection methods predicted positives among swept cells;
+they do not show the observed inspection trend the user asked for.
 The borough_months COVID period starts in March 2020. The zip_years COVID period covers calendar years 2020–2021,
 including January–February 2020; use borough_months when the March boundary matters.
 Use filters to narrow rows (for example filters {"borough": ["Bronx", "Manhattan"]} or {"period": "after COVID"}).
@@ -97,8 +100,9 @@ ZIP rankings cover the eligible areas described in the catalog, not every NYC ZI
 311 complaints and inspection findings are not rat counts, so say which one a chart shows. Model B estimates
 active rat signs conditional on inspection. Event counts include queued detections, including rejected ones.
 In publish_dashboard, each card's x and y must be column keys returned by that card's own query (a pivot returns
-the split values as keys; a ranking must list its sort_by field in metrics). If a card is rejected, fix only that
-card and publish again.
+the split values as keys; a ranking must list its sort_by field in metrics). The tool returns a card-specific
+chart_schema after a column error; use its exact columns to fix that card and publish again. Do not change the
+meaning of a card merely to pass validation.
 For follow-ups, revise the supplied dashboard using the user's chart selection; preserve useful cards. Do not claim a
 chart exists until publish_dashboard succeeds. Use only the Night Owl data tools. Do not make external research
 claims, request URLs or files, execute code, or ask for secrets."""
@@ -315,9 +319,11 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
     artifact = None
     text = ""
     queries_used = 0
+    publish_attempted = False
     for round_index in range(MAX_ROUNDS):
         yield {"type": "status", "text": "Thinking"}
-        round_text = ""
+        round_text: list[str] = []
+        had_summary = False
         response: dict = {}
         async with aclosing(_round({"model": model, "input": context, "tools": tools,
                                     "store": False, "max_output_tokens": 2500})) as provider_stream:
@@ -325,25 +331,30 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
                 if kind == "response":
                     response = value
                 elif kind == "thinking":
-                    yield {"type": "thinking", "text": value}
-                elif kind == "delta" and len(text) < MAX_TEXT:
-                    separator = "\n\n" if not round_text and text and not text.endswith("\n") else ""
-                    piece = (separator + value)[:MAX_TEXT - len(text)]
-                    if piece:
-                        round_text += piece
-                        text += piece
-                        yield {"type": "delta", "text": piece}
+                    had_summary = True
+                    yield {"type": "thinking", "round": round_index + 1, "text": value}
+                elif kind == "delta":
+                    round_text.append(value)
         output = response["output"]
         context.extend(output)
         calls = [item for item in output if isinstance(item, dict) and item.get("type") == "function_call"]
-        if not calls:
-            if not round_text:  # final text may be unstreamed after an earlier tool round streamed prose
-                final = _output_text(response).strip()[:MAX_TEXT - len(text)]
+        spoken = "".join(round_text) or _output_text(response)
+        if calls:
+            if spoken:
+                yield {"type": "thinking", "round": round_index + 1,
+                       "text": ("\n\n" if had_summary else "") + spoken[:MAX_THINKING]}
+        else:
+            if publish_attempted and artifact is None:
+                raise DashboardError("The assistant could not publish the dashboard. Try a more specific request.")
+            final_pieces = round_text or ([spoken] if spoken else [])
+            for index, piece in enumerate(final_pieces):
+                if index == 0 and text and not text.endswith("\n"):
+                    piece = "\n\n" + piece
+                final = piece[:MAX_TEXT - len(text)]
                 if final:
-                    if text and not text.endswith("\n"):
-                        final = ("\n\n" + final)[:MAX_TEXT - len(text)]
                     text += final
                     yield {"type": "delta", "text": final}
+        if not calls:
             break
         for call in calls:
             name, call_id = call.get("name"), call.get("call_id")
@@ -351,6 +362,8 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
                 raise DashboardError("xAI returned an invalid tool call")
             summary = name or "?"
             try:
+                if name == "publish_dashboard":
+                    publish_attempted = True
                 args = json.loads(call.get("arguments") or "{}")
                 if not isinstance(args, dict):
                     raise DashboardError("tool arguments must be an object")
@@ -392,6 +405,8 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
                        "detail": str(exc)[:160], "error": True}
                 log.info("tool %s -> rejected: %s", summary, str(exc)[:200])
                 result = {"error": str(exc)[:300]}
+                if exc.repair is not None:
+                    result["repair"] = exc.repair
             except Exception:  # noqa: BLE001 - provider tool arguments must never expose internal errors
                 yield {"type": "step", "text": "Dashboard rejected" if name == "publish_dashboard" else "Query rejected",
                        "detail": "The data tool failed", "error": True}

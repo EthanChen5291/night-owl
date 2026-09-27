@@ -145,8 +145,19 @@
 .dx-trace-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 2px 0; border: 0; background: none; color: var(--dx-muted); }
 .dx-trace-toggle:hover { color: var(--dx-ink); }
 .dx-trace-body { margin: 8px 0 2px 4px; padding-left: 14px; border-left: 1px solid var(--dx-line); animation: dx-fade 0.3s ease both; }
-.dx-thinking { margin: 0 0 8px; color: color-mix(in srgb, var(--dx-ink) 74%, transparent); font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.dx-thinking { margin: 0 0 8px; color: color-mix(in srgb, var(--dx-ink) 74%, transparent); font-size: 13px; line-height: 1.55; }
 .dx-thinking:last-child { margin-bottom: 0; }
+.dx-thinking-round + .dx-thinking-round { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--dx-line); }
+.dx-thinking-label { display: block; margin-bottom: 4px; color: var(--dx-faint); font-size: 11px; font-weight: 600; }
+.dx-thinking-content p { margin: 0 0 7px; }
+.dx-thinking-content > :last-child { margin-bottom: 0; }
+.dx-thinking-content h4 { margin: 9px 0 4px; color: var(--dx-ink); font-size: 13px; font-weight: 600; }
+.dx-thinking-content h4:first-child { margin-top: 0; }
+.dx-thinking-content ul, .dx-thinking-content ol { margin: 3px 0 7px; padding-left: 20px; }
+.dx-thinking-content li { margin: 2px 0; }
+.dx-thinking-content code { padding: 1px 4px; border-radius: 3px; background: var(--dx-hover-2); }
+.dx-thinking-content pre { overflow-x: auto; margin: 6px 0; padding: 8px; border-radius: 5px; background: var(--dx-hover-2); }
+.dx-thinking-content pre code { padding: 0; background: none; }
 .dx-thinking.tail {
   max-height: 7.75em; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
 }
