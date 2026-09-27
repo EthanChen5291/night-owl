@@ -29,7 +29,7 @@ interface Props {
   onView: SceneCallbacks['onView']
 }
 
-/** The live scene, for callers outside React's data flow (the assistant's map screenshot). */
+/** Exposes the mounted scene to the assistant's screenshot tool. */
 export const sceneHandle: { current: CityScene | null } = { current: null }
 
 /** The only component that touches three.js. Owns one CityScene for the life of the canvas. */

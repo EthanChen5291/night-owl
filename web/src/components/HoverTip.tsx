@@ -47,7 +47,7 @@ export default function HoverTip({ info, mode, cell, node, area, placing }: Prop
       {v !== null && (
         <div className="hovertip-sub muted">
           {MODE_UNIT[mode]} <b>{mode === 'silence' ? (v > 0 ? '+' : '') + v.toFixed(0) : v.toFixed(0) + '%'}</b>
-          {cell && cell.posterior.n_events > 0 && <span> · {cell.posterior.n_events} sightings</span>}
+          {cell && cell.posterior.n_events > 0 && <span> · {cell.posterior.n_events} accepted events</span>}
         </div>
       )}
     </div>

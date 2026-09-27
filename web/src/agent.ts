@@ -1,4 +1,4 @@
-// The Barn Owl assistant's wire protocol (api/agent.py): POST /api/agent/chat, Server-Sent Events back.
+// Assistant chat streams responses from POST /api/agent/chat using Server-Sent Events.
 // The browser keeps the history and runs the "client tools" (things only the page knows) between rounds.
 
 export type AgentEvent =

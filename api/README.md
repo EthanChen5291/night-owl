@@ -1,9 +1,9 @@
-# api/ — Barn Owl demo hub
+# Night Owl API
 
-FastAPI server that sits between the Pi node, the model output and the web app. It serves the frozen JSON
-contract (`plan/master-plan.md` §6), takes `POST /event` from `vision/pi/detect.py`, keeps one
-Beta-Binomial posterior per H3 cell and month (plan §4) and overlays it on `/cells` so the map moves when the prop
-is waved on stage (plan §9).
+This FastAPI server connects the Pi detector, Sanjavan's city-model exports, and the web app. It accepts
+the event contract in [the master plan](../plan/master-plan.md), keeps a separate probability estimate
+for each H3 cell and month, and serves the updated cells and site plan to the map. The detector targets
+the team's plush prop in room light; an event is sensor evidence, not a retrained city model.
 
 ## Run
 
@@ -15,7 +15,7 @@ uv run --project api uvicorn main:app --app-dir api --host 0.0.0.0 --port 8000
 
 Tests: `uv run --project api pytest -q api/tests`
 
-Stage fallback when the node or the network is dead (plan §9 step 2):
+To rehearse the map without the Pi, use this canned event against an isolated API:
 
 ```
 ./api/fake_event.sh                  # POST fixtures/event.demo.json to localhost:8000 with ts = now
@@ -24,20 +24,20 @@ API=http://192.168.7.1:8000 ./api/fake_event.sh
 
 Reset between rehearsals: `curl -X DELETE -H 'X-Demo-Reset: yes' localhost:8000/events`
 
-The scripts below post staged sightings with fresh timestamps. Both change the API's persisted queue and
-posterior. Use them only against an isolated rehearsal API, reset afterward, and never treat their
-events as Pi detections or evaluation evidence.
+The scripts below also post staged sightings with fresh timestamps. Both change the persisted queue and
+cell probabilities. Reset afterward. Their events are demo fixtures, not Pi detections or evaluation evidence.
 
 ```
 ./api/fake_sightings.py        # 15 sightings: grayscale crops of the rat prop from the team's own footage
-./api/real_sightings.py        # 17 sightings: real wild rats and house mice in daylight, dusk, flash, torchlight and unlit subway track
+./api/real_sightings.py        # 17 staged sightings with wild rat and mouse photo crops
 ```
 
-`fake_sightings.py` uses rat-prop crops from team footage. `real_sightings.py` cuts openly licensed
-Wikimedia Commons photos to the node's crop format (grayscale by default,
-`--colour` to keep colour). The photos themselves are re-downloaded with `--fetch` into `api/fixtures/rodents/`
-(gitignored); the crops are baked into `fixtures/events.real.json`, and `fixtures/rodents.credits.json` has the
-author and licence of every photo. Attribute CC BY and CC BY-SA images if a crop appears on a slide.
+`fake_sightings.py` uses plush-prop crops from team footage. `real_sightings.py` uses openly licensed
+Wikimedia Commons photos, cut to the node's crop format. Its node IDs, H3 cells, and times are invented;
+some photos show mice although the event schema calls the class `rat`. It is an illustration, not a
+sample from the detector. The original photos can be fetched with `--fetch` into the gitignored
+`api/fixtures/rodents/`. The baked crops are in `fixtures/events.real.json`, with authors, licenses,
+and source links in `fixtures/rodents.credits.json`. Attribute CC BY and CC BY-SA images on slides.
 
 ## Endpoints (contract §6)
 
@@ -51,6 +51,7 @@ author and licence of every photo. Attribute CC BY and CC BY-SA images if a crop
 | GET | `/stream` | Server-Sent Events: `hello` on connect, `event` per POST, `reset` on DELETE; keepalive every 15 s |
 | GET | `/health` | `{"ok":true,"events":n,"cells_source":path}` |
 | DELETE | `/events` | needs header `X-Demo-Reset: yes`; clears memory and `events.jsonl` |
+| POST | `/agent/chat` | Optional assistant. Web requests send `month` and `plan_k`; its cell and site tools read the same live Store as the map. Requires `XAI_API_KEY`. |
 
 `/cells` and `/plan` report the actual file `month`, `source` (`model` or `fixture`), and `synthetic`
 (`true` for the fixture). A request also echoes `requested_month`, which may differ from the file month
@@ -62,9 +63,9 @@ in the served month, `/cells` replaces `posterior` and `score_b`, computes an ap
 `/plan` keeps its generated pins when no candidate has new evidence. For an affected candidate, it
 re-ranks the original nodes plus tree-pit options in same-month `model/out/placements.json`, scales
 expected gain by the posterior risk change and remaining uncertainty, and enforces 100 m spacing.
-It never creates a new location. The September demo H3 is in the model cells but outside its planner
-candidate pool, so a demo event updates the map without moving a September plan pin. For a pin-movement
-rehearsal, configure the node with the H3 of a current plan candidate.
+It never creates a new location. A detection in a cell outside the planner's candidate pool can update
+that cell without moving a plan pin. The optional assistant uses the same selected month and site budget
+as the web app and reports the actual source month when the requested export is unavailable.
 
 ## Posterior (plan §4)
 

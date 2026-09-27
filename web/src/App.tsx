@@ -797,7 +797,7 @@ export default function App() {
             onView={onView}
           />
         )}
-        {!ready && <div className="loading">loading the city…</div>}
+        {!ready && <div className="loading">loading map data…</div>}
         {pendingTiles > 0 && <div className="loading-chip panel">streaming {pendingTiles} tile{pendingTiles === 1 ? '' : 's'}…</div>}
 
         <Toolbar

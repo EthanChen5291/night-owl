@@ -57,7 +57,7 @@ export default function BacktestChart({ data, open, onToggle, wide }: Props) {
             <span className="kpi-value">{mean311 !== null ? fmtPct(mean311) : '—'}</span>
           </div>
           <div className="kpi">
-            <span className="kpi-label">months ahead</span>
+            <span className="kpi-label">months above 311</span>
             <span className="kpi-value">{beating !== null && months !== null ? `${beating} / ${months}` : '—'}</span>
           </div>
           <div className="kpi grow">

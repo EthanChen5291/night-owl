@@ -14,7 +14,7 @@ interface Props {
   onPick: (p: Place) => void
 }
 
-/** Top right: address search, then the month being shown, how many cells, and whether the API is live. */
+/** Search, selected month, plan budget, cell count, and data source. */
 export default function Header({ month, servedMonth, cellCount, source, planBudget, onMonth, onPlanBudget, onDemo, cells, onPick }: Props) {
   return (
     <header className="header">
@@ -30,9 +30,9 @@ export default function Header({ month, servedMonth, cellCount, source, planBudg
             </select>
           </label>
           <span className="muted">{cellCount.toLocaleString()} cells</span>
-          <button className="demo-link" onClick={onDemo} title="Fly to the live demo cell">Demo cell</button>
+          <button className="demo-link" onClick={onDemo} title="Fly to the demo cell">Demo cell</button>
           <span className={`pill ${source ?? 'loading'}`} title={source === 'live' ? 'Reading model data from the server' : source === 'fixture' ? 'Showing fixture data' : source === 'stale' ? 'Server unavailable; showing last response' : 'Connecting'}>
-            {source === 'live' ? 'live' : source === 'fixture' ? 'fixture' : source === 'stale' ? 'stale' : '…'}
+            {source === 'live' ? 'model' : source === 'fixture' ? 'fixture' : source === 'stale' ? 'stale' : '…'}
           </span>
         </div>
         {servedMonth && servedMonth !== month && <div className="month-note panel" role="status">Showing {servedMonth} data; {month} is unavailable.</div>}

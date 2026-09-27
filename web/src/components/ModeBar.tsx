@@ -32,7 +32,7 @@ export default function ModeBar({ mode, onMode, preset, onPreset }: Props) {
           <button role="radio" aria-checked={preset === 'day'} aria-label="Day" className={preset === 'day' ? 'active' : ''} title="Day" onClick={() => onPreset('day')}>
             <SunIcon size={18} />
           </button>
-          <button role="radio" aria-checked={preset === 'night'} aria-label="Night" className={preset === 'night' ? 'active' : ''} title="Night (stage)" onClick={() => onPreset('night')}>
+          <button role="radio" aria-checked={preset === 'night'} aria-label="Night" className={preset === 'night' ? 'active' : ''} title="Night" onClick={() => onPreset('night')}>
             <MoonIcon size={18} />
           </button>
         </div>

@@ -49,7 +49,7 @@ export default function NodesPanel({ nodes, sightings, rates, selected, plan, op
           Owls
           <span className="count">{nodes.length}</span>
         </span>
-        <span className={`pill ${source === 'live' ? 'live' : 'fixture'}`}>{source === 'live' ? (streaming ? 'live' : 'polling') : 'offline'}</span>
+        <span className={`pill ${source === 'live' ? 'live' : 'fixture'}`}>{source === 'live' ? (streaming ? 'streaming' : 'polling') : source}</span>
       </div>
       <div className="nodes-body">
         {nodes.length === 0 && (
@@ -74,7 +74,7 @@ export default function NodesPanel({ nodes, sightings, rates, selected, plan, op
                   </div>
                   <div className="owl-addr">{n.addr}</div>
                   <div className="owl-row small muted">
-                    <span>{last ? `last rat ${ago(last.ts)}` : 'quiet'}</span>
+                    <span>{last ? `last event ${ago(last.ts)}` : 'no events'}</span>
                     <span>{n.nodeId}</span>
                   </div>
                 </div>
@@ -85,9 +85,9 @@ export default function NodesPanel({ nodes, sightings, rates, selected, plan, op
         {inArea && (
           <div className="suggested">
             <div className="suggested-head muted small">
-              <SparkIcon size={14} /> suggested by the model
+              <SparkIcon size={14} /> suggested sites
             </div>
-            {plan.length === 0 && <div className="small muted">No suggested hexagons in this borough.</div>}
+            {plan.length === 0 && <div className="small muted">No suggested sites for this view.</div>}
             <ul className="owl-list compact">
               {plan.map((p) => {
                 const isOpen = openRank === p.rank

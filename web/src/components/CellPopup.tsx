@@ -52,10 +52,10 @@ export default function CellPopup({ cell, mode, addr, onClose }: Props) {
       <div className="cellcard-detail small"><span>Rat-sign percentile</span><b>{fmt(cell.pct_b, 1)}</b></div>
       <div className="cellcard-row muted small">
         <span>
-          P(active) <b>{fmt(cell.score_b, 2)}</b> [{fmt(cell.ci_b[0], 2)}–{fmt(cell.ci_b[1], 2)}]
+          P(active signs | inspected) <b>{fmt(cell.score_b, 2)}</b> [{fmt(cell.ci_b[0], 2)}–{fmt(cell.ci_b[1], 2)}]
         </span>
         <span>
-          <b>{cell.posterior.n_events}</b> sightings
+          <b>{cell.posterior.n_events}</b> accepted events
         </span>
       </div>
       <div className="cellcard-detail small"><span>Posterior α / β</span><b>{fmt(cell.posterior.alpha)} / {fmt(cell.posterior.beta)}</b></div>

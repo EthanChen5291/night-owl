@@ -13,7 +13,7 @@ interface Props {
   onLogs: () => void
 }
 
-/** Top left: back to the city, place an owl, suggested sites, sightings log. Icons only, names on hover. */
+/** Back to the city, place an owl, show suggested sites, or open the event log. */
 export default function Toolbar({ area, noBake, placing, showPlan, logsOpen, onBack, onPlace, onShowPlan, onLogs }: Props) {
   return (
     <div className="toolbar">
@@ -33,7 +33,7 @@ export default function Toolbar({ area, noBake, placing, showPlan, logsOpen, onB
           <SparkIcon size={20} />
         </button>
       )}
-      <button className={`tool panel ${logsOpen ? 'active' : ''}`} aria-pressed={logsOpen} title="Sightings log" onClick={onLogs}>
+      <button className={`tool panel ${logsOpen ? 'active' : ''}`} aria-pressed={logsOpen} aria-label="Event log" title="Event log" onClick={onLogs}>
         <ListIcon size={20} />
       </button>
     </div>

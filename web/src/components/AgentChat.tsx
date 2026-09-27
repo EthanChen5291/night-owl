@@ -228,14 +228,14 @@ export default function AgentChat({ tools, month, planBudget, onShown }: { tools
 
   return (
     <>
-      <section className={`agent panel ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="Barn Owl assistant">
+      <section className={`agent panel ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="Night Owl assistant">
         <header className="agent-head">
           <span className="agent-avatar">
             <SparkIcon size={16} />
           </span>
           <div className="agent-title">
-            <b>Barn Owl assistant</b>
-            <span className="muted small">Grok · reads the model, the node and your map</span>
+            <b>Night Owl assistant</b>
+            <span className="muted small">Grok · map, model and node tools</span>
           </div>
           <button className="icon-btn" title="New chat" onClick={reset} disabled={!items.length && !busy}>
             <NewChatIcon size={16} />
@@ -252,7 +252,7 @@ export default function AgentChat({ tools, month, planBudget, onShown }: { tools
                 <ChatIcon size={26} />
               </div>
               <b>Ask about rats, blocks and owls</b>
-              <p className="muted">I can rank hexagons, explain why a block scores high, check the Pi and its camera, and look at your map.</p>
+              <p className="muted">Ask about ranked cells, the backtest, or this map. Pi tools work when the node dashboard is connected.</p>
               <div className="agent-suggest">
                 {SUGGESTIONS.map((s) => (
                   <button key={s} onClick={() => void send(s)}>
@@ -329,14 +329,14 @@ export default function AgentChat({ tools, month, planBudget, onShown }: { tools
             </button>
           )}
         </form>
-        <div className="agent-foot muted">Answers come from the model and live node data. Grok can make mistakes.</div>
+        <div className="agent-foot muted">Answers may use model files and queued events. Check the source labels.</div>
       </section>
 
       <button
         className={`agent-fab panel ${open ? 'open' : ''} ${shown ? 'shown' : ''}`}
         onClick={() => setOpen((o) => !o)}
         onFocus={() => setNear(true)}
-        title={open ? 'Close assistant' : 'Ask Barn Owl'}
+        title={open ? 'Close assistant' : 'Ask Night Owl'}
         aria-expanded={open}
       >
         <span className="fab-icon chat">

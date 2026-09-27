@@ -63,7 +63,7 @@ export default function SearchBar({ cells, onPick }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
 
-  // neighbourhoods the cells carry (live data only): name -> centroid of its hexagons
+  // Group cells with neighborhood names and use their centroids for local search results.
   const hoods = useMemo(() => {
     const acc = new Map<string, { borough: string | null; lat: number; lon: number; n: number }>()
     for (const c of cells) {
