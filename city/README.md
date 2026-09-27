@@ -174,10 +174,16 @@ curl -L -G -o $C/trees_citywide.json 'https://data.cityofnewyork.us/resource/uvp
     --data-urlencode '$select=tree_id,latitude,longitude,address,status' --data-urlencode '$limit=1000000'
 ./city/make_tiles.py          # ~3 min -> web/public/city/tiles/*.json, tiles.json, areas.json
 ./city/make_areas.py          # <1 min -> web/public/city/areas/<id>/{land,parks,water}.json, tiles.json gets "a"
+./city/clean_coast.py         # seconds  -> rewrites web/public/city/land.json as a smooth citywide coastline
 ```
 
 `city/areas.json` is the source of the boroughs' names and landing centres and of the shared projection
 centre; `make_tiles.py` adds each borough's outline from `boroughs.geojson`.
+
+`clean_coast.py` tidies the citywide `land.json` for the map view: it dissolves the borough seams,
+shaves piers and spits thinner than 160 m, fills slips narrower than 110 m, drops islets under 3 ha and
+rounds what is left, so the coast reads as a clean outline from 36 km up instead of a torn edge. Run it
+whenever `land.json` is rebaked; the per-borough land under `areas/<id>/` keeps its full detail.
 
 `make_areas.py` runs after it (or alone, after editing `city/areas.json`): it cuts each borough's own
 land, parks and water out of `boroughs.geojson`, `parks_citywide.geojson` and `hydro_citywide.geojson`

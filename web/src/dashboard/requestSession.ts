@@ -45,7 +45,7 @@ export function forCurrentGeneration<T>(state: T, expected: number, current: num
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
 const KINDS = ['bar', 'line', 'scatter', 'table', 'metric']
-const validQuery = (value: unknown) => record(value) && ['cells', 'backtest', 'events', 'sites'].includes(String(value.dataset))
+const validQuery = (value: unknown) => record(value) && typeof value.dataset === 'string' && value.dataset.length > 0
   && ['mean', 'sum', 'count', 'raw'].includes(String(value.aggregation)) && strings(value.metrics)
 
 function validArtifact(value: unknown): value is DashboardArtifact {
@@ -62,7 +62,7 @@ function validArtifact(value: unknown): value is DashboardArtifact {
     && Array.isArray(result.columns) && result.columns.every((column: unknown) => record(column)
       && typeof column.key === 'string' && typeof column.label === 'string' && typeof column.unit === 'string')
     && record(result.source) && typeof result.source.label === 'string' && typeof result.source.as_of === 'string'
-    && ['model', 'events', 'fixture'].includes(String(result.source.kind)) && strings(result.source.notes)
+    && ['model', 'events', 'fixture', 'history'].includes(String(result.source.kind)) && strings(result.source.notes)
     && typeof result.total_rows === 'number')
 }
 

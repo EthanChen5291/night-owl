@@ -50,6 +50,7 @@ function Scene(props: Props) {
       onView: (view) => cbRef.current.onView(view),
     })
     sceneRef.current = scene
+    if (import.meta.env.DEV) (window as unknown as { __nightowl?: CityScene }).__nightowl = scene // the screenshot scripts ask it where things are
     sceneHandle.current = scene
     return () => {
       scene.dispose()

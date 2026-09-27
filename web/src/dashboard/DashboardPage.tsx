@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react'
 import { markdown } from '../agent'
-import { BackIcon, CheckIcon, ChevronIcon, CloseIcon, NewChatIcon, OwlIcon, StopIcon } from '../components/Icons'
+import { BackIcon, CheckIcon, ChevronIcon, CloseIcon, NewChatIcon, StopIcon } from '../components/Icons'
 import ChartCard from './ChartCard'
 import { fetchCatalog, refreshDashboard, streamDashboardChat } from './client'
 import { downloadDashboard } from './export'
-import { ArrowUpIcon, DashIcon, DownloadIcon, RefreshIcon } from './icons'
+import { ArrowUpIcon, DashIcon, DownloadIcon, OwlMark, RefreshIcon } from './icons'
 import { emptySession, forActiveRequest, forCurrentGeneration, isActiveRequest, MAX_ARTIFACTS, restoreSession, STORE_KEY, type RequestIdentity, type Turn } from './requestSession'
 import type { DashboardArtifact } from './types'
 import { resolvedKind, sortedRows, visibleSeries, type CardView } from './view'
@@ -16,9 +16,10 @@ interface Catalog {
 }
 
 const STARTERS = [
+  { title: 'Bronx vs Manhattan', prompt: 'Compare monthly rat complaints per 100k residents in the Bronx and Manhattan since 2015.' },
+  { title: 'COVID and income', prompt: 'Show the 10 richest ZIP code areas and their rat complaints before and after COVID-19.' },
+  { title: 'Income and findings', prompt: 'Compare complaints and inspections finding rat activity across years by income band.' },
   { title: 'Compare boroughs', prompt: 'Compare rat complaints and model likelihood by borough.' },
-  { title: 'Inspection trend', prompt: 'Show how inspection results changed over time.' },
-  { title: 'Camera activity', prompt: 'Where have recent rat camera events been reported?' },
 ]
 
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -250,14 +251,14 @@ export default function DashboardPage() {
     <section className="dx-chat" aria-label="Conversation">
       <header className="dx-bar">
         <a className="dx-pill" href="/" title="Back to the map"><BackIcon size={15} /><span>Map</span></a>
-        <div className="dx-brand"><OwlIcon size={16} /><b>Night Owl</b><span>Explore</span></div>
+        <div className="dx-brand"><OwlMark size={20} /><b>Night Owl</b><span>Explore</span></div>
         {empty ? <span className="dx-bar-spacer" /> : <button type="button" className="dx-icon-btn" onClick={newChat} title="New chat" aria-label="New chat"><NewChatIcon size={17} /></button>}
       </header>
 
       {empty ? <div className="dx-hero">
-        <div className="dx-hero-mark" aria-hidden="true"><OwlIcon size={26} /></div>
+        <div className="dx-hero-mark" aria-hidden="true"><OwlMark size={34} /></div>
         <h1>What should we look into?</h1>
-        <p>Ask a question and Night Owl builds an interactive dashboard from the model, inspections, and camera events.</p>
+        <p>Ask a question and Night Owl builds an interactive dashboard from the model, 16 years of NYC complaints and inspections, ACS income, and camera events.</p>
         {composer}
         <div className="dx-starters">{STARTERS.map((starter, i) => <button key={starter.title} type="button" style={{ '--i': i } as CSSProperties} onClick={() => void send(starter.prompt)}>
           <b>{starter.title}</b><span>{starter.prompt}</span>
@@ -272,7 +273,7 @@ export default function DashboardPage() {
               const built = turn.dashboard ? session.artifacts[turn.dashboard] : undefined
               const isOpen = !!turn.dashboard && turn.dashboard === openKey
               return <div className="dx-turn assistant" key={index}>
-                <div className={`dx-avatar${live ? ' live' : ''}`}><OwlIcon size={15} /></div>
+                <div className={`dx-avatar${live ? ' live' : ''}`}><OwlMark size={19} /></div>
                 <div className="dx-turn-body">
                   <Trace turn={turn} live={live} status={status} />
                   {built && <button type="button" className={`dx-artifact${isOpen ? ' open' : ''}`} onClick={() => openArtifact(isOpen ? null : turn.dashboard!)} aria-pressed={isOpen}>

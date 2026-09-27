@@ -22,8 +22,8 @@ from store import Store
 
 XAI_RESPONSES_URL = "https://api.x.ai/v1/responses"
 MAX_REQUEST_BYTES = 100_000
-MAX_ROUNDS = 5
-MAX_TOOL_CALLS = 10
+MAX_ROUNDS = 8
+MAX_TOOL_CALLS = 16
 MAX_HISTORY = 12
 MAX_QUERY_PREVIEW = 40
 MAX_TEXT = 6000
@@ -39,12 +39,19 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 QUERY_TOOL = {
     "type": "function", "name": "query_data",
-    "description": "Query allowlisted Night Owl model, backtest, event, or site data. Dates are only supported for backtest and events. Count uses metrics ['records'].",
+    "description": ("Query allowlisted Night Owl data: the model month (cells, sites), the inspection backtest, recent events, "
+                    "and NYC Open Data history (borough_months, zip_years, zips). Dates follow each dataset's date_format in the "
+                    "catalog. filters narrows rows by dimension values; split_by pivots one metric by a second dimension so each "
+                    "value becomes a y column. Count uses metrics ['records']."),
     "parameters": {"type": "object", "properties": {"query": {"type": "object", "properties": {
         "dataset": {"type": "string", "enum": list(DATASETS)},
-        "group_by": {"type": "string"}, "metrics": {"type": "array", "items": {"type": "string"}},
+        "group_by": {"type": "string"}, "split_by": {"type": "string"},
+        "metrics": {"type": "array", "items": {"type": "string"}},
         "aggregation": {"type": "string", "enum": ["raw", "mean", "sum", "count"]},
-        "borough": {"type": "string"}, "start": {"type": "string"}, "end": {"type": "string"},
+        "borough": {"type": "string"},
+        "filters": {"type": "object", "additionalProperties": {"anyOf": [{"type": "string"}, {"type": "number"},
+                                                                          {"type": "array", "items": {"anyOf": [{"type": "string"}, {"type": "number"}]}}]}},
+        "start": {"type": "string"}, "end": {"type": "string"},
         "limit": {"type": "integer"}, "sort_by": {"type": "string"},
         "direction": {"type": "string", "enum": ["asc", "desc"]}},
         "required": ["dataset", "metrics", "aggregation"], "additionalProperties": False}},
@@ -53,7 +60,7 @@ QUERY_TOOL = {
 
 PUBLISH_TOOL = {
     "type": "function", "name": "publish_dashboard",
-    "description": "Publish a dashboard spec. Every card query runs on the server; x and y must match query result columns. Call this to finish a dashboard request.",
+    "description": "Publish a dashboard spec. Every card query runs on the server; x and y must match query result columns. Title at most 60 characters, description at most 160, card titles at most 60, optional card descriptions at most 140. Call this to finish a dashboard request.",
     "parameters": {"type": "object", "properties": {"spec": {"type": "object", "properties": {
         "title": {"type": "string"}, "description": {"type": "string"},
         "cards": {"type": "array", "items": {"type": "object", "properties": {
@@ -68,13 +75,26 @@ PUBLISH_TOOL = {
 }
 
 SYSTEM = """You build editable Night Owl dashboards from the supplied catalog and tool results. Never invent numbers.
-First use query_data to inspect relevant data, then publish_dashboard with 1–6 valid cards. Use the exact field keys
-from the query results for x and y. Explain the result briefly after publishing. A cell/site export is a single
-model month, not a time series; only backtest and events have dates. Model B estimates active rat signs conditional
-on inspection, not rat counts. Event counts include queued detections, including rejected ones. For follow-ups,
-revise the supplied dashboard using the user's chart selection; preserve useful cards. Do not claim a chart exists
-until publish_dashboard succeeds. Use only the Night Owl data tools. Do not make external research claims,
-request URLs or files, execute code, or ask for secrets."""
+First use query_data to inspect relevant data, then publish_dashboard with 1–6 valid cards. Use the exact column keys
+from the query results for x and y. Explain the result briefly after publishing, naming what each chart measures.
+Datasets: cells and sites are one model month with no dates. backtest is a monthly citywide validation series.
+borough_months (one row per borough per month since 2010), zip_years (one row per ZIP code area per year) and zips
+(one row per ZIP code area comparing 2017–2019 with 2022–2025) come from NYC Open Data 311 rodent complaints, DOHMH
+initial inspections and ACS income. Use borough_months for borough trends and COVID comparisons, zip_years for
+income-band or neighborhood trends, and zips with sort_by and limit for rankings. "Richest" or "poorest" areas mean
+ZIP code areas ranked by ACS median household income; the only cities are NYC boroughs and ZIP code areas.
+Use filters to narrow rows (for example filters {"borough": ["Bronx", "Manhattan"]} or {"period": "after COVID"}).
+To put several boroughs, periods or income bands on one chart, set split_by to that dimension with one metric;
+each value becomes its own y column. Use mean for rates such as complaints_per_100k and active_rate and sum for
+counts; periods differ in length, so compare mean monthly values. 311 complaints and inspection findings are not rat
+counts, so say which one a chart shows. Model B estimates active rat signs conditional on inspection. Event counts
+include queued detections, including rejected ones.
+In publish_dashboard, each card's x and y must be column keys returned by that card's own query (a pivot returns
+the split values as keys; a ranking must list its sort_by field in metrics). If a card is rejected, fix only that
+card and publish again.
+For follow-ups, revise the supplied dashboard using the user's chart selection; preserve useful cards. Do not claim a
+chart exists until publish_dashboard succeeds. Use only the Night Owl data tools. Do not make external research
+claims, request URLs or files, execute code, or ask for secrets."""
 
 
 def _rate_ok(ip: str) -> bool:
@@ -221,8 +241,10 @@ class _RoundEmitter:
 def _query_detail(result: dict) -> str:
     query, labels = result["query"], {column["key"]: column["label"] for column in result["columns"]}
     metrics = ", ".join(labels.get(metric, metric) for metric in query["metrics"] if metric != "records") or "Record count"
+    filters = ", ".join(", ".join(str(v) for v in values) for values in query.get("filters", {}).values())
     parts = [metrics, f"by {labels.get(query['group_by'], query['group_by']).lower()}" if query.get("group_by") else "",
-             query.get("borough") or "", f"{result['total_rows']} row{'s' if result['total_rows'] != 1 else ''}"]
+             f"split by {query['split_by'].replace('_', ' ')}" if query.get("split_by") else "",
+             query.get("borough") or "", filters[:80], f"{result['total_rows']} row{'s' if result['total_rows'] != 1 else ''}"]
     return " · ".join(part for part in parts if part)
 
 
@@ -274,7 +296,7 @@ def _chat_body(raw: Any) -> dict:
 
 async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
     tools = [QUERY_TOOL, PUBLISH_TOOL]
-    context: list[dict] = [{"role": "system", "content": SYSTEM + "\nCatalog: " + json.dumps(catalog(), separators=(",", ":"))}]
+    context: list[dict] = [{"role": "system", "content": SYSTEM + "\nCatalog: " + json.dumps(catalog(store), separators=(",", ":"))}]
     model = os.environ.get("XAI_DASHBOARD_MODEL") or os.environ.get("XAI_MODEL") or "grok-4.7"
     context += body["history"]
     message = body["message"]
@@ -331,7 +353,7 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
                     raw_query = args.get("query")
                     dataset = raw_query.get("dataset") if isinstance(raw_query, dict) else None
                     label = DATASETS.get(dataset, {}).get("label", "Data") if isinstance(dataset, str) else "Data"
-                    label = label[:1].lower() + label[1:]
+                    label = label[:1].lower() + label[1:] if label[1:2].islower() else label
                     yield {"type": "status", "text": f"Querying {label}"}
                     result = run_query(store, args.get("query"))
                     yield {"type": "step", "text": f"Queried {label}", "detail": _query_detail(result)}
@@ -371,7 +393,7 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
 def mount_dashboards(app: FastAPI, store: Store) -> None:
     @app.get("/dashboards/catalog")
     async def dashboard_catalog():
-        return catalog()
+        return catalog(store)
 
     @app.post("/dashboards/query")
     async def dashboard_query(request: Request):

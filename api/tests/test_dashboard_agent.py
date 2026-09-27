@@ -49,6 +49,9 @@ def test_chat_tool_loop_emits_dashboard_from_local_data(tmp_path, monkeypatch):
     assert artifact["results"]["risk"]["total_rows"] == 5
     assert all(body["store"] is False for body in inputs)
     assert [tool["name"] for tool in inputs[0]["tools"]] == ["query_data", "publish_dashboard"]
+    query_schema = inputs[0]["tools"][0]["parameters"]["properties"]["query"]["properties"]
+    assert {"filters", "split_by"} <= set(query_schema) and "borough_months" in query_schema["dataset"]["enum"]
+    assert '"periods"' in inputs[0]["input"][0]["content"]
     assert any(item.get("type") == "function_call_output" and item.get("call_id") == "q1" for item in inputs[1]["input"])
     assert any(item.get("type") == "function_call_output" and item.get("call_id") == "p1" for item in inputs[2]["input"])
 

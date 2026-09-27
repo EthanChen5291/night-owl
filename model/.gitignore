@@ -2,6 +2,7 @@
 out/*
 !out/backtest.json
 !out/backtest.png
+!out/history.json
 !out/metrics.json
 !out/cells.json
 !out/cells_2026-08.json

@@ -1,10 +1,12 @@
 export type DataRow = Record<string, string | number | null>
 export interface DataQuery {
-  dataset: 'cells' | 'backtest' | 'events' | 'sites'
+  dataset: string
   group_by?: string
+  split_by?: string
   metrics: string[]
   aggregation: 'mean' | 'sum' | 'count' | 'raw'
   borough?: string
+  filters?: Record<string, string | number | (string | number)[]>
   start?: string
   end?: string
   limit?: number
@@ -14,7 +16,7 @@ export interface DataQuery {
 export interface DataSource {
   label: string
   as_of: string
-  kind: 'model' | 'events' | 'fixture'
+  kind: 'model' | 'events' | 'fixture' | 'history'
   notes: string[]
 }
 export interface QueryResult {

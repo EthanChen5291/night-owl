@@ -144,6 +144,15 @@ Available data:
 - `sites`: the current ranked camera-placement plan.
 - `backtest`: monthly citywide inspection validation, not per-block history.
 - `events`: the recent event ring, not the full historical archive. Images are excluded.
+- `borough_months`, `zip_years`, `zips`: 311 rodent complaints and DOHMH initial
+  inspection results since 2010 by borough and month, and by ZIP code area and year,
+  with ACS median household income and population. These come from
+  `model/out/history.json`, written by `data/fetch_history.py` from NYC Open Data
+  aggregates. They are complaint and inspection counts, never rat counts.
+
+Queries take `filters` (dimension values, for example two boroughs or one COVID
+period) and `split_by`, which pivots one metric by a second dimension so that
+several boroughs, periods, or income bands share one chart.
 
 The data catalog describes supported fields and calculations. Queries are
 validated against those fields and capped before returning chart data. The model

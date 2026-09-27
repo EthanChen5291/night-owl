@@ -9,12 +9,15 @@ const KEY = 'nightowl.owls'
 export const STAGE_NODE_ID = 'demo-01' // what vision/pi/detect.py posts
 
 export const eventKey = (e: RatEvent) => `${e.node_id}|${e.ts}`
+export const PENDING_ADDR = 'Location pending' // until the owl's tile loads and the address index names the street
 
 export function loadOwls(): OwlNode[] {
   try {
     const raw = readSavedValue(KEY, 'barnowl.owls')
     const list = raw ? (JSON.parse(raw) as OwlNode[]) : []
-    return Array.isArray(list) ? list.filter((n) => n && typeof n.id === 'string') : []
+    if (!Array.isArray(list)) return []
+    // owls saved by an earlier build carry a "block 7ffff" placeholder: treat it as pending so it gets named
+    return list.filter((n) => n && typeof n.id === 'string').map((n) => (/^block [0-9a-f]{5}$/.test(n.addr ?? '') ? { ...n, addr: PENDING_ADDR } : n))
   } catch {
     return []
   }
@@ -39,7 +42,7 @@ export function newOwl(owls: OwlNode[], lat: number, lon: number, addr: string |
     lat,
     lon,
     h3: latLngToCell(lat, lon, 9),
-    addr: addr ?? `block ${latLngToCell(lat, lon, 9).slice(-5)}`,
+    addr: addr ?? PENDING_ADDR,
     placedAt: new Date().toISOString(),
     treeId,
   }

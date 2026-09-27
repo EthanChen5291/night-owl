@@ -23,6 +23,7 @@ ASSET = "city-bake.tar.gz"
 SHA256 = "5c7f43dcf1dffdcff79da49d657065e04a6e67e25dfc0c297fc98774ec57e802"
 PUBLIC = Path(__file__).resolve().parents[1] / "public"
 TARGET = PUBLIC / "city"
+CLEAN_COAST = Path(__file__).resolve().parents[2] / "city" / "clean_coast.py"  # smooths the citywide land.json
 
 
 def install() -> None:
@@ -87,6 +88,17 @@ def install() -> None:
         os.replace(city, TARGET)
 
     print(f"Installed {len(tiles['tiles'])} city tiles at {TARGET} (SHA-256 {digest})")
+    smooth_coast()
+
+
+def smooth_coast() -> None:
+    """The release ships the coast at survey detail; the map view wants it smoothed (needs uv, see city/README.md)."""
+    if shutil.which("uv") is None:
+        print(f"uv not found: run {CLEAN_COAST} later to smooth the citywide coastline")
+        return
+    result = subprocess.run(["uv", "run", "--with", "shapely", "python", str(CLEAN_COAST)])
+    if result.returncode != 0:
+        print(f"Coast smoothing failed: run {CLEAN_COAST} by hand once shapely is available")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ Data files resolve relative to the repo root (parent of api/), overridable with 
   cells:    model/out/cells_<month>.json -> model/out/cells.json -> city/cells.fixture.json
   plan:     model/out/plan_<month>.json  -> model/out/plan.json  -> city/plan.fixture.json
   backtest: model/out/backtest.json      -> api/fixtures/backtest.json
+  history:  model/out/history.json       -> api/fixtures/history.json
 """
 from __future__ import annotations
 
@@ -69,6 +70,9 @@ class Store:
 
     def backtest_path(self) -> Path:
         return self._first_existing([self.data_dir / "model" / "out" / "backtest.json", API_DIR / "fixtures" / "backtest.json"])
+
+    def history_path(self) -> Path:
+        return self._first_existing([self.data_dir / "model" / "out" / "history.json", API_DIR / "fixtures" / "history.json"])
 
     def load_json(self, path: Path) -> dict:
         """Read with an mtime cache; returns a deep copy so callers can mutate."""
@@ -214,6 +218,11 @@ class Store:
 
     def backtest(self) -> tuple[dict, Path]:
         path = self.backtest_path()
+        return self.load_json(path), path
+
+    def history(self) -> tuple[dict, Path]:
+        """Dated 311 complaint and inspection history by borough and ZIP code area (data/fetch_history.py)."""
+        path = self.history_path()
         return self.load_json(path), path
 
     def queue(self, limit: int = 50) -> list[dict]:

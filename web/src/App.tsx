@@ -18,7 +18,7 @@ import ModeBar from './components/ModeBar'
 import NodesPanel from './components/NodesPanel'
 import Scene from './components/Scene'
 import Toolbar from './components/Toolbar'
-import { activityRate, eventKey, loadOwls, newOwl, saveOwls } from './owls'
+import { activityRate, eventKey, loadOwls, newOwl, PENDING_ADDR, saveOwls } from './owls'
 import type {
   AreasManifest,
   BacktestResponse,
@@ -488,7 +488,15 @@ export default function App() {
     [areas, projector, tileAreas],
   )
   // inside a borough only its owls exist, on the map and in the list; citywide, all of them
-  const owlsHere = useMemo(() => (noBake ? owls : area ? owls.filter((o) => areaOfOwl(o) === area) : owls), [owls, area, noBake, areaOfOwl])
+  const owlsHere = useMemo(() => {
+    const here = noBake ? owls : area ? owls.filter((o) => areaOfOwl(o) === area) : owls
+    // an owl spawned by a sighting has no street address until its tile loads: show its neighbourhood meanwhile
+    return here.map((o) => {
+      if (o.addr !== PENDING_ADDR) return o
+      const c = cellByH3.get(o.h3)
+      return c?.neighborhood ? { ...o, addr: `${c.neighborhood}${c.borough ? `, ${c.borough}` : ''}` } : o
+    })
+  }, [owls, area, noBake, areaOfOwl, cellByH3])
   const openSpots = useMemo(() => (openNode ? spotsByCell.get(openNode.h3) : undefined), [openNode, spotsByCell])
 
   // ---- an owl spawned by an event before any tile was loaded has a placeholder address: fill it in once we can
@@ -500,7 +508,7 @@ export default function App() {
         const [x0, y0] = projector.xy(o.lat, o.lon)
         // an owl inside a building footprint (placed before the rule, or spawned at a cell centre) moves to the sidewalk
         const off = !o.treeId && index.buildingAt(x0, y0) ? offBuilding(index, x0, y0) : null
-        if (!off && !o.addr.startsWith('block ')) return o
+        if (!off && o.addr !== PENDING_ADDR) return o
         const [x, y] = off ? [off.x, off.y] : [x0, y0]
         const hit = off?.tree?.addr ? { addr: `near ${off.tree.addr}` } : index.at(x, y)
         const near = hit ? hit.addr : (() => { const t = index.nearestTree(x, y, 120); return t?.tree.addr ? `near ${t.tree.addr}` : null })()

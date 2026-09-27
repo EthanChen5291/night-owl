@@ -95,3 +95,59 @@ def test_render_validates_chart_fields_units_and_empty_metric(tmp_path):
                                             "query": query("events", ["records"], "count", group_by="day"),
                                             "x": "day", "y": ["records"]}]}
         assert client.post("/dashboards/render", json={"spec": empty_metric}).status_code == 400
+
+
+def test_history_datasets_filter_pivot_and_rank(tmp_path):
+    with TestClient(create_app(data_dir=REPO, events_file=tmp_path / "events.jsonl")) as client:
+        catalog = client.get("/dashboards/catalog").json()
+        assert catalog["datasets"]["borough_months"]["date_format"] == "YYYY-MM"
+        assert catalog["datasets"]["zip_years"]["date_format"] == "YYYY"
+        assert catalog["history"]["periods"]["COVID"] == "2020-03 to 2021-12"
+        assert len(catalog["history"]["income_bands"]) == 5
+        # Two boroughs on one chart: split_by pivots the metric into one column per borough.
+        pivot = client.post("/dashboards/query", json=query("borough_months", ["complaints_per_100k"], "mean", group_by="year",
+                                                             split_by="borough", filters={"borough": ["bronx", "Manhattan"]},
+                                                             start="2019-01", end="2021-12")).json()
+        assert [column["key"] for column in pivot["columns"]] == ["year", "Bronx", "Manhattan"]
+        assert [row["year"] for row in pivot["rows"]] == [2019, 2020, 2021]
+        assert all(row["Bronx"] > 0 and row["Manhattan"] > 0 for row in pivot["rows"])
+        assert pivot["source"]["kind"] == "history" and pivot["source"]["as_of"] >= "2026-08"
+        # COVID periods: monthly means per period for one borough, via the legacy borough field.
+        periods = client.post("/dashboards/query", json=query("borough_months", ["n_complaints"], "mean", group_by="period", borough="Bronx")).json()
+        assert {row["period"] for row in periods["rows"]} == {"before COVID", "COVID", "after COVID"}
+        # Rankings: the ten highest-income ZIP code areas with complaints before and after COVID.
+        richest = client.post("/dashboards/query", json=query("zips", ["median_income", "complaints_per_year_pre", "complaints_per_year_post"], "raw",
+                                                               group_by="neighborhood", sort_by="median_income", direction="desc", limit=10)).json()
+        assert len(richest["rows"]) == 10 and richest["total_rows"] > 100
+        assert richest["rows"][0]["median_income"] >= richest["rows"][-1]["median_income"]
+        # Income bands over years, with year strings and numbers both accepted as filter values.
+        band = client.post("/dashboards/query", json=query("zip_years", ["active_rate"], "mean", group_by="year",
+                                                            filters={"income_band": "Q5 highest income", "year": ["2019", 2023]})).json()
+        assert [row["year"] for row in band["rows"]] == [2019, 2023]
+        spec = {"title": "COVID", "description": "Complaint history", "cards": [
+            {"id": "trend", "title": "Bronx vs Manhattan", "kind": "line", "x": "month", "y": ["Bronx", "Manhattan"],
+             "query": query("borough_months", ["complaints_per_100k"], "mean", group_by="month", split_by="borough",
+                            filters={"borough": ["Bronx", "Manhattan"]}, start="2018-01")},
+            {"id": "rich", "title": "Richest areas", "kind": "bar", "x": "neighborhood", "y": ["complaints_per_year_pre", "complaints_per_year_post"],
+             "query": richest["query"]}]}
+        artifact = client.post("/dashboards/render", json={"spec": spec}).json()
+        assert artifact["results"]["trend"]["columns"][1]["key"] == "Bronx"
+        assert artifact["results"]["rich"]["total_rows"] > 100 and len(artifact["results"]["rich"]["rows"]) == 10
+
+
+def test_history_query_rejections(tmp_path):
+    with TestClient(create_app(data_dir=REPO, events_file=tmp_path / "events.jsonl")) as client:
+        bad = [query("zips", ["median_income"], "raw", filters={"month": "2020-01"}),
+               query("zip_years", ["n_complaints"], "sum", start="2019-01"),
+               query("borough_months", ["n_complaints"], "sum", start="2019"),
+               query("borough_months", ["n_complaints"], "sum", group_by="borough", split_by="borough"),
+               query("borough_months", ["n_complaints", "n_active"], "sum", group_by="month", split_by="borough"),
+               query("borough_months", ["n_complaints"], "raw", group_by="month", split_by="borough"),
+               query("zip_years", ["n_complaints"], "sum", group_by="year", split_by="zip"),
+               query("borough_months", ["n_complaints"], "sum", filters={"borough": [True]}),
+               query("borough_months", ["n_complaints"], "sum", filters={"borough": ["Bronx"] * 21}),
+               query("zips", ["median_income"], "sum"),
+               query("backtest", ["precision_silent"], "mean", filters={"borough": "Bronx"})]
+        for item in bad:
+            response = client.post("/dashboards/query", json=item)
+            assert response.status_code == 400, item

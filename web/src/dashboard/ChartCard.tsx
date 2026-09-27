@@ -17,12 +17,16 @@ interface Props {
   onSelect: (selection: ChartSelection) => void
 }
 
-// The map's palette: owl amber first, then the model's teal and the complaint blue.
-const LIGHT = ['#c8731e', '#2a9180', '#2f6fae', '#6f9e3e', '#8a63c9']
-const DARK = ['#eaa25a', '#4cc2ad', '#5b9be0', '#9fd46a', '#a98be6']
-const KIND_LABEL: Record<DashboardCard['kind'], string> = { bar: 'Bar chart', line: 'Line chart', scatter: 'Scatter plot', table: 'Table', metric: 'Single value' }
+// Series colours in a fixed order: owl amber, then blue, green, violet. Both lists pass the
+// dataviz palette validator (lightness band, chroma, CVD and normal-vision separation, 3:1
+// contrast) against the light and dark card surfaces. A card has at most three series.
+const LIGHT = ['#c8731e', '#2f6fae', '#2a9a70', '#8a63c9', '#c2477a', '#4e8f9c']
+const DARK = ['#cf7f30', '#4585cc', '#3fa060', '#8f74d4', '#d0608f', '#5ea3b0']
+const KIND_LABEL: Record<DashboardCard['kind'], string> = { bar: 'Bar', line: 'Line', scatter: 'Scatter', table: 'Table', metric: 'Value' }
 const ORDER: DashboardCard['kind'][] = ['bar', 'line', 'scatter', 'metric', 'table']
 const KIND_ICON = { bar: BarIcon, line: LineIcon, scatter: ScatterIcon, table: TableIcon, metric: MetricIcon }
+const SOURCE_LABEL = { fixture: 'Sample data', events: 'Event data', model: 'Model data', history: 'NYC Open Data' } as const
+const PLOT_HEIGHT = 220
 
 const darkQuery = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)') : null
 const subscribeDark = (notify: () => void) => { darkQuery?.addEventListener('change', notify); return () => darkQuery?.removeEventListener('change', notify) }
@@ -34,10 +38,11 @@ const valueFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 
 const largeTickFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 const compact = (value: number) => valueFormat.format(value)
 const compactTick = (value: number) => Math.abs(value) >= 1000 ? largeTickFormat.format(value) : valueFormat.format(value)
-const unitLabel = (unit: string) => isFraction(unit) ? '%' : unit === 'percentile 0–100' ? 'percentile' : unit
+const unitLabel = (unit: string) => isFraction(unit) ? '%' : unit === 'percentile 0–100' ? 'percentile' : unit === 'year' ? '' : unit
 
 function axisTick(value: string | number | null, unit = ''): string {
   if (value === null) return ''
+  if (unit === 'year') return String(value)
   if (typeof value === 'number') return `${compactTick(isFraction(unit) ? value * 100 : value)}${isFraction(unit) || unit === '%' ? '%' : ''}`
   return value.length > 14 ? `${value.slice(0, 13)}…` : value
 }
@@ -45,6 +50,7 @@ function axisTick(value: string | number | null, unit = ''): string {
 function display(value: string | number | null | undefined, unit = ''): string {
   if (value === null || value === undefined) return '—'
   if (typeof value !== 'number') return value
+  if (unit === 'year') return String(value)
   if (isFraction(unit)) return `${compact(value * 100)}%`
   return `${compact(value)}${unit === '%' ? '%' : unit ? ` ${unitLabel(unit)}` : ''}`
 }
@@ -86,6 +92,7 @@ export default function ChartCard({ card, result, view, selection, index, onView
   }
   const sort = (key: string) => onView({ ...view, page: 0, sortBy: key, sortDirection: view.sortBy === key && view.sortDirection === 'asc' ? 'desc' : 'asc' })
   const axisUnit = activeY.length && activeY.every((key) => unit(key) === unit(activeY[0])) ? unit(activeY[0]) : ''
+  // Colour follows the series, not its position among the visible ones, so hiding one never repaints the rest.
   const color = (key: string) => colors[Math.max(0, numericY.indexOf(key)) % colors.length]
   const pageSize = 50
   const pages = Math.max(1, Math.ceil(rows.length / pageSize))
@@ -93,6 +100,7 @@ export default function ChartCard({ card, result, view, selection, index, onView
   const shownRows = rows.slice(page * pageSize, (page + 1) * pageSize)
   const numericColumn = (key: string) => rows.some((row) => number(row[key]))
   const wide = kind === 'table' || ((kind === 'bar' || kind === 'line') && rows.length > 12)
+  const tile = kind === 'metric'
 
   const tip = ({ active, label: at, payload }: TipProps) => {
     if (!active || !payload?.length) return null
@@ -102,20 +110,20 @@ export default function ChartCard({ card, result, view, selection, index, onView
     return <div className="dx-tip">
       <div className="dx-tip-head">{display(x as string | number | null, unit(card.x))}</div>
       {entries.map(({ key, value }) => <div className="dx-tip-row" key={key}>
-        <i style={{ background: color(key) }} /><span>{label(key)}</span><b>{display(value as string | number | null, unit(key))}</b>
+        <i className={kind === 'line' ? 'line' : ''} style={{ background: color(key) }} /><span>{label(key)}</span><b>{display(value as string | number | null, unit(key))}</b>
       </div>)}
     </div>
   }
   const axes = <>
-    <CartesianGrid vertical={false} strokeDasharray="3 4" />
-    <XAxis dataKey={card.x} tickLine={false} axisLine={false} tickFormatter={(value: string | number) => axisTick(value, unit(card.x))} interval="preserveStartEnd" minTickGap={14} tickMargin={10} />
-    <YAxis tickLine={false} axisLine={false} tickFormatter={(value: number) => axisTick(value, axisUnit)} width={44} tickMargin={6} />
-    <Tooltip content={tip} cursor={kind === 'bar' ? { className: 'dx-cursor' } : { strokeDasharray: '3 3', className: 'dx-cursor-line' }} isAnimationActive={false} />
+    <CartesianGrid vertical={false} />
+    <XAxis dataKey={card.x} tickLine={false} axisLine={false} tickFormatter={(value: string | number) => axisTick(value, unit(card.x))} interval="preserveStartEnd" minTickGap={16} tickMargin={8} />
+    <YAxis tickLine={false} axisLine={false} tickFormatter={(value: number) => axisTick(value, axisUnit)} width={40} tickMargin={4} />
+    <Tooltip content={tip} cursor={kind === 'bar' ? { className: 'dx-cursor' } : { className: 'dx-cursor-line' }} isAnimationActive={false} />
   </>
-  const margin = { top: 10, right: 6, left: -4, bottom: 0 }
+  const margin = { top: 8, right: 4, left: 0, bottom: 0 }
 
   return (
-    <article className={`dx-card${wide ? ' wide' : ''}${selectedHere ? ' selected' : ''}`} style={{ '--i': index } as CSSProperties}>
+    <article className={`dx-card${wide ? ' wide' : ''}${tile ? ' tile' : ''}${selectedHere ? ' selected' : ''}`} style={{ '--i': index } as CSSProperties}>
       <header className="dx-card-head">
         <div className="dx-card-title">
           <h3>{card.title}</h3>
@@ -125,47 +133,50 @@ export default function ChartCard({ card, result, view, selection, index, onView
           {ORDER.filter((choice) => choices.has(choice)).map((choice) => {
             const Icon = KIND_ICON[choice]
             return <button key={choice} type="button" role="radio" aria-checked={kind === choice} aria-label={KIND_LABEL[choice]} title={KIND_LABEL[choice]}
-              onClick={() => onView({ ...view, kind: choice })}><Icon size={15} /></button>
+              onClick={() => onView({ ...view, kind: choice })}><Icon size={14} /></button>
           })}
         </div>}
       </header>
 
-      {!result && <div className="dx-empty">No result was returned for this card.</div>}
-      {result && rows.length === 0 && <div className="dx-empty">No rows match this query.</div>}
+      {!result && <div className="dx-empty">No result for this card.</div>}
+      {result && rows.length === 0 && <div className="dx-empty">No rows match.</div>}
       {result && rows.length > 0 && <>
-        {numericY.length > 1 && kind !== 'table' && <div className="dx-legend" aria-label={`Series in ${card.title}`}>
-          {numericY.map((key) => {
-            const on = activeY.includes(key)
-            return <button key={key} type="button" className={on ? 'on' : ''} aria-pressed={on} disabled={on && activeY.length === 1} onClick={() => toggleSeries(key)}>
-              <i style={{ background: color(key) }} />{label(key)}{unit(key) && <small>{unitLabel(unit(key))}</small>}
-            </button>
-          })}
-        </div>}
+        {kind === 'metric' && <div className="dx-metrics">{activeY.map((key) => {
+          const value = rows[0][key]
+          const suffix = number(value) && unit(key) && !isFraction(unit(key)) && unit(key) !== '%' ? unitLabel(unit(key)) : ''
+          return <div key={key} className="dx-metric">
+            <span>{label(key)}</span><strong>{suffix ? compact(value as number) : display(value, unit(key))}{suffix && <small>{suffix}</small>}</strong>
+          </div>
+        })}</div>}
 
-        {kind === 'metric' && <div className="dx-metrics">{activeY.map((key) => <div key={key} className="dx-metric">
-          <strong>{display(rows[0][key], unit(key))}</strong><span>{label(key)}</span>
-        </div>)}</div>}
-
-        {(kind === 'bar' || kind === 'line' || kind === 'scatter') && <div className="dx-plot" role="group" aria-label={`${card.title} ${KIND_LABEL[kind].toLowerCase()}`}>
-          <ResponsiveContainer width="100%" height={250}>
-            {kind === 'bar' ? <BarChart data={rows} onClick={chartClick} margin={margin} barCategoryGap="22%">
+        {(kind === 'bar' || kind === 'line' || kind === 'scatter') && <div className="dx-plot" role="group" aria-label={`${card.title} ${KIND_LABEL[kind].toLowerCase()} chart`}>
+          {numericY.length > 1 && <div className="dx-legend" aria-label={`Series in ${card.title}`}>
+            {numericY.map((key) => {
+              const on = activeY.includes(key)
+              return <button key={key} type="button" className={on ? 'on' : ''} aria-pressed={on} disabled={on && activeY.length === 1} onClick={() => toggleSeries(key)}>
+                <i className={kind === 'line' ? 'line' : ''} style={{ background: color(key) }} />{label(key)}
+              </button>
+            })}
+          </div>}
+          <ResponsiveContainer width="100%" height={PLOT_HEIGHT}>
+            {kind === 'bar' ? <BarChart data={rows} onClick={chartClick} margin={margin} barCategoryGap="30%" barGap={2}>
               {axes}
-              {activeY.map((key) => <Bar key={key} dataKey={key} name={key} fill={color(key)} radius={[5, 5, 1, 1]} maxBarSize={44} isAnimationActive={false}
+              {activeY.map((key) => <Bar key={key} dataKey={key} name={key} fill={color(key)} radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false}
                 onClick={(entry: { payload?: DataRow }) => selectRow(entry.payload)}>
-                {rows.map((row, i) => <Cell key={i} fillOpacity={dimmed(row) ? 0.28 : 1} />)}
+                {rows.map((row, i) => <Cell key={i} fillOpacity={dimmed(row) ? 0.25 : 1} />)}
               </Bar>)}
             </BarChart> : kind === 'line' ? <LineChart data={rows} onClick={chartClick} margin={margin}>
               {axes}
-              {activeY.map((key) => <Line key={key} type="monotone" dataKey={key} name={key} stroke={color(key)} strokeWidth={2.2}
-                dot={rows.length <= 24 ? { r: 2.5, strokeWidth: 0, fill: color(key) } : false} activeDot={{ r: 4.5, strokeWidth: 2 }} isAnimationActive={false} />)}
-              {selectedHere && <ReferenceLine x={selection.value} className="dx-ref" strokeDasharray="4 3" />}
+              {activeY.map((key) => <Line key={key} type="monotone" dataKey={key} name={key} stroke={color(key)} strokeWidth={2}
+                dot={rows.length <= 24 ? { r: 4, strokeWidth: 2, fill: color(key) } : false} activeDot={{ r: 5, strokeWidth: 2 }} isAnimationActive={false} />)}
+              {selectedHere && <ReferenceLine x={selection.value} className="dx-ref" />}
             </LineChart> : <ScatterChart onClick={chartClick} margin={margin}>
-              <CartesianGrid strokeDasharray="3 4" />
-              <XAxis type="number" dataKey={card.x} name={label(card.x)} tickLine={false} axisLine={false} tickFormatter={(value: number) => axisTick(value, unit(card.x))} tickMargin={10} />
-              <YAxis type="number" dataKey={activeY[0]} name={label(activeY[0])} tickLine={false} axisLine={false} tickFormatter={(value: number) => axisTick(value, unit(activeY[0]))} width={44} />
-              <Tooltip content={tip} cursor={{ strokeDasharray: '3 3', className: 'dx-cursor-line' }} isAnimationActive={false} />
+              <CartesianGrid vertical={false} />
+              <XAxis type="number" dataKey={card.x} name={label(card.x)} tickLine={false} axisLine={false} tickFormatter={(value: number) => axisTick(value, unit(card.x))} tickMargin={8} />
+              <YAxis type="number" dataKey={activeY[0]} name={label(activeY[0])} tickLine={false} axisLine={false} tickFormatter={(value: number) => axisTick(value, unit(activeY[0]))} width={40} tickMargin={4} />
+              <Tooltip content={tip} cursor={{ className: 'dx-cursor-line' }} isAnimationActive={false} />
               <Scatter data={rows} fill={color(activeY[0])} isAnimationActive={false} onClick={(entry: { payload?: DataRow }) => selectRow(entry.payload)}>
-                {rows.map((row, i) => <Cell key={i} fillOpacity={dimmed(row) ? 0.22 : 0.85} />)}
+                {rows.map((row, i) => <Cell key={i} fillOpacity={dimmed(row) ? 0.2 : 0.9} />)}
               </Scatter>
             </ScatterChart>}
           </ResponsiveContainer>
@@ -194,11 +205,11 @@ export default function ChartCard({ card, result, view, selection, index, onView
       </>}
 
       {result && <footer className="dx-card-foot">
-        <span className={`dx-src ${result.source.kind}`}>{result.source.kind === 'fixture' ? 'Sample data' : result.source.kind === 'events' ? 'Event data' : 'Model data'}</span>
-        <span>As of {result.source.as_of || 'unknown'}</span>
+        <span className={`dx-src ${result.source.kind}`}>{SOURCE_LABEL[result.source.kind]}</span>
+        <span>{result.source.as_of || 'date unknown'}</span>
         <span>{result.rows.length === result.total_rows ? `${result.total_rows} rows` : `${result.rows.length} of ${result.total_rows} rows`}</span>
         {result.source.notes.length > 0 && <details className="dx-notes">
-          <summary aria-label="Data notes" title="Data notes"><InfoIcon size={14} /></summary>
+          <summary aria-label="Data notes" title="Data notes"><InfoIcon size={13} /></summary>
           <ul>{result.source.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>
         </details>}
       </footer>}
