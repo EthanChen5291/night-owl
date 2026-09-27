@@ -16,6 +16,7 @@ the NoIR/IR footage share one domain (README decision 7). It must match ``GRAY``
 Only frames listed in ``labels/_reviewed.txt`` are included by default; every selected frame
 needs a label file, which may be empty for a reviewed negative. ``--allow-unreviewed`` is an
 explicit demo override. Prints counts by split and tag and writes ``dataset/manifest.json``.
+An existing output directory is left untouched unless ``--replace`` is given.
 
 Example::
 
@@ -98,6 +99,7 @@ def main(argv=None) -> int:
     ap.add_argument("--extra", action="append", default=[], metavar="FRAMES:LABELS",
                     help="extra (augmented) frames+labels, train only; repeatable")
     ap.add_argument("--out", default="dataset")
+    ap.add_argument("--replace", action="store_true", help="delete and rebuild an existing output directory")
     ap.add_argument("--val-tags", help="comma-separated tags that form val (whole clips)")
     ap.add_argument("--val-frac", type=float, default=0.2, help="target val share when --val-tags is not given")
     ap.add_argument("--gray", dest="gray", action="store_true", default=GRAY)
@@ -210,7 +212,19 @@ def main(argv=None) -> int:
         return 2
 
     # write
-    if out.is_dir():
+    if out.exists() or out.is_symlink():
+        if not args.replace:
+            print(f"output already exists: {out}; choose a new --out or pass --replace", file=sys.stderr)
+            return 2
+        if not out.is_dir() or out.is_symlink():
+            print(f"--replace requires a real output directory: {out}", file=sys.stderr)
+            return 2
+        source_dirs = [frames_dir, labels_dir]
+        source_dirs.extend(Path(part) for spec in args.extra for part in spec.split(":"))
+        output_path = out.resolve()
+        if any(source.resolve().is_relative_to(output_path) for source in source_dirs):
+            print(f"refusing to replace {out}: it contains a source directory", file=sys.stderr)
+            return 2
         shutil.rmtree(out)
     for s in split:
         (out / "images" / s).mkdir(parents=True)

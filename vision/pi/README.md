@@ -6,6 +6,10 @@ The earlier `world_rat_person.onnx` was a zero-training fallback for the
 standalone detector. It is not tracked or used by the observed live path.
 `vision/pi/rat.onnx` remains the separate deployment target; the V5 and V6
 candidates have not replaced it.
+The standalone `detect.py` CLI fails when a requested model is missing and
+posts events only with `--post`. A bare model filename can resolve beside the
+script; an explicit path must exist at that path. The older `--no-post` flag
+still works for archived dry-run commands.
 
 Older paths, systemd names, and environment variables still say `barn-owl`. They are code and deployment identifiers, not the current team name.
 

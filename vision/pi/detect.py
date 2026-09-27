@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Node detector: camera -> ONNX YOLO -> rules -> event -> POST /event -> LED. Runs on the Pi CPU.
+"""Standalone detector: camera -> ONNX YOLO -> rules -> event -> LED. Runs on the Pi CPU.
 
 Only numpy, opencv-python-headless and onnxruntime are needed (the offline wheels in ``wheels/``);
 ``gpiozero`` is optional and only used for the LED. Nothing here imports ultralytics.
@@ -14,7 +14,7 @@ Pipeline per frame (README §4)::
          inside a big one)
       -> hit counter: HITS_NEEDED hits inside HIT_WINDOW_S seconds -> one event
       -> cooldown: at most one event per EVENT_COOLDOWN_S
-      -> POST {API_URL}/event (urllib, 2 s timeout, failures are logged and ignored)
+      -> optional POST {API_URL}/event with --post (urllib, 2 s timeout)
       -> LED blink on LED_PIN
 
 The event body is exactly the contract::
@@ -27,17 +27,16 @@ The event body is exactly the contract::
 The full frame stays in RAM. ``--save-events DIR`` also writes the JSON and the crop locally for
 the deck and for debugging without a server.
 
-Models: ``rat.onnx`` (ours, classes rat/person, produced by ``train.sh``) is the default;
-``--model world_rat_person.onnx`` is the zero-training YOLO-World fallback whose classes are
-``stuffed animal`` / ``person``; both are mapped to ``rat`` / ``person`` here. Set ``GRAY`` to
-match ``make_dataset.py`` for the model in use (the World model was not trained gray; pass
-``--color`` for it).
+Models: ``rat.onnx`` (classes rat/person) is the default. Select
+``--model world_rat_person.onnx`` explicitly for the older YOLO-World model, whose classes are
+``stuffed animal`` / ``person``. Set ``GRAY`` to match ``make_dataset.py`` for the model in use
+(the World model was not trained gray; pass ``--color`` for it).
 
 Examples::
 
-    python3 detect.py --mock ../frames --show --no-post          # Mac
-    python3 detect.py --model world_rat_person.onnx --color      # Pi, hour-6 gate
-    BARN_OWL_API=http://192.168.7.1:8000 python3 detect.py --save-events events
+    python3 detect.py --model rat.onnx --mock ../frames --show
+    python3 detect.py --model world_rat_person.onnx --color --mock ../frames
+    python3 detect.py --model rat.onnx --post --api http://192.168.7.1:8000
 """
 from __future__ import annotations
 
@@ -434,7 +433,7 @@ def main(argv=None) -> int:
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     add_camera_args(ap)
-    ap.add_argument("--model", default=MODEL, help=f"ONNX file (default {MODEL}; fallback {FALLBACK_MODEL})")
+    ap.add_argument("--model", default=MODEL, help=f"ONNX file (default {MODEL}; bare names also searched beside this script)")
     ap.add_argument("--names", help="comma-separated class names if the model is neither of the known two")
     ap.add_argument("--conf", type=float, default=CONF)
     ap.add_argument("--iou", type=float, default=IOU)
@@ -451,7 +450,9 @@ def main(argv=None) -> int:
     ap.add_argument("--api", default=API_URL, help="server base URL (env BARN_OWL_API)")
     ap.add_argument("--node-id", default=NODE_ID)
     ap.add_argument("--h3", default=DEMO_H3)
-    ap.add_argument("--no-post", action="store_true", help="never POST (Mac testing)")
+    posting = ap.add_mutually_exclusive_group()
+    posting.add_argument("--post", action="store_true", help="POST events to --api (default: local only)")
+    posting.add_argument("--no-post", action="store_true", help="local only (compatibility alias for the default)")
     ap.add_argument("--save-events", metavar="DIR", help="write event JSON + crop here")
     ap.add_argument("--show", action="store_true", help="cv2.imshow with boxes (Mac / desktop)")
     ap.add_argument("--max-frames", type=int, default=0, help="stop after N frames (0 = run until ^C / mock ends)")
@@ -462,14 +463,13 @@ def main(argv=None) -> int:
 
     model = Path(args.model)
     if not model.is_file():
-        here = Path(__file__).resolve().parent / model.name
-        if here.is_file():
-            model = here
-        elif Path(FALLBACK_MODEL).is_file() or (Path(__file__).resolve().parent / FALLBACK_MODEL).is_file():
-            print(f"{args.model} not found, using fallback {FALLBACK_MODEL}", file=sys.stderr)
-            model = Path(FALLBACK_MODEL) if Path(FALLBACK_MODEL).is_file() else Path(__file__).resolve().parent / FALLBACK_MODEL
-        else:
-            print(f"no model: {args.model} (train.sh makes pi/rat.onnx; the World fallback is {FALLBACK_MODEL})", file=sys.stderr)
+        if args.model == model.name:
+            here = Path(__file__).resolve().parent / model.name
+            if here.is_file():
+                print(f"resolved bare model name {args.model} to {here}", file=sys.stderr)
+                model = here
+        if not model.is_file():
+            print(f"no model: {args.model}", file=sys.stderr)
             return 2
     try:
         apply_deployed_config(args, model, argv)
@@ -492,7 +492,7 @@ def main(argv=None) -> int:
     save_dir = Path(args.save_events) if args.save_events else None
     print(f"model {model.name} classes {det.names} imgsz {det.imgsz} gray={args.gray} conf {args.conf} "
           f"floor_y {args.floor_y} hits {args.hits}/{args.window}s cooldown {args.cooldown}s "
-          f"api {'(off)' if args.no_post else args.api} node {args.node_id} h3 {args.h3}", flush=True)
+          f"api {args.api if args.post else '(off)'} node {args.node_id} h3 {args.h3}", flush=True)
 
     n = 0
     t_start = time.monotonic()
@@ -516,7 +516,7 @@ def main(argv=None) -> int:
                 top, n_hits = fired
                 body = make_event(top, n_hits, fr.bgr if fr.has_color else fr.gray, args.node_id, args.h3, fr.ts)
                 status = "no-post"
-                if not args.no_post:
+                if args.post:
                     updated, status = post_event(args.api, body)
                     status = ("POST score updated " if updated else "POST no score update ") + status
                 if save_dir:
