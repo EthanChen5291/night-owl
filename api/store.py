@@ -1,6 +1,6 @@
 """In-memory state for the demo hub, mirrored to an append-only JSONL so a restart keeps the events.
 
-Data files resolve relative to the repo root (parent of api/), overridable with BARN_OWL_DATA_DIR:
+Data files resolve relative to the repo root (parent of api/), overridable with NIGHT_OWL_DATA_DIR:
   cells:    model/out/cells_<month>.json -> model/out/cells.json -> city/cells.fixture.json
   plan:     model/out/plan_<month>.json  -> model/out/plan.json  -> city/plan.fixture.json
   backtest: model/out/backtest.json      -> api/fixtures/backtest.json
@@ -22,7 +22,7 @@ from posterior import PRIOR_SCORE_B, Posterior, accepts, percentile_rank
 
 API_DIR = Path(__file__).resolve().parent
 REPO_ROOT = API_DIR.parent
-RING_SIZE = int(os.environ.get("BARN_OWL_RING", "2000"))
+RING_SIZE = int(os.environ.get("NIGHT_OWL_RING", os.environ.get("BARN_OWL_RING", "2000")))
 
 
 def utcnow_iso() -> str:
@@ -31,8 +31,8 @@ def utcnow_iso() -> str:
 
 class Store:
     def __init__(self, data_dir: Path | None = None, events_file: Path | None = None):
-        self.data_dir = Path(data_dir or os.environ.get("BARN_OWL_DATA_DIR") or REPO_ROOT).resolve()
-        self.events_file = Path(events_file or os.environ.get("BARN_OWL_EVENTS_FILE") or (API_DIR / "events.jsonl"))
+        self.data_dir = Path(data_dir or os.environ.get("NIGHT_OWL_DATA_DIR", os.environ.get("BARN_OWL_DATA_DIR")) or REPO_ROOT).resolve()
+        self.events_file = Path(events_file or os.environ.get("NIGHT_OWL_EVENTS_FILE", os.environ.get("BARN_OWL_EVENTS_FILE")) or (API_DIR / "events.jsonl"))
         self.events: deque[dict] = deque(maxlen=RING_SIZE)  # oldest -> newest
         self.posteriors: dict[tuple[str, str], Posterior] = {}
         self.last_event_at: dict[tuple[str, str], str] = {}

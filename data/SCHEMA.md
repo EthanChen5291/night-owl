@@ -1,4 +1,4 @@
-# Barn Owl open-data schema
+# NightOwl open-data schema
 
 Every source the models read, what `data/bake_open_data.py` turns it into, the join keys, the gotchas, and the P0
 finding that justifies the validation claim. Raw CSVs (~2.7 GB) live in `data/raw/open/`, baked Parquet (~222 MB)

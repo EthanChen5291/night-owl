@@ -82,7 +82,7 @@ def main() -> None:
         _, source = make_panel(idx, clip, name, detail)
         sources.append(source)
     make_end()
-    preview = OUT / "barn-owl-v5-development-replay-montage-v1-preview.jpg"
+    preview = OUT / "nightowl-v5-development-replay-montage-v1-preview.jpg"
     with Image.open(BUILD / "panel-01.png") as image:
         image.save(preview, quality=92, subsampling=0)
     concat = BUILD / "concat.txt"
@@ -91,7 +91,7 @@ def main() -> None:
         lines.extend((f"file '{BUILD / f'panel-{idx:02d}.png'}'", "duration 2.4"))
     lines.append(f"file '{BUILD / 'panel-05.png'}'")
     concat.write_text("\n".join(lines) + "\n")
-    video = OUT / "barn-owl-v5-development-replay-montage-v1.mp4"
+    video = OUT / "nightowl-v5-development-replay-montage-v1.mp4"
     subprocess.run([
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-f", "concat", "-safe", "0", "-i", str(concat),

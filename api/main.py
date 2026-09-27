@@ -1,4 +1,4 @@
-"""Night Owl API: the hub between the Pi node, model output, and web app.
+"""NightOwl API: the hub between the Pi node, model output, and web app.
 
 Run:  api/run.sh   or   uv run --project api uvicorn main:app --app-dir api --host 0.0.0.0 --port 8000
 Contract: plan/master-plan.md §6 (frozen). Stage fallback: api/fake_event.sh (plan §9).
@@ -68,7 +68,7 @@ class Event(BaseModel):
 
 def create_app(data_dir: Path | None = None, events_file: Path | None = None) -> FastAPI:
     store = Store(data_dir=data_dir, events_file=events_file)
-    app = FastAPI(title="Night Owl API", version="0.1.0")
+    app = FastAPI(title="NightOwl API", version="0.1.0")
     app.state.store = store
     app.add_middleware(
         CORSMiddleware,

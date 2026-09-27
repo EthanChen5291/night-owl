@@ -1,6 +1,6 @@
-# Night Owl
+# NightOwl
 
-Night Owl is a DivHacks prototype for finding NYC blocks where rat risk may be higher than 311 complaints suggest. The map compares two monthly H3 cell rankings: Model A predicts complaints, and Model B estimates active rat signs conditional on inspection. Their percentile difference is the "silence" score. It is a planning signal, not a count of rats.
+NightOwl is a DivHacks prototype for finding NYC blocks where rat risk may be higher than 311 complaints suggest. The map compares two monthly H3 cell rankings: Model A predicts complaints, and Model B estimates active rat signs conditional on inspection. Their percentile difference is the "silence" score. It is a planning signal, not a count of rats.
 
 The web app shows those cells, suggested sensor sites, an inspection backtest, and a sightings feed. A Raspberry Pi camera node can send a detection to the local API, which updates the affected cell's posterior. The API owns that update; the browser refetches the result.
 
@@ -42,4 +42,4 @@ The V5 detector remains a demo candidate. Its fresh box test scored 0.6158 rat A
 | [plan/](plan/master-plan.md) | Team plan and data contract |
 | [docs/utsav-technical-handoff.md](docs/utsav-technical-handoff.md) | Detailed technical handoff and evidence limits |
 
-Fixture events and the scripts under `api/` are for an isolated rehearsal. They are not Pi observations or detector evaluation data. The historical Barn Owl name remains in file paths, environment variables, storage keys, and the `barn-owl.tech` domain.
+Fixture events and the scripts under `api/` are for an isolated rehearsal. They are not Pi observations or detector evaluation data. The earlier Barn Owl name remains only where it is a live identifier: paths and the systemd unit on the Pi, and the `barn-owl.tech` domain.

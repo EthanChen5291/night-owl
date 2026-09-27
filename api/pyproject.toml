@@ -1,7 +1,7 @@
 [project]
-name = "barn-owl-api"
+name = "nightowl-api"
 version = "0.1.0"
-description = "Barn Owl demo hub: serves the frozen JSON contract, takes node events, keeps the Beta-Binomial posterior"
+description = "NightOwl demo hub: serves the frozen JSON contract, takes node events, keeps the Beta-Binomial posterior"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

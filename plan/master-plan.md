@@ -1,4 +1,4 @@
-# Barn Owl — master plan (DivHacks 2026, Hack the City)
+# NightOwl — master plan (DivHacks 2026, Hack the City)
 
 Team plan for the 36-hour build. Rewritten at the event from `README.md` (the handoff). Other files
 cross-reference sections here by number; do not renumber. Section 6 (JSON contract) is frozen at hour 0
@@ -12,7 +12,7 @@ Event: Sat 2026-09-26 12:00 → Sun 2026-09-27 24:00 (36 h). Hour N below = Sat 
 
 NYC's rat map is built from 311 calls, so it is a map of who complains, not of where rats are. The Health
 Department's rodent inspections split into complaint-driven visits and proactive (indexed) visits; the
-proactive ones give ~130k near-unbiased outcomes a year, half inside the four Rat Mitigation Zones. Barn Owl
+proactive ones give ~130k near-unbiased outcomes a year, half inside the four Rat Mitigation Zones. NightOwl
 trains two models on every H3 resolution-9 cell × month. Model A predicts complaints from all features:
 "what the city sees". Model B predicts P(active rat signs | inspected) from physical and environmental
 features only, with inverse-propensity weights, trained on Initial inspections with no prior complaint on the
@@ -209,7 +209,7 @@ enters B only as a weight. Grep the B feature list against the forbidden columns
 - Origins: every month from 2016-01 to 2026-07. Train on data before the origin, score all cells, rank.
 - Positives: next-month Initial inspections with `l60 = 0` that found active rat signs.
 - Metric: precision@k for k in {50, 100, 200} cells, plotted over origins.
-- Lines: Barn Owl silent blocks (top-k by silence score) vs baseline of 311 ranking (top-k by trailing
+- Lines: NightOwl silent blocks (top-k by silence score) vs baseline of 311 ranking (top-k by trailing
   3-month complaints) vs B alone. Shade the 2020–21 dip.
 - Output: `backtest.json` (origin, k, method, precision) that the frontend chart reads. One PNG for the deck.
 - Owner: Ethan builds the loop, Sanjavan runs it from hour 14 and makes the chart.
@@ -458,7 +458,7 @@ inspection since 2015 to the complaints on the same lot. Seventy-five to ninety 
 behind them. And inspections that follow a complaint find active rats two to three times as often. That gap
 is the selection bias, in one number.
 
-[Slide: two models] Barn Owl trains two models on every H3 cell, every month. Model A predicts complaints
+[Slide: two models] NightOwl trains two models on every H3 cell, every month. Model A predicts complaints
 from everything the city knows. That is what the city sees. Model B predicts the chance an inspector finds
 active rat signs, trained only on those proactive inspections, only on physical features: buildings,
 restaurant vermin violations, demolitions, litter baskets, catch basins, income, temperature. Weighted so
@@ -483,7 +483,7 @@ ten cells, hundred-metre spacing, snapped to real tree pits.
 [Slide: what's real] Real: seventeen open datasets, both models, the backtest, the hardware, the detector.
 Demo-only: the detector is trained on a prop; the glow is for you.
 
-[Slide: close] The city already pays for the inspections. We just stopped throwing the answer away. Barn Owl.
+[Slide: close] The city already pays for the inspections. We just stopped throwing the answer away. NightOwl.
 ratst.at.
 
 ### Q&A bank
@@ -560,4 +560,4 @@ Say this on stage before anyone asks.
 - Containerization rollout as a feature (no dataset exists).
 - Real-rat detection, multi-node deployment, negative evidence from quiet nights, citywide map.
 
-**Not a population estimate.** Barn Owl ranks blocks by risk of active signs; it does not count rats.
+**Not a population estimate.** NightOwl ranks blocks by risk of active signs; it does not count rats.

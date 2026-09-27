@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run --with duckdb --with h3 --with requests python
-"""Bake NYC open data CSVs into Parquet for Barn Owl.
+"""Bake NYC open data CSVs into Parquet for NightOwl.
 
     data/raw/open/*.csv  ->  data/parquet/*.parquet   (DuckDB, one function per table)
 

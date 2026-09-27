@@ -1,6 +1,6 @@
 # V5 recorded-development montage
 
-[14.4-second MP4](out/barn-owl-v5-development-replay-montage-v1.mp4) · [preview](out/barn-owl-v5-development-replay-montage-v1-preview.jpg)
+[14.4-second MP4](out/nightowl-v5-development-replay-montage-v1.mp4) · [preview](out/nightowl-v5-development-replay-montage-v1-preview.jpg)
 
 **Dated development snapshot:** the closing card says “fresh test pending.” That test has since run. Its as-run rat AP50 was 0.615779 on 369 frames and did not establish the 0.90 target. Completed source-only QC found reference-box errors; 31 proposed corrections remain unadopted and no corrected AP exists. The montage remains useful as an example of recorded development detections, paired with that result and caveat.
 

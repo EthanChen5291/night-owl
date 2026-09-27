@@ -1,6 +1,6 @@
 # Modal training environment
 
-Night Owl trained the plush-rat YOLO11n candidates on one Modal L4 at a time. Each job was capped at 3,600 seconds, used at most four CPUs and 16 GiB of memory, and had zero retries. The launcher creates no serving endpoint. At [Modal's listed rates](https://modal.com/pricing), one full-hour job is about $1.12 for those GPU, CPU, and memory limits, before storage or other charges.
+NightOwl trained the plush-rat YOLO11n candidates on one Modal L4 at a time. Each job was capped at 3,600 seconds, used at most four CPUs and 16 GiB of memory, and had zero retries. The launcher creates no serving endpoint. At [Modal's listed rates](https://modal.com/pricing), one full-hour job is about $1.12 for those GPU, CPU, and memory limits, before storage or other charges.
 
 The current results are in [V5 results](V5_RESULTS.md), [V5 formal event results](V5_FORMAL_EVENT_RESULTS.md), and [V6 results](V6_RESULTS.md). V5 remains a supervised lit-room candidate after its formal event test failed. The V6 recovery model also failed its predeclared development regression limits. Neither was promoted to `pi/rat.onnx`; no further GPU run is queued by this document.
 

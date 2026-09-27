@@ -1,3 +1,4 @@
+import { readSavedValue } from './storage'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cellToLatLng, cellToParent, latLngToCell } from 'h3-js'
 import { fetchBacktest, fetchCells, fetchPlacements, fetchPlan, fetchPublic, fetchQueue } from './api'
@@ -55,7 +56,7 @@ function modeFromHash(): Mode {
 }
 function areaFromHash(): string | null {
   try {
-    return hashParams().get('a') || localStorage.getItem('barnowl.area') || null
+    return hashParams().get('a') || readSavedValue('nightowl.area', 'barnowl.area') || null
   } catch {
     return hashParams().get('a') || null
   }
@@ -127,8 +128,11 @@ export default function App() {
     setSelected(null)
     setOpenRank(null)
     try {
-      if (id) localStorage.setItem('barnowl.area', id)
-      else localStorage.removeItem('barnowl.area')
+      if (id) localStorage.setItem('nightowl.area', id)
+      else {
+        localStorage.removeItem('nightowl.area')
+        localStorage.removeItem('barnowl.area')
+      }
     } catch {
       /* ignore */
     }

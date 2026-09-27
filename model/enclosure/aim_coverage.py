@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run --with matplotlib --with numpy python
-"""Camera coverage vs hanger tilt for the Barn Owl D3 node (side view).
+"""Camera coverage vs hanger tilt for the NightOwl D3 node (side view).
 
 Writes aim-coverage.png (1600x900) next to this file.
 
@@ -181,7 +181,7 @@ def main() -> None:
     panel_diorama(axes[1]); axes[1].set_xticks(range(-10, 51, 10))
 
     # legend by colour + text (identity never colour-alone: every bar is labelled)
-    fig.text(0.5, 0.945, "Barn Owl node: camera coverage vs hanger tilt (side view, tilt swings the 48.8° axis)",
+    fig.text(0.5, 0.945, "NightOwl node: camera coverage vs hanger tilt (side view, tilt swings the 48.8° axis)",
              ha="center", fontsize=16, color=INK, weight="bold")
     fig.text(0.5, 0.905,
              "IMX219 full FOV 62.2° x 48.8° (datasheet; HANDOFF-D3 rounds to 62° x 49°). The camera's 25 mm edge lies along the hanger's pivot axis, "
