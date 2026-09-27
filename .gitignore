@@ -52,3 +52,6 @@ web/public/city/
 
 # real rodent photos for api/real_sightings.py (re-download with --fetch); the crops live in events.real.json
 api/fixtures/rodents/
+
+# assistant chat threads (api/chat_store.py)
+api/chat.db*
