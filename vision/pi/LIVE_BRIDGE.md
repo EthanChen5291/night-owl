@@ -37,6 +37,8 @@ Run the local tests without touching the Pi:
 
 ```sh
 vision/.venv/bin/python -m unittest vision.tests.test_live_handoff -v
+python3 -m unittest vision.tests.test_event_relay -v
+api/.venv/bin/python -m unittest vision.tests.test_event_relay_api -v
 ```
 
 For a saved-frame dry run on the Pi after copying `live_bridge.py` and
@@ -126,6 +128,67 @@ The dashboard viewer or recording control still decides when the existing
 camera runs. Watch `run_stats.json` after stopping the worker and inspect event
 crops. A three-hit alert should be evaluated against actual push timestamps;
 saved or sparse frames do not establish event recall.
+
+For later local-only observation with the reviewed bridge already enabled, run
+the worker in a Pi shell with a **new** events directory for each run:
+
+```sh
+cd ~/barn-owl-candidates/v4-fb557bd9
+../v3-3214f2a0/.venv/bin/python live_worker.py \
+  --socket "$HOME/barn-owl-candidates/live-frames.sock" \
+  --model "$PWD/rat.onnx" \
+  --expected-sha256 fb557bd9c1dafa7466a45afb50ac47668550a666a44f1791af714011a0bf1b27 \
+  --conf 0.70 --iou 0.45 --floor-y 0 --hits 3 --window 1 --cooldown 2 \
+  --events-dir "$PWD/live-observation-NEW-NAME"
+```
+
+Press Ctrl-C in that shell to stop only the worker. It writes `run_stats.json`
+and removes its socket; the dashboard camera agent remains running. The worker
+saves crops locally and has no API or LED output. `received_fps` and
+`processed_fps` include time spent waiting for a viewer, so use a run started
+after the viewer is open for a direct live-rate measurement.
+
+## Optional event relay
+
+`event_relay.py` is a separate standard-library process. It reads only complete
+`event_*.json` files from one worker events directory and leaves the detector and
+camera threads free of network calls. Copy it to the V4 slot from the Mac:
+
+```sh
+scp vision/pi/event_relay.py barn-owl-pi:/home/pi/barn-owl-candidates/v4-fb557bd9/
+```
+
+Then use a second Pi shell while the worker is running (or after it stops):
+
+```sh
+cd ~/barn-owl-candidates/v4-fb557bd9
+python3 event_relay.py --events-dir "$PWD/live-observation-NEW-NAME" --once
+```
+
+That command is a dry run and sends nothing. To relay later, use the same events
+directory and supply both `--post` and the reviewed API base URL explicitly:
+
+```sh
+python3 event_relay.py --events-dir "$PWD/live-observation-NEW-NAME" \
+  --post --api 'http://<reviewed-api-host>:8000'
+```
+
+Press Ctrl-C to stop only the relay. Its `relay_receipts.jsonl` records each
+attempt before POST and each server receipt with an fsync. The default total
+budget is three attempts per event, including across relay restarts. Once an
+event has a server receipt, restarting does not resend it. A server
+`accepted:false` is recorded separately from a network failure; the API uses
+that response both for a duplicate and for an event below its threshold. If a
+network failure exhausts the budget, inspect the journal and raise
+`--max-attempts` explicitly for a further bounded retry. The relay resends the
+saved JSON bytes unchanged, so the API's body-based deduplication protects the
+posterior if the first request succeeded but its receipt was lost, while the API
+retains that event. An API event reset or lost server log removes that protection.
+Every attempt and receipt records the exact API destination. Starting the relay
+against a different URL with the same events directory fails before any POST;
+use the original destination or a new events directory after reviewing the
+delivery history.
+HTTP redirects are rejected without following them; supply the API's direct URL.
 
 To roll back, remove the service override, restore the exact backed-up agent,
 reload and restart the service, then stop the worker. `live_worker.py` removes its
