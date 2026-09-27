@@ -143,9 +143,11 @@ def main(argv=None) -> int:
               "start_sec": segment_start or 0.0,
               "end_sec": previous_ts or 0.0,
               "duration_sec": (previous_ts - segment_start) if previous_ts is not None else 0.0,
-              "gray": args.gray, "conf": args.conf,
+              "gray": args.gray, "conf": args.conf, "iou": args.iou,
               "floor_y": args.floor_y, "min_rat_width": args.min_rat_width,
-              "max_rat_width": args.max_rat_width, "hits": args.hits, "window": args.window,
+              "max_rat_width": args.max_rat_width,
+              "person_iou": args.person_iou, "person_contain": args.person_contain,
+              "hits": args.hits, "window": args.window,
               "cooldown": args.cooldown, "events": events}
     if args.pushes:
         from eval_events import read_pushes, score_pushes
