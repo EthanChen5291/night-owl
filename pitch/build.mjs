@@ -9,7 +9,7 @@ const SKILL_DIR = '/Users/utsavsharma/.codex/plugins/cache/openai-primary-runtim
 const PYTHON = '/Users/utsavsharma/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3';
 const TMP = path.join(WORKSPACE, '.build');
 const OUT = path.join(WORKSPACE, 'out');
-const version = process.env.DECK_VERSION || 'v18';
+const version = process.env.DECK_VERSION || 'v19';
 const FINAL = path.join(OUT, `barn-owl-three-minute-pitch-${version}.pptx`);
 const { applyPresentationChartFont, finalizePresentation } = await import(
   pathToFileURL(path.join(SKILL_DIR, 'container_tools/artifact_tool_utils.mjs')).href
@@ -107,45 +107,46 @@ function notes(slide,text,source='') {
     'model/out/backtest.json and model/05_backtest.py');
 }
 
-// 4. Physical prototype and recorded-footage software loop.
+// 4. Verified live Pi-to-map prototype loop.
 {
-  const slide=base('Recorded footage reaches the map',4);
+  const slide=base('A live Pi event reaches the map',4);
   const steps=[
-    {y:158,n:'1',t:'Pick a site',d:'Rank risk and the data gap; select a tree pit'},
-    {y:250,n:'2',t:'Capture',d:'Physical owl rig: Pi 5 camera and PIR sensor'},
-    {y:342,n:'3',t:'Detect',d:'Room-lit plush model; live positive test pending'},
-    {y:434,n:'4',t:'Update the map',d:'Accepted events update a chosen prior'},
+    {y:158,n:'1',t:'Pick a site',d:'Rank risk and the data gap'},
+    {y:250,n:'2',t:'Capture',d:'Pi 5 camera watches the room-lit prop'},
+    {y:342,n:'3',t:'Detect',d:'V5 processed 1,346 live frames in 90 s'},
+    {y:434,n:'4',t:'Update the map',d:'One genuine event reached the local API'},
   ];
   for(const q of steps){
     txt(slide,q.n,80,q.y,52,64,43,c.teal,true);
-    txt(slide,q.t,147,q.y,640,37,28,c.navy,true);
-    txt(slide,q.d,147,q.y+37,660,42,22,c.ink);
+    txt(slide,q.t,147,q.y,470,37,28,c.navy,true);
+    txt(slide,q.d,147,q.y+37,475,42,22,c.ink);
   }
-  const rigPhoto=await fs.readFile(path.join(WORKSPACE,'assets/physical-prototype.jpeg'));
-  slide.images.add({blob:new Uint8Array(rigPhoto),contentType:'image/jpeg',alt:'Physical owl camera rig and laptop at the hackathon',fit:'contain',position:{left:905,top:150,width:285,height:365}});
-  txt(slide,'Physical prototype at the hackathon',915,516,275,43,17,c.muted);
+  line(slide,645,175,2,c.pale,344);
+  const liveMap=await fs.readFile(path.join(WORKSPACE,'assets/live-pi-map-20260927.png'));
+  slide.images.add({blob:new Uint8Array(liveMap),contentType:'image/png',alt:'Live Barn Owl map after one accepted Pi plush event; two sightings and site ranked first',fit:'contain',position:{left:675,top:182,width:525,height:295}});
+  txt(slide,'Live map · two sightings · site rank 1',675,483,525,48,18,c.muted);
   line(slide,80,561,1120,c.pale,2);
-  txt(slide,'Earlier replay',80,579,200,49,25,c.teal,true);
-  txt(slide,'1 event · score 9.2% → 13.0% · rank 11 → 2',280,577,900,70,27,c.ink);
+  txt(slide,'Live loop',80,579,190,49,25,c.teal,true);
+  txt(slide,'1 event · score 13.0% → 16.2% · rank 2 → 1',270,577,910,70,27,c.ink);
   notes(slide,
-    'The planner has 20 candidate tree sites in its current export. The table prop is room-lit. In an earlier local Mac replay using the V2 detector, original camera footage from zoom15_b at 59–63 seconds passed through the exported ONNX model, the Pi Detector class and its three-hit rules, crop generation, and the local API. Exactly one event at confidence 0.860 was accepted. The served cell score moved from 0.0923 to 0.1297; the plan candidate moved from rank 11 to 2. The frontend screenshot showed the crop, one sighting, and rank 2. V5 has separate detector development results but has not been verified through the same API path. The earlier software loop used saved video on a Mac. V5 also ran on a saved frame on the physical Pi; positive live-camera detection remains unverified. PIR only wakes capture; the detector decides. Team-reported IR capture does not validate the model under IR. An accepted event updates a chosen Beta prior and can rerank candidates; it does not retrain Model B. If demonstrating from recorded footage on stage, name it as recorded. A physical Pi trigger can be shown only if it works in a fresh test.',
-    'vision/replay_video.py; vision/RUNBOOK.md; vision/TRAINING_RESULTS.md; model/out/plan.json; api/posterior.py; team local replay and frontend screenshot 2026-09-26; team physical-rig photo IMG_1788.jpeg 2026-09-26');
+    'The room-lit physical Pi 5 camera fed the locked V5 ONNX detector for 89.859 seconds. The observer inferred 1,346 frames at 14.98 processed frames per second, mean 59.15 milliseconds per frame. It saved six event crops; root and the API reviewer inspected all six and each showed the same visible plush. Exactly one genuine event from the live Pi observer was relayed to the local API on the Mac, which returned HTTP 200 and accepted it. The node was live-v5-observer in H3 cell 892a100d467ffff at 2026-09-27 04:52:03.340 UTC. The served score changed from .1297 to .1618, sightings from one to two, and candidate rank from two to one. The visible map screenshot shows the new sighting and rank-one site. The other five saved events were not posted. This verifies a supervised live Pi camera-to-detector-to-local-API-to-map loop on a room-lit plush prop. It does not establish field reliability, wild-rat or infrared performance, or the .90 detector target. PIR wakes capture; the detector decides. An accepted event updates a chosen Beta prior and reranks candidates; it does not retrain Model B.',
+    'pitch/evidence/v5-live-run-stats.json; pitch/evidence/v5-live-integration-result.json; pitch/assets/live-pi-map-20260927.png; api/posterior.py; vision/V5_FORMAL_EVENT_RESULTS.md');
 }
 
 // 5. Honest demo state and proposed next test.
 {
   const slide=base('What is real today',5);
   txt(slide,'Real',80,173,190,56,36,c.teal,true);
-  txt(slide,'NYC data and sweep outcomes\nCell models and a 119-month backtest\nPi camera and PIR at the hackathon\nSaved-frame ONNX inference on Pi',80,242,530,241,27,c.ink);
+  txt(slide,'NYC data and sweep outcomes\nCell models and a 119-month backtest\nPi camera and PIR at the hackathon\nLive plush event reached the map',80,242,530,241,27,c.ink);
   line(slide,638,175,2,c.pale,352);
   txt(slide,'Demo and open work',696,173,480,56,36,c.coral,true);
-  txt(slide,'Fresh V5 test did not establish .90 AP50\nLabels and edge misses need work\nTuned development: .961 weakest clip\nEarlier footage → API → map verified\nRoom-lit prop demo; no field deployment',696,242,485,240,24,c.ink);
+  txt(slide,'Fresh V5 box target not established\nFormal replay: 17 false alerts / 190 s\nCap and shoe caused those alerts\nRoom-lit prop; no field deployment\nNo IR or wild-rat validation',696,242,485,240,24,c.ink);
   line(slide,80,531,1100,c.pale,2);
   txt(slide,'Next',80,558,173,50,28,c.teal,true);
-  txt(slide,'Improve the detector and repeat a frozen test before a pilot.',251,553,935,69,29,c.navy);
+  txt(slide,'Improve cap and shoe handling, then test on new footage.',251,553,935,69,29,c.navy);
   notes(slide,
-    'Here is the honest state. The data exports, model scores, and sweep backtest exist. Teammates report working Pi 5 camera, PIR, and infrared capture; the prop footage is room-lit. V4 scored rat AP50 .925806 on 59 adjacent frames from the same camera session, then .882675 on 439 reviewed new-room frames, below the .90 box target. Its recorded replay missed a parked plush and fired once on a dark case. V5 used those prior new-room clips as development data. The locked V5 checkpoint reached .960806 rat AP50 on its weakest selected development clip and .975279 combined over 146 development frames. A frozen fresh test of 369 reviewed frames measured .615779 rat AP50 and .492688 person AP50 as run, with .703102 rat AP50 on the positive clip; PyTorch and ONNX AP matched exactly. Completed source-only review of all 193 positive sampled frames found shifted and oversized rat reference boxes. Thirty-one source-estimated correction proposals are drafts and were not adopted or rescored; the frozen labels, model settings, and original report remain unchanged. The .615779 figure is the as-run score with known annotation defects, not a corrected performance estimate. The as-run test did not establish the .90 rat-box target. The fresh replay emitted 34 events in the positive clip; independent review of every saved event crop beside its source frame confirmed all 34 target the visible plush. The negative clip emitted zero events over 175.937 seconds. These are repeated firings across only two complete coarse positive presences, not 34 independent encounters or a 20-push recall test. The negative clip is shorter than three minutes, so the formal event gate is incomplete. The second presence first alerted 58.890 seconds after its start, largely while the plush was near the image edge. Source-only annotation QC is complete; the 31 proposed corrections remain unadopted. The V5 ONNX ran on a saved plush frame on the physical Pi at 60.23 milliseconds median, confidence .931. A separate earlier Mac replay using V2 footage carried one accepted event through detector rules and local API to the visible map. A later Pi live-camera trial had no plush target; positive live-camera integration is pending. AP50 is a box detection measure, not accuracy or rat population prevalence. No IR or wild-rat detector test and no field deployment have been done. An accepted event updates a chosen prior and can change candidate order; it does not retrain Model B. Improve the detector and repeat a frozen test before a field pilot.',
-    'vision/V5_FRESH_RESULTS.md (completed crop and source-only annotation reviews; 31 correction proposals unadopted); pitch/evidence/v5-fresh-test-provisional.json (frozen as-run box scores); vision/artifacts/rat-litroom-v5-development-candidate-20260927.zip: reports/metrics.json, reports/candidate_lock.json, reports/dev_replay, reports/pi_saved_frame_smoke.json; vision/artifacts/rat-litroom-v4-new-room-evaluation-20260927.zip; model/out/backtest.json; api/posterior.py');
+    'The city data, cell models and 119-month swept-cell backtest exist. The live room-lit plush Pi-to-local-API-to-map loop is verified on one accepted event; see slide four. Detector readiness is separate. V4 scored rat AP50 .925806 on 59 adjacent same-session frames, then .882675 on 439 reviewed new-room frames. V5 used those new-room clips for tuning and scored .960806 rat AP50 on its weakest development clip and .975279 combined over 146 development frames. Its frozen fresh box test measured .615779 rat AP50 as run on 369 frames, with exact PyTorch/ONNX AP parity. Completed source-only annotation QC found shifted and oversized reference boxes; 31 correction proposals remain unadopted and no corrected AP exists. The .90 box target is not established. In a separate fixed recorded-video formal event test, 18 of 19 source-reviewed plush appearances eventually had verified alerts, or 94.7 percent observed on that source; the brief first appearance was missed. All 43 emitted positive crops showed plush, but include repeat firings. The negative clip produced 17 false events over 190.409 seconds, or 5.357 per minute, above the required fewer than .5 per minute. Sixteen false alerts targeted one cap and one targeted a partial shoe. The formal event test failed, and 19 appearances also fall short of the specified 20-push coverage. These event and box measurements do not establish general field performance. There is no IR or wild-rat validation, field deployment, or rat population estimate. Improve cap and shoe handling, then evaluate on new independent footage before any pilot.',
+    'vision/V5_FORMAL_EVENT_RESULTS.md; vision/V5_FRESH_RESULTS.md; pitch/evidence/v5-live-integration-result.json; pitch/evidence/v5-live-run-stats.json; vision/artifacts/rat-litroom-v5-development-candidate-20260927.zip; model/out/backtest.json; api/posterior.py');
 }
 
 const staging=path.join(WORKSPACE,'.codex-finalizer');
