@@ -217,10 +217,10 @@ These numbers appear in the HTML deck ([`pitch/nightowl-deck/`](../pitch/nightow
 | Rats are a warning light | Swept buildings with rats (2023–25) had **2.8×** the HPD mold violations per home, **2.3×** the heat and hot-water complaints per home, and **1.8×** the illegal-dumping complaints per property. Each holds within building-size bands. | HPD violations and 311 by BBL (NYC Open Data), against lots swept 2023–25 |
 
 These are associations, not causes, and swept-lot rates are not a citywide rat count. The published health
-figures on the same slide come from outside sources:
+figures in the deck come from outside sources:
 - Leptospirosis: 24 NYC cases in 2023, a record (NYC Health advisory, 2024).
-- Asthma: rat allergen in 1 in 3 inner-city homes (Inner-City Asthma Study, 2003).
-- Depression: 72% more likely where rats are a big problem (Johns Hopkins, Baltimore, 2016).
+- Asthma: rat allergen in 1 in 3 inner-city homes (Inner-City Asthma Study, 2003). Shown on the 382 slide.
+- Depression: 72% more likely where rats are a big problem (Johns Hopkins, Baltimore, 2016). Shown on the 382 slide.
 
 The analysis scripts from pitch prep are not in the repo yet.
 

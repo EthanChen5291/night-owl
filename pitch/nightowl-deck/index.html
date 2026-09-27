@@ -337,9 +337,12 @@
   /* 5 silent blocks: what qualifies, what they look like */
   .silent-left.v3 { top: 222px; width: 620px; }
   .silent-right { position: absolute; left: 840px; right: 110px; top: 150px; }
-  .crit { list-style: none; margin: 0 0 34px; padding: 0; counter-reset: c; }
-  .crit li { counter-increment: c; display: grid; grid-template-columns: 46px 1fr; padding: 12px 0; border-top: 1px solid var(--rule); font-size: 21px; line-height: 1.35; color: var(--ink-2); }
-  .crit li::before { content: counter(c, lower-roman) "."; font-family: var(--f-italic); font-style: italic; font-size: 26px; line-height: 1.1; color: var(--accent); }
+  .health { margin: 0 0 34px; }
+  .health .hrow { display: grid; grid-template-columns: 170px 1fr; align-items: baseline; gap: 10px; padding: 16px 0; border-top: 1px solid var(--rule); }
+  .health .n { font-family: var(--f-display); font-weight: 900; font-size: 50px; line-height: 1; letter-spacing: -.03em; }
+  .health .t { font-size: 19px; line-height: 1.35; color: var(--ink-2); }
+  .health .t b { display: block; font-family: var(--f-italic); font-style: italic; font-weight: 400; font-size: 30px; color: var(--ink); margin-bottom: 4px; }
+  .health .src { display: block; margin-top: 7px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-faint); }
   .props { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 34px; }
   .props div { border-top: 1px solid var(--rule); padding-top: 12px; }
   .props b { display: block; font-family: var(--f-display); font-weight: 900; font-size: 50px; letter-spacing: -.03em; line-height: 1; }
@@ -510,21 +513,19 @@
     <p class="leaves reveal r6">…and it leaves <em>382 blocks</em> behind.</p>
     <aside class="say">About 150,000 rat inspections a year go where the calls are. Rich, loud blocks get five times the inspections of poor, quiet ones, for only 1.4 times the rats. And that leaves 382 blocks behind. [Blue and red: split at the city median for income and for rat calls per resident; grey is everything else. Inspections: initial visits, 2023–25 average (about 230,000 a year counting follow-ups and baiting). Rats: properties times the share of swept lots with rats, 2015–26.]</aside>
   </section>
-  <!-- ============================================================ 5 · THE SILENT BLOCKS (0:43–0:50) -->
-  <section class="slide" data-section="Problem" data-time="0:43–0:50">
+  <!-- ============================================================ 5 · THE SILENT BLOCKS (0:43–0:57) -->
+  <section class="slide" data-section="Problem" data-time="0:43–0:57">
     <div class="silent-left v3">
       <div class="eyebrow reveal r1">The Silent Blocks</div>
       <div class="n382 reveal r2">382</div>
       <p class="silent-line reveal r3">blocks where the rats are likely and the <em>phones are quiet.</em></p>
     </div>
     <div class="silent-right">
-      <div class="lab reveal r3">Silent means all four</div>
-      <ol class="crit reveal r4">
-        <li><span>Rat risk in the <b>top 40%</b> of NYC blocks (Model B)</span></li>
-        <li><span>Its 311 calls per resident rank at least <b>25 points</b> (of 100) below its rat risk</span></li>
-        <li><span>All <b>5 of 5</b> model copies agree</span></li>
-        <li><span>At least <b>100 homes</b>, so it's not a park or rail yard</span></li>
-      </ol>
+      <div class="lab reveal r3">Why it matters</div>
+      <div class="health reveal r4">
+        <div class="hrow"><div class="n">1 in 3</div><div class="t"><b>Asthma</b>inner-city homes had rat allergen, linked to worse asthma in kids.<span class="src">Inner-City Asthma Study, 2003</span></div></div>
+        <div class="hrow"><div class="n">72%</div><div class="t"><b>Depression</b>more likely where rats are a big problem.<span class="src">Johns Hopkins · Baltimore, 2016</span></div></div>
+      </div>
       <div class="lab reveal r5">What they look like</div>
       <div class="props reveal r5">
         <div><b>1.2M</b><span>people live on them</span></div>
@@ -533,10 +534,10 @@
         <div><b>17%</b><span>homes with limited English (NYC: 10%)</span></div>
       </div>
     </div>
-    <aside class="say">We call them silent blocks: twice the rat risk, under half the calls, and 1.2 million people living on them. [If asked: 211 of the 382 are red blocks from the last slide.]</aside>
+    <aside class="say">We call them silent blocks: twice the rat risk, under half the calls, and 1.2 million people living on them. And it matters: rat allergen is linked to worse asthma in kids, and where rats are a big problem, depressive symptoms are 72% more likely. [If asked: 211 of the 382 are red blocks from the last slide.]</aside>
   </section>
-  <!-- ============================================================ 5 · TWO MODELS (Tech 0:50–1:08) -->
-  <section class="slide" data-section="Tech" data-time="0:50–1:08">
+  <!-- ============================================================ 6 · TWO MODELS (Tech 0:57–1:15) -->
+  <section class="slide" data-section="Tech" data-time="0:57–1:15">
     <div class="eyebrow reveal r1">02 · The Solution</div>
     <h2 class="head reveal r2">Two models, <em>one gap.</em></h2>
     <div class="models">
@@ -549,8 +550,8 @@
     <p class="gapline reveal r6">B high, A low: a <em>silent block.</em></p>
     <aside class="say">So we built two models. Model A learns from 311: what the city hears. Model B learns from everything objective in NYC's datasets: inspections, buildings, restaurants, trash, weather. Where B is high and A is low, that's a silent block.</aside>
   </section>
-  <!-- ============================================================ 6 · THE PROOF (Tech 1:08–1:23) -->
-  <section class="slide" data-section="Tech" data-time="1:08–1:23">
+  <!-- ============================================================ 7 · THE PROOF (Tech 1:15–1:30) -->
+  <section class="slide" data-section="Tech" data-time="1:15–1:30">
     <div class="eyebrow reveal r1">The Proof</div>
     <h2 class="head reveal r2">Ten years of history.<br>Who finds <em>more rats?</em></h2>
     <div class="bars2">
@@ -560,8 +561,8 @@
     </div>
     <aside class="say">Big claim, so we backtested it on ten years of history, month by month, training only on the past. Model B's picks found rats 28% more often than following 311 calls: 19.5% versus 15.2%.</aside>
   </section>
-  <!-- ============================================================ 7 · THE OWL (Tech 1:23–1:50) · → fades the list into the validation loop -->
-  <section class="slide" data-section="Tech · the Owl" data-time="1:23–1:50" data-steps="2">
+  <!-- ============================================================ 8 · THE OWL (Tech 1:30–1:57) · → fades the list into the validation loop -->
+  <section class="slide" data-section="Tech · the Owl" data-time="1:30–1:57" data-steps="2">
     <figure class="frame owl-photo render reveal r2"><img src="assets/owl_node_render.png" alt="The NightOwl sensor node">
       <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
       </figure>
@@ -580,31 +581,29 @@
     </div>
     <aside class="say">Then we send an Owl. It spots rats in any light, every night, for up to six weeks, for about thirty dollars. Classification runs on the device: no video leaves it, only a small rat event and a crop of the confirmed rat. [→] And it's a validation loop: the model places the Owl, motion wakes it, the camera confirms the rat, and the map updates that block and re-ranks where the next Owl goes. [Cost and battery: Bruno to confirm.]</aside>
   </section>
-  <!-- ============================================================ 9 · WARNING LIGHT (What's next 1:50–2:25) -->
-  <section class="slide" data-section="What's next" data-time="1:50–2:25">
+  <!-- ============================================================ 9 · WARNING LIGHT (What's next 1:57–2:25) -->
+  <section class="slide" data-section="What's next" data-time="1:57–2:25">
     <div class="eyebrow reveal r1">03 · What's Next</div>
     <h2 class="head sm reveal r2">Rats are a <em>warning light.</em></h2>
     <div class="tree">
-      <svg class="links" viewBox="0 0 1360 470" aria-hidden="true"><path d="M318,235 C420,235 410,48 504,48"/><circle cx="504" cy="48" r="4"/><path d="M318,235 C420,235 410,116 504,116"/><circle cx="504" cy="116" r="4"/><path d="M318,235 C420,235 410,184 504,184"/><circle cx="504" cy="184" r="4"/><path d="M318,235 C420,235 410,288 504,288"/><circle cx="504" cy="288" r="4"/><path d="M318,235 C420,235 410,356 504,356"/><circle cx="504" cy="356" r="4"/><path d="M318,235 C420,235 410,424 504,424"/><circle cx="504" cy="424" r="4"/></svg>
+      <svg class="links" viewBox="0 0 1360 470" aria-hidden="true"><path d="M318,235 C420,235 410,103 504,103"/><circle cx="504" cy="103" r="4"/><path d="M318,235 C420,235 410,223 504,223"/><circle cx="504" cy="223" r="4"/><path d="M318,235 C420,235 410,299 504,299"/><circle cx="504" cy="299" r="4"/><path d="M318,235 C420,235 410,375 504,375"/><circle cx="504" cy="375" r="4"/></svg>
       <div class="root reveal r3">Rat<br>infestations</div>
-      <div class="grp reveal r4" style="top:0">Health</div>
-      <div class="node reveal r4" style="top:24px"><div class="n">24</div><div class="t"><b>Leptospirosis</b>cases in NYC in 2023, a record. About 3 a year before 2021.<span class="src">NYC Health advisory, 2024</span></div></div>
-      <div class="node reveal r4" style="top:92px"><div class="n">1 in 3</div><div class="t"><b>Asthma</b>inner-city homes had rat allergen, linked to worse asthma in kids.<span class="src">Inner-City Asthma Study, 2003</span></div></div>
-      <div class="node reveal r4" style="top:160px"><div class="n">72%</div><div class="t"><b>Depression</b>more likely where rats are a big problem.<span class="src">Johns Hopkins · Baltimore, 2016</span></div></div>
-      <div class="grp reveal r5" style="top:240px">Home &amp; street <span>· swept buildings with rats vs without</span></div>
-      <div class="node reveal r5" style="top:264px"><div class="n">2.8×</div><div class="t"><b>Mold</b>the mold violations per home.<span class="src">NYC HPD · NYC Health sweeps · 2023–25</span></div></div>
-      <div class="node reveal r5" style="top:332px"><div class="n">2.3×</div><div class="t"><b>No heat</b>the heat and hot-water complaints per home.<span class="src">NYC 311 · 2023–25</span></div></div>
-      <div class="node reveal r5" style="top:400px"><div class="n">1.8×</div><div class="t"><b>Illegal dumping</b>the dumping complaints per property.<span class="src">NYC 311 · 2023–25</span></div></div>
+      <div class="grp reveal r4" style="top:55px">Health</div>
+      <div class="node reveal r4" style="top:79px"><div class="n">24</div><div class="t"><b>Leptospirosis</b>cases in NYC in 2023, a record. About 3 a year before 2021.<span class="src">NYC Health advisory, 2024</span></div></div>
+      <div class="grp reveal r5" style="top:175px">Home &amp; street <span>· swept buildings with rats vs without</span></div>
+      <div class="node reveal r5" style="top:199px"><div class="n">2.8×</div><div class="t"><b>Mold</b>the mold violations per home.<span class="src">NYC HPD · NYC Health sweeps · 2023–25</span></div></div>
+      <div class="node reveal r5" style="top:275px"><div class="n">2.3×</div><div class="t"><b>No heat</b>the heat and hot-water complaints per home.<span class="src">NYC 311 · 2023–25</span></div></div>
+      <div class="node reveal r5" style="top:351px"><div class="n">1.8×</div><div class="t"><b>Illegal dumping</b>the dumping complaints per property.<span class="src">NYC 311 · 2023–25</span></div></div>
     </div>
     <p class="warn-next reveal r6">Then: the same method for <em>mold, heat outages and dumping</em>, anything the city only hears about through calls.</p>
-    <aside class="say">And rat infestations are a warning light. Rat urine spreads leptospirosis: New York hit a record 24 cases in 2023. Rat allergen worsens kids' asthma, and where rats are a big problem, people are 72% more likely to show depressive symptoms. In the city's own data, buildings where inspectors found rats had nearly three times the mold violations, more than twice the heat complaints, and almost twice the illegal dumping. So a silent rat block is often a silent health and housing block. Then we take the same method to mold, heat and dumping.</aside>
+    <aside class="say">And rat infestations are a warning light. Rat urine spreads leptospirosis: New York hit a record 24 cases in 2023. In the city's own data, buildings where inspectors found rats had nearly three times the mold violations, more than twice the heat complaints, and almost twice the illegal dumping. So a silent rat block is often a silent health and housing block. Then we take the same method to mold, heat and dumping.</aside>
   </section>
   <!-- ============================================================ 10 · TRY IT (Demo 2:25–2:55) -->
   <section class="slide" data-section="Demo" data-time="2:25–2:55">
     <div class="try-in"><h2 class="try reveal r2">Try it <em>yourself.</em></h2></div>
     <aside class="say">Now try it yourself. [Hand a judge the rat and have them pass it in front of the Owl.] The Owl spots it and sends one small event: time, block, confidence. Watch the map: that block's risk goes up, and it becomes the top site for the next Owl. [Point at the map.]</aside>
   </section>
-  <!-- ============================================================ 10 · CLOSE (2:55–3:00) -->
+  <!-- ============================================================ 11 · CLOSE (2:55–3:00) -->
   <section class="slide" data-section="Demo · close" data-time="2:55–3:00">
     <div class="close-in">
       <div class="eyebrow center reveal r1">The Close</div>
