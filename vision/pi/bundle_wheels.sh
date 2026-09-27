@@ -3,10 +3,12 @@
 #
 #   ./bundle_wheels.sh 3.13        # Python version ON THE PI (python3 --version there), not on the Mac
 #
-# Produces wheels/ next to this script: onnxruntime, numpy, opencv-python-headless and their
-# dependencies (manylinux_2_17 / manylinux2014 aarch64, cp3X). Then on the Pi:
+# Produces wheels/ next to this script: pinned runtime packages, their dependencies, and a
+# pip bootstrap wheel (manylinux_2_28 / 2_27 / 2014 aarch64, cp3X). Pi OS Trixie has glibc 2.41.
+# Then on the Pi, inside a separate venv:
 #
-#   pip install --no-index --find-links wheels/ onnxruntime numpy opencv-python-headless
+#   PIP_WHEEL=$(find wheels -maxdepth 1 -name 'pip-*.whl' -print -quit)
+#   PYTHONPATH="$PIP_WHEEL" .venv/bin/python -m pip install --no-index --find-links wheels/ -r runtime-requirements.txt
 #
 # (use `python3 -m pip ... --break-system-packages` on Trixie if you are not in a venv; a venv is
 # cleaner: `python3 -m venv --system-site-packages ~/venv && . ~/venv/bin/activate`, the
@@ -25,14 +27,22 @@ esac
 
 mkdir -p wheels
 python3 -m pip download \
+  --index-url https://pypi.org/simple \
   --only-binary=:all: \
-  --platform manylinux_2_17_aarch64 --platform manylinux2014_aarch64 \
+  --platform manylinux_2_28_aarch64 --platform manylinux_2_27_aarch64 \
+  --platform manylinux2014_aarch64 \
   --python-version "$PYVER" --implementation cp \
   -d wheels/ \
-  onnxruntime numpy opencv-python-headless
+  -r runtime-requirements.txt
+python3 -m pip download \
+  --index-url https://pypi.org/simple \
+  --only-binary=:all: \
+  --python-version "$PYVER" --implementation cp \
+  -d wheels/ pip==26.1.2
+(cd wheels && shasum -a 256 ./*.whl > SHA256SUMS)
 
 echo
 echo "wheels for cp${PYVER/./} aarch64 in $(pwd)/wheels:"
 ls -1 wheels | sed 's/^/  /'
 echo
-echo "on the Pi:  pip install --no-index --find-links wheels/ onnxruntime numpy opencv-python-headless"
+echo "on the Pi:  use a separate venv and install runtime-requirements.txt from wheels/"

@@ -16,6 +16,74 @@ Wi-Fi), so the wheels travel with the code and the camera is driven through `rpi
 | `world_rat_person.onnx` | YOLO-World zero-training fallback ("stuffed animal", "person"); not in git, ~50 MB |
 | `wheels/` | offline wheels; **gitignored** |
 
+## Isolated candidate smoke on the Pi
+
+The candidate can be checked without using the camera, posting to the API, or replacing the
+running Owl agent. These commands stage files under a new home-directory slot. Run them only
+after SSH is stable. Set `PI_TARGET` to the reachable Pi SSH address; the example candidate
+hash is for the expanded V3 export.
+
+```sh
+PI_TARGET=pi@<pi-address>
+SLOT=barn-owl-candidates/v3-3214f2a0
+bash vision/pi/bundle_wheels.sh 3.13  # on the Mac; pinned aarch64 wheels from PyPI
+ssh "$PI_TARGET" 'uname -m; python3 --version; ldd --version | head -1'
+ssh "$PI_TARGET" 'mkdir -p "$HOME/barn-owl-candidates/v3-3214f2a0"'
+scp vision/pi/{detect.py,selftest.py,camera.py,runtime-requirements.txt} "$PI_TARGET:$SLOT/"
+scp vision/runs/modal-rat-v3-expanded-20260926/rat.onnx "$PI_TARGET:$SLOT/rat.onnx"
+scp vision/runs/modal-rat-v3-expanded-20260926/dataset/images/val/zoom15_b_00013.jpg "$PI_TARGET:$SLOT/positive.jpg"
+scp vision/runs/modal-rat-v3-expanded-20260926/dataset/images/val/zoom15_b_00000.jpg "$PI_TARGET:$SLOT/negative.jpg"
+scp -r vision/pi/wheels "$PI_TARGET:$SLOT/"
+```
+
+`vision/pi/wheels/` is about 75 MB; each individual wheel is under 100 MB. The runtime
+requirements are only NumPy, OpenCV headless, and ONNX Runtime. The Mac evaluator's PyTorch,
+TorchVision, and Ultralytics dependencies are not installed on the Pi. This bundle targets
+Python 3.13 aarch64 and glibc at least 2.28; the Pi inspected on 2026-09-26 had Debian 13,
+glibc 2.41, and Python 3.13.5. If its interpreter or architecture changes, rebuild the wheels
+before installing. If `venv` is unavailable, stop here and arrange a separate setup step.
+
+```sh
+ssh "$PI_TARGET" 'cd "$HOME/barn-owl-candidates/v3-3214f2a0" && sha256sum -c wheels/SHA256SUMS && sha256sum rat.onnx'
+# Expected model SHA256: 3214f2a0dbe1699016b8f4e8aaa8d4c7c5eb3d5e365a07f26a2efbe13114672b
+ssh "$PI_TARGET" 'cd "$HOME/barn-owl-candidates/v3-3214f2a0" && python3 -m venv --without-pip .venv && PIP_WHEEL=$(find wheels -maxdepth 1 -name "pip-*.whl" -print -quit) && PYTHONPATH="$PWD/$PIP_WHEEL" .venv/bin/python -m pip install --no-index --find-links "$PWD/wheels" -r runtime-requirements.txt'
+ssh "$PI_TARGET" 'cd "$HOME/barn-owl-candidates/v3-3214f2a0" && .venv/bin/python selftest.py --only detector --model "$PWD/rat.onnx"'
+```
+
+The detector self-test runs a zero frame. For a representative saved-frame timing and the
+rat/person rule result, run the following from the Mac. It reads the two staged JPEGs and
+does not import `camera.py` or initialize GPIO:
+
+```sh
+ssh "$PI_TARGET" 'cd "$HOME/barn-owl-candidates/v3-3214f2a0" && .venv/bin/python -' <<'PY'
+import cv2
+import statistics
+import time
+from detect import Detector, apply_rules
+
+detector = Detector("rat.onnx", gray=True, conf=0.5, iou=0.45)
+for name in ("positive.jpg", "negative.jpg"):
+    image = cv2.imread(name, cv2.IMREAD_GRAYSCALE)
+    assert image is not None and image.shape == (480, 640), name
+    for _ in range(3):
+        detector.infer(image)
+    durations = []
+    for _ in range(20):
+        start = time.perf_counter()
+        detections = detector.infer(image)
+        durations.append((time.perf_counter() - start) * 1000)
+    rats, persons = apply_rules(detections, floor_y=0)
+    print(name, "median_ms", round(statistics.median(durations), 1),
+          "p95_ms", round(sorted(durations)[18], 1),
+          "rats", len(rats), "persons", len(persons),
+          "top_rat_conf", round(rats[0].conf, 3) if rats else None)
+PY
+```
+
+Keep `~/barn-owl/agent.py`, its model, service, camera, and API untouched until a separate
+deployment decision. Saved-frame timing checks ONNX Runtime compatibility and CPU speed;
+it does not validate camera capture or real event recall.
+
 ## Setup, in order
 
 1. **Wheels on the Mac** (once, for the Pi's Python; it was 3.13 on 09-23):
