@@ -1,4 +1,5 @@
-# vision workstream: data, weights and wheels never go in git (README §8)
+# Generated data, weights and wheels stay ignored.
+# The user-requested portable candidate ZIP is tracked under artifacts/.
 clips/
 frames/
 frames_pruned/
