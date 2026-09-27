@@ -5,3 +5,5 @@ The five-slide deck and three-minute speaker script use the current `model/out/b
 To rebuild with the bundled Codex presentation runtime, set `RUNTIME_NODE_MODULES` to its Node package directory, link that directory as `pitch/node_modules`, and run `node pitch/build.mjs` from the repo root. Use `DECK_VERSION=v9` (or another new version) for each later finalization. Then update the spoken numbers in `script.md` to match the new chart.
 
 Before presenting, update the formal push and physical Pi test status only after measured results exist. If the audience sees recorded footage or a canned POST, say which one it is.
+
+The short [training demo clip](training-demo.md) uses the actual V3 training log and ONNX predictions on fixed validation footage. Its captions explicitly say that an independent scene test is pending.
