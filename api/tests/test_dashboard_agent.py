@@ -291,3 +291,32 @@ def test_unstreamed_final_text_after_tool_round_is_not_lost(tmp_path, monkeypatc
         events = frames(client.post("/dashboards/chat", json={"message": "Build a chart"}))
     assert any(event["type"] == "dashboard" for event in events)
     assert "Final result." in "".join(event["text"] for event in events if event["type"] == "delta")
+
+
+def test_query_budget_skips_extra_queries_but_still_publishes(tmp_path, monkeypatch):
+    monkeypatch.setenv("XAI_API_KEY", "mock-only")
+    dashboard_agent._hits.clear()
+    inputs = []
+    too_many = [{"type": "function_call", "name": "query_data", "call_id": f"q{i}", "arguments": json.dumps({"query": QUERY})}
+                for i in range(dashboard_agent.MAX_QUERIES + 2)]
+    responses = iter([
+        {"output": too_many},
+        {"output": [{"type": "function_call", "name": "publish_dashboard", "call_id": "p1", "arguments": json.dumps({"spec": SPEC})}]},
+        {"output": [{"type": "message", "content": [{"type": "output_text", "text": "Done."}]}]},
+    ])
+
+    def provider(body, emit=None):
+        inputs.append(body)
+        return next(responses)
+
+    monkeypatch.setattr(dashboard_agent, "_provider", provider)
+    with TestClient(create_app(data_dir=REPO, events_file=tmp_path / "events.jsonl")) as client:
+        response = client.post("/dashboards/chat", json={"message": "Everything at once", "history": []})
+    events = frames(response)
+    steps = [e for e in events if e["type"] == "step"]
+    assert sum(1 for s in steps if s["text"] == "Queried modelled NYC cells") == dashboard_agent.MAX_QUERIES
+    assert sum(1 for s in steps if s["text"] == "Query skipped") == 2
+    assert any(e["type"] == "dashboard" for e in events) and not any(e["type"] == "error" for e in events)
+    # The provider sees one shared input list, so filter to the query outputs of the first round.
+    outputs = [item for item in inputs[1]["input"] if item.get("type") == "function_call_output" and item["call_id"].startswith("q")]
+    assert len(outputs) == dashboard_agent.MAX_QUERIES + 2 and "budget" in outputs[-1]["output"] and "rows" in outputs[0]["output"]

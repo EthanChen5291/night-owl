@@ -443,3 +443,29 @@ button { font: inherit; color: inherit; }
 .cellcard-more-body { margin-top: 4px; }
 .cellcard-hint { margin-top: 6px; line-height: 1.35; }
 .nodes-sub { font-weight: 400; margin-left: 4px; }
+
+/* Page transitions: the dashboard slides in from the right over the map and back out to the right, under a soft veil. */
+.pages { position: relative; height: 100%; overflow: hidden; }
+.page { position: absolute; inset: 0; }
+.page.entering.forward { animation: page-in-right 0.56s var(--ease) both; }
+.page.leaving.forward { animation: page-out-left 0.56s var(--ease) both; }
+.page.entering.back { animation: page-in-left 0.56s var(--ease) both; }
+.page.leaving.back { animation: page-out-right 0.56s var(--ease) both; }
+.page.entering { z-index: 2; }
+.page.leaving { z-index: 1; pointer-events: none; }
+.page-veil {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 70vw; z-index: 3; pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg) 72%, transparent) 50%, transparent);
+}
+.page-veil.forward { animation: veil-forward 0.62s cubic-bezier(0.3, 0.6, 0.3, 1) both; }
+.page-veil.back { animation: veil-back 0.62s cubic-bezier(0.3, 0.6, 0.3, 1) both; }
+@keyframes page-in-right { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes page-out-left { from { transform: none; opacity: 1; } to { transform: translateX(-24%); opacity: 0.55; } }
+@keyframes page-in-left { from { transform: translateX(-24%); opacity: 0.55; } to { transform: none; opacity: 1; } }
+@keyframes page-out-right { from { transform: none; } to { transform: translateX(100%); } }
+/* The veil sweeps the whole width and leaves the viewport, fading over the back half of its travel. */
+@keyframes veil-forward { from { transform: translateX(100vw); opacity: 1; } 50% { opacity: 0.85; } to { transform: translateX(-70vw); opacity: 0; } }
+@keyframes veil-back { from { transform: translateX(-70vw); opacity: 1; } 50% { opacity: 0.85; } to { transform: translateX(100vw); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .page, .page-veil { animation-duration: 0.01ms !important; }
+}
