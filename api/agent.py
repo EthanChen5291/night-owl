@@ -1,6 +1,7 @@
 """NightOwl assistant: Grok (xAI) with tools over the model output, the Pi node and the map.
 
 POST /agent/chat streams Server-Sent Events back to the web app's chat panel:
+    {"type": "thread", "id", "title", "answer_id"}                                stored conversation and answer identity
     {"type": "tool", "id", "name", "label", "state": "start" | "done", "summary"?}   a tool ran on the server
     {"type": "image", "src", "caption"}                                               show a picture in the chat
     {"type": "thinking", "state": "start" | "done"}                                    Grok is reasoning before it answers
@@ -9,7 +10,7 @@ POST /agent/chat streams Server-Sent Events back to the web app's chat panel:
     {"type": "messages", "messages"}                                                   the history to send next time
     {"type": "error", "text"} / {"type": "done"}
 
-The browser keeps the conversation (no server state). Server tools read model/out/*.json through the Store and
+Stored map and iMessage conversations live in SQLite. Server tools read model/out/*.json through the Store and
 the Pi node through the barn-owl dashboard on 127.0.0.1 (a read-only agent token). Browser tools
 (CLIENT_TOOLS) see what only the page knows: the placed owls, the camera view, a screenshot of the map.
 Standard library only, so the API keeps its three dependencies.
@@ -22,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import hmac
 import json
 import math
 import os
@@ -32,6 +34,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import defaultdict, deque
+from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable
@@ -39,7 +42,7 @@ from typing import Any, Awaitable, Callable
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from chat_store import ChatStore
+from chat_store import ChatStore, MAX_IMPORT_ITEMS
 from store import Store
 
 XAI_URL = "https://api.x.ai/v1/chat/completions"
@@ -808,13 +811,18 @@ class _Answer:
 
 
 def _owner(request: Request, body: dict | None = None) -> str:
-    """Whose threads these are. iMessage conversations come from the bot on this machine only (anything that came
-    through Caddy carries X-Forwarded-For); the map chat sends an anonymous per-browser id, not a login."""
+    """The map uses a browser ID. iMessage uses an explicit shared bot token."""
     space = (body or {}).get("imessage_space")
-    if space:
-        if request.headers.get("x-forwarded-for"):
-            raise HTTPException(403, "imessage threads are only for the bot on this server")
-        return "imessage:" + str(space)[:200]
+    if space is not None:
+        token = os.environ.get("NIGHT_OWL_CHAT_BOT_TOKEN")
+        if not token:
+            raise HTTPException(503, "iMessage chat bot token is not configured")
+        supplied = request.headers.get("x-chat-bot-token", "")
+        if not hmac.compare_digest(supplied, token):
+            raise HTTPException(403, "invalid iMessage chat bot token")
+        if not isinstance(space, str) or not space.strip() or len(space) > 200:
+            raise HTTPException(400, "imessage_space must be a nonempty string of at most 200 characters")
+        return "imessage:" + space
     cid = request.headers.get("x-chat-client", "")
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", cid):
         raise HTTPException(400, "missing or malformed x-chat-client header")
@@ -840,6 +848,78 @@ def mount_agent(app: FastAPI, store: Store, chats: ChatStore | None = None) -> N
     async def new_thread(request: Request):
         th = await asyncio.to_thread(chats.create, _owner(request))
         return {k: th[k] for k in ("id", "title", "created_at", "updated_at")}
+
+    @app.post("/agent/threads/import")
+    async def import_thread(request: Request):
+        raw = await request.body()
+        if len(raw) > 4_000_000:
+            raise HTTPException(413, "legacy chat is too large")
+        try:
+            body = json.loads(raw)
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(400, "invalid legacy chat") from None
+        if not isinstance(body, dict) or body.get("migration_key") not in ("nightowl.chat.v1", "barnowl.chat.v1"):
+            raise HTTPException(400, "invalid migration_key")
+        items, history = body.get("items"), body.get("history")
+        if not isinstance(items, list) or not 0 < len(items) <= MAX_IMPORT_ITEMS or not isinstance(history, list) or len(history) > MAX_HISTORY:
+            raise HTTPException(400, "legacy chat exceeds limits or is empty")
+        clean_items = []
+        for item in items:
+            if not isinstance(item, dict) or item.get("kind") not in ("user", "bot") or not isinstance(item.get("text"), str) or len(item["text"]) > MAX_MSG_CHARS:
+                raise HTTPException(400, "invalid legacy chat item")
+            if item["kind"] == "user":
+                clean_items.append({"kind": "user", "text": item["text"]})
+                continue
+            steps, images = item.get("steps", []), item.get("images", [])
+            if not isinstance(steps, list) or len(steps) > 30 or not isinstance(images, list) or len(images) > 4:
+                raise HTTPException(400, "invalid legacy answer")
+            if any(not isinstance(s, dict) or not isinstance(s.get("id"), str) or len(s["id"]) > 200 or
+                   not isinstance(s.get("label"), str) or len(s["label"]) > 200 or s.get("state") not in ("start", "done", "error") for s in steps):
+                raise HTTPException(400, "invalid legacy steps")
+            if any(not isinstance(i, dict) or not isinstance(i.get("src"), str) or len(i["src"]) > 700_000 or
+                   not i["src"].startswith("data:image/") or
+                   (i.get("caption") is not None and (not isinstance(i["caption"], str) or len(i["caption"]) > 300))
+                   for i in images):
+                raise HTTPException(400, "invalid legacy images")
+            error = item.get("error")
+            if error is not None and (not isinstance(error, str) or len(error) > 2000):
+                raise HTTPException(400, "invalid legacy error")
+            clean_items.append({"kind": "bot", "text": item["text"],
+                                "steps": [{k: s[k] for k in ("id", "label", "state")} for s in steps],
+                                "images": [{k: i[k] for k in ("src", "caption") if k in i} for i in images],
+                                "error": error})
+        if any(not isinstance(m, dict) or m.get("role") not in ("user", "assistant", "tool") or
+               not isinstance(m.get("content", ""), str) for m in history):
+            raise HTTPException(400, "invalid legacy history")
+        for m in history:
+            calls = m.get("tool_calls", [])
+            if not isinstance(calls, list) or len(calls) > 8 or any(
+                not isinstance(call, dict) or not isinstance(call.get("id"), str) or
+                not isinstance(call.get("function"), dict) or
+                not isinstance(call["function"].get("name"), str) or
+                not isinstance(call["function"].get("arguments", "{}"), str)
+                for call in calls
+            ):
+                raise HTTPException(400, "invalid legacy tool calls")
+        # The old browser kept only its last 40 messages, so a valid saved slice may start with a tool reply.
+        clean_history = _clean_history(history)
+        if not clean_history:
+            clean_history = [{"role": "user" if i["kind"] == "user" else "assistant", "content": i["text"]}
+                             for i in clean_items if i["text"]][-MAX_HISTORY:]
+        owner = _owner(request)
+        th, turns = await asyncio.to_thread(chats.import_legacy, owner, body["migration_key"], clean_items, clean_history)
+        return {"thread": {k: th[k] for k in ("id", "title", "channel", "created_at", "updated_at")}, "turns": turns}
+
+    @app.post("/agent/imessage/reset")
+    async def reset_imessage(request: Request):
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise HTTPException(400, "request body must be an object")
+        owner = _owner(request, body)
+        if not owner.startswith("imessage:"):
+            raise HTTPException(400, "imessage_space is required")
+        th = await asyncio.to_thread(chats.current_imessage, owner, True)
+        return {k: th[k] for k in ("id", "title", "channel", "created_at", "updated_at")}
 
     @app.get("/agent/threads/{tid}")
     async def get_thread(tid: str, request: Request):
@@ -889,38 +969,65 @@ def mount_agent(app: FastAPI, store: Store, chats: ChatStore | None = None) -> N
         thread: dict | None = None
         answer: _Answer | None = None
         turn_id = 0
+        run_id: str | None = None
+        results = body.get("client_results") or []
+        if not isinstance(results, list) or len(results) > 8 or any(not isinstance(r, dict) or not isinstance(r.get("id"), str)
+                                                                   or not isinstance(r.get("content"), str) for r in results):
+            raise HTTPException(400, "invalid client_results")
+        text = body.get("text")
+        has_question = isinstance(text, str) and bool(text.strip())
+        if text is not None and not has_question and not results:
+            raise HTTPException(400, "text must be a nonempty string")
+        if has_question and results:
+            raise HTTPException(400, "send a question or tool results, not both")
+        raw_images = body.get("pending_images") or []
+        if not isinstance(raw_images, list) or len(raw_images) > 4 or any(
+            not isinstance(i, dict) or not isinstance(i.get("src"), str) or
+            not i["src"].startswith("data:image/") or len(i["src"]) > MAX_IMAGE_B64
+            for i in raw_images
+        ):
+            raise HTTPException(400, "invalid pending_images")
         if "thread_id" in body or body.get("imessage_space"):
+            if not has_question and not results:
+                raise HTTPException(400, "nothing to continue: send text")
             owner = _owner(request, body)
             if owner.startswith("imessage:"):
-                thread = None if body.get("new_thread") else await asyncio.to_thread(chats.latest, owner)
-                thread = thread or await asyncio.to_thread(chats.create, owner, "imessage")
+                thread = await asyncio.to_thread(chats.current_imessage, owner, bool(body.get("new_thread")))
             elif body.get("thread_id"):
                 thread = await asyncio.to_thread(chats.get, str(body["thread_id"]), owner)
                 if not thread:
                     raise HTTPException(404, "no such thread")
             else:
                 thread = await asyncio.to_thread(chats.create, owner, "web")
-            messages = _clean_history(await asyncio.to_thread(chats.history, thread["id"]))
-            text = body.get("text")
-            if isinstance(text, str) and text.strip():
+            if has_question:
                 question = text.strip()[:4000]
-                messages.append({"role": "user", "content": question})
-                turn_id = await asyncio.to_thread(chats.add_question, thread["id"], question)
+                started = await asyncio.to_thread(chats.begin_question, thread["id"], owner, question)
+                if started is None:
+                    raise HTTPException(409, "this thread already has a running answer")
+                run_id, turn_id, messages, thread = started
+                messages = _clean_history(messages)
                 answer = _Answer()
-                thread = await asyncio.to_thread(chats.get, thread["id"], owner) or thread  # it may have just been titled
             else:
-                last = await asyncio.to_thread(chats.last_answer, thread["id"])
-                if not last:
+                answer_id = body.get("answer_id")
+                if type(answer_id) is not int or answer_id <= 0:
+                    raise HTTPException(400, "invalid answer_id")
+                if not results:
                     raise HTTPException(400, "nothing to continue: send text")
-                turn_id, answer = last["id"], _Answer(last)
+                try:
+                    started = await asyncio.to_thread(chats.begin_continuation, thread["id"], owner, answer_id,
+                                                      [r["id"] for r in results])
+                except ValueError as e:
+                    raise HTTPException(409, str(e)) from None
+                if started is None:
+                    raise HTTPException(409, "this thread already has a running answer")
+                run_id, turn_id, messages, last = started
+                messages = _clean_history(messages)
+                answer = _Answer(last)
         else:
             messages = _clean_history(body.get("messages"))
         # results of browser tools from the previous round
-        results = body.get("client_results") or []
-        images = [i for i in body.get("pending_images") or [] if isinstance(i, dict) and str(i.get("src", "")).startswith("data:image/")][:4]
-        for r in results[:8]:
-            if not isinstance(r, dict):
-                continue
+        images = raw_images[:]
+        for r in results:
             content = str(r.get("content", ""))[:MAX_MSG_CHARS]
             messages.append({"role": "tool", "tool_call_id": str(r.get("id")), "content": content})
             img = r.get("image")
@@ -935,30 +1042,63 @@ def mount_agent(app: FastAPI, store: Store, chats: ChatStore | None = None) -> N
         if not messages or messages[-1]["role"] not in ("user", "tool"):
             raise HTTPException(400, "nothing to answer")
 
+        # The result of a browser tool is durable before the next provider request starts.
+        if thread and run_id and results:
+            await asyncio.to_thread(chats.checkpoint, thread["id"], run_id, turn_id, answer.text,
+                                    answer.steps, answer.images, answer.error, messages)
+
         q: asyncio.Queue = asyncio.Queue()
+        latest_messages: list[dict] | None = None
+        last_checkpoint = 0.0  # save the first streamed fragment, then at most twice per second
 
         async def emit(ev: dict) -> None:
+            nonlocal latest_messages, last_checkpoint
             if answer:
                 answer.record(ev)
                 if ev.get("type") == "messages":
-                    await asyncio.to_thread(chats.save_history, thread["id"], ev["messages"])
+                    latest_messages = ev["messages"]
+                if ev.get("type") in ("messages", "error") or (ev.get("type") in ("delta", "tool", "image", "client_tools") and
+                                                               time.monotonic() - last_checkpoint >= 0.5):
+                    await asyncio.to_thread(chats.checkpoint, thread["id"], run_id, turn_id, answer.text,
+                                            answer.steps, answer.images, answer.error, latest_messages)
+                    last_checkpoint = time.monotonic()
             await q.put(ev)
 
-        def save_answer() -> None:
-            answer.close()
-            chats.save_answer(turn_id, answer.text, answer.steps, answer.images, answer.error)
+        async def keep_lease():
+            while True:
+                await asyncio.sleep(5)
+                if not await asyncio.to_thread(chats.heartbeat, thread["id"], run_id):
+                    return
 
         async def work():
+            heartbeat = asyncio.create_task(keep_lease()) if thread and run_id else None
             try:
                 if thread:
-                    await emit({"type": "thread", "id": thread["id"], "title": thread["title"]})
+                    await emit({"type": "thread", "id": thread["id"], "title": thread["title"], "answer_id": turn_id})
                 await run_agent(data, messages, emit, channel)
             except Exception as e:  # noqa: BLE001
-                await emit({"type": "error", "text": f"assistant error: {e}"})
+                try:
+                    await emit({"type": "error", "text": f"assistant error: {e}"})
+                except Exception:
+                    await q.put({"type": "error", "text": f"assistant error: {e}"})
             finally:
-                if answer:  # also when the reader hung up mid-answer: keep what was said so far
-                    save_answer()
-            await q.put({"type": "done"})
+                try:
+                    if heartbeat:
+                        heartbeat.cancel()
+                        with suppress(asyncio.CancelledError):
+                            await heartbeat
+                    if answer:
+                        answer.close()
+                        if latest_messages is None and answer.error is None and not answer.waiting:
+                            answer.error = "Answer interrupted"
+                        # A shielded short transaction completes even if the browser disconnected.
+                        await asyncio.shield(asyncio.to_thread(chats.checkpoint, thread["id"], run_id, turn_id,
+                                                             answer.text, answer.steps, answer.images, answer.error,
+                                                             latest_messages, True))
+                except Exception as e:
+                    await q.put({"type": "error", "text": f"could not save answer: {e}"})
+                finally:
+                    await q.put({"type": "done"})
 
         task = asyncio.create_task(work())
 
@@ -971,5 +1111,7 @@ def mount_agent(app: FastAPI, store: Store, chats: ChatStore | None = None) -> N
                         break
             finally:
                 task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
 
         return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

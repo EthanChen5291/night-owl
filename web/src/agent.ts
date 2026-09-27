@@ -9,7 +9,7 @@ export type AgentEvent =
   | { type: 'delta'; text: string }
   | { type: 'client_tools'; calls: ClientCall[]; pending_images: { src: string; caption?: string }[] }
   | { type: 'messages'; messages: WireMessage[] }
-  | { type: 'thread'; id: string; title: string }
+  | { type: 'thread'; id: string; title: string; answer_id: number }
   | { type: 'error'; text: string }
   | { type: 'done' }
 
@@ -69,10 +69,47 @@ export const listThreads = () => api<{ threads: ThreadSummary[] }>('').then((r) 
 export const getThread = (id: string) => api<{ thread: ThreadSummary; turns: StoredTurn[] }>('/' + encodeURIComponent(id))
 export const deleteThread = (id: string) => api<{ ok: boolean }>('/' + encodeURIComponent(id), { method: 'DELETE' })
 
+const LEGACY_KEYS = ['nightowl.chat.v1', 'barnowl.chat.v1'] as const
+const IMPORTED_KEY = 'nightowl.chat.imported.v1'
+export type LegacyChat = { migration_key: (typeof LEGACY_KEYS)[number]; items: unknown[]; history: WireMessage[] }
+
+/** Keep the old record until the server confirms an import. The canonical NightOwl copy wins when both exist. */
+export function pendingLegacyChat(): LegacyChat | null {
+  try {
+    let marker: { migration_key?: string } | null = null
+    try { marker = JSON.parse(localStorage.getItem(IMPORTED_KEY) || 'null') as { migration_key?: string } | null } catch { /* retry */ }
+    for (const key of LEGACY_KEYS) {
+      const source = localStorage.getItem(key)
+      if (!source) continue
+      let saved: { items?: unknown; history?: unknown }
+      try { saved = JSON.parse(source) as { items?: unknown; history?: unknown } } catch { continue }
+      if (!Array.isArray(saved?.items) || !saved.items.length || !Array.isArray(saved?.history)) continue
+      if (marker?.migration_key === key) return null
+      return { migration_key: key, items: saved.items, history: saved.history as WireMessage[] }
+    }
+  } catch {
+    // Private mode, damaged storage, or a failed earlier migration: leave source untouched.
+  }
+  return null
+}
+
+export async function importLegacyChat(chat: LegacyChat): Promise<{ thread: ThreadSummary; turns: StoredTurn[] }> {
+  const imported = await api<{ thread: ThreadSummary; turns: StoredTurn[] }>('/import', {
+    method: 'POST', body: JSON.stringify(chat),
+  })
+  if (!imported?.thread?.id || !Array.isArray(imported.turns)) throw new Error('invalid imported chat response')
+  try {
+    localStorage.setItem(IMPORTED_KEY, JSON.stringify({ migration_key: chat.migration_key, thread_id: imported.thread.id }))
+  } catch {
+    // The server's migration key makes a retry safe if this marker could not be saved.
+  }
+  return imported
+}
+
 /** One request of an answer. A stored thread sends `text` (a new question) or `client_results` (the page's tool
  * results, to continue); the server keeps the history. */
 export async function streamAgent(
-  body: { thread_id: string | null; text?: string; month: string; plan_k: number; client_results?: ClientResult[]; pending_images?: { src: string }[] },
+  body: { thread_id: string | null; text?: string; month: string; plan_k: number; answer_id?: number; client_results?: ClientResult[]; pending_images?: { src: string }[] },
   onEvent: (e: AgentEvent) => void,
   signal: AbortSignal,
 ): Promise<void> {
