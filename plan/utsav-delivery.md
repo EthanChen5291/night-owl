@@ -38,7 +38,7 @@ Work starts from current `origin/main` in managed worktrees. The original checko
 
 - The integrated frontend branch includes the API and detector code from `utsav/model`.
 - API tests: 25 passed in the integrated frontend checkout.
-- Detector pipeline tests: 8 passed in the integrated frontend checkout.
+- Detector pipeline tests: 8 passed in the original integrated frontend checkout; expanded detector, verifier, and frame-handoff checks passed 20 tests in the model checkout before integration.
 - Frontend: `pnpm build` passed; `pnpm lint` passed with two existing warnings.
 - Browser: 5,170 cells, direct map-cell selection, all three display modes, five-site budget, model plan, four-series backtest, and demo-cell popup verified.
 - A clearly identified local test event changed the demo cell from P(active) 0.04 to 0.08, showed one sighting, and updated its timestamp and posterior without reloading. Reset restored its prior and zero sightings.
@@ -58,12 +58,12 @@ Work starts from current `origin/main` in managed worktrees. The original checko
 ## Handoff artifacts
 
 - The editable three-minute pitch deck is `pitch/out/barn-owl-three-minute-pitch-v13.pptx`, with speaker script at `pitch/script.md` and training video at `pitch/out/barn-owl-training-demo-v3.mp4` in the model branch. They use the v4 same-session reserve result, rat AP50 0.926 on 59 reviewed frames, and leave new-room and live-camera tests pending. The earlier recorded-footage replay is labeled as v2.
-- The v4 candidate bundle is committed locally in the model branch as `vision/artifacts/rat-litroom-v4-candidate-20260927.zip` (91,067,807 bytes), SHA256 `8757ba863b0b20618f49b817059bec9a6af0d5d4268126f0f46e4704de4cecc7`. A clean extraction passed checksums for all 2,192 included files other than the verifier itself and the sealed-test provenance check. It contains the locked ONNX and PyTorch models, reviewed data, source and package lockfile, metrics, original videos, replay evidence, and Pi saved-frame timing. The bundled recheck command uses locked runtime confidence 0.70. See `vision/artifacts/README.md` and the extracted README for verification and the no-POST Pi command. This bundle is a lit metal-table plush demo candidate; it is not formally promoted.
-- The earlier v2 ZIP, `vision/artifacts/rat-litroom-candidate-20260926.zip`, remains the remote handoff until the v4 branch is reviewed and integrated. Its combined rat AP50 was 0.79031 and missed the box gate. Generated training runs remain ignored.
+- The v4 candidate bundle is included in both Utsav branches as `vision/artifacts/rat-litroom-v4-candidate-20260927.zip` (91,067,807 bytes), SHA256 `8757ba863b0b20618f49b817059bec9a6af0d5d4268126f0f46e4704de4cecc7`. A clean extraction passed checksums for all 2,192 included files other than the verifier itself and the sealed-test provenance check. It contains the locked ONNX and PyTorch models, reviewed data, source and package lockfile, metrics, original videos, replay evidence, and Pi saved-frame timing. The bundled recheck command uses locked runtime confidence 0.70. See `vision/artifacts/README.md` and the extracted README for verification and the no-POST Pi command. This bundle is a lit metal-table plush demo candidate; it is not formally promoted.
+- The earlier v2 ZIP, `vision/artifacts/rat-litroom-candidate-20260926.zip`, remains available as historical evidence; use the v4 candidate bundle for the current supervised demo. Its combined rat AP50 was 0.79031 and missed the box gate. Generated training runs remain ignored.
 - Recorded replay evidence in the model worktree: `vision/events/v2_live_demo/`, including `before.json`, `after.json`, `replay_report.json`, the plush crop, and `frontend.png`.
 - V4's locked test and replay reports are under `vision/runs/modal-rat-v4-20260926/weak_test_once/` in the model worktree and inside the bundle. The 20 timed pushes and three-minute negative reel described in `vision/RUNBOOK.md` still need measurement on the Pi. Live camera operation, a new-room test, and live-rat performance also remain unverified.
 - An optional frame bridge and isolated Pi worker passed offline checks with the existing Owl agent unchanged. The bridge is off by default; enabling it on the live agent is pending user approval and a supervised trial. See `vision/pi/LIVE_BRIDGE.md`.
-- Ethan's conversation is monitored every five minutes. Project questions are authorized when needed; Utsav handles outgoing messages.
+- Ethan's conversation is monitored every five minutes. Concise project questions may be sent directly to Ethan under Utsav's authorization; the group chat remains read-only for the assistant.
 - The DivHacks group chat contains nine hardware photos and five videos from Sanjavan. They document the physical setup but do not establish detector performance or a successful Pi run.
 
 ## Run the integrated demo
