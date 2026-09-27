@@ -127,6 +127,25 @@ camera runs. Watch `run_stats.json` after stopping the worker and inspect event
 crops. A three-hit alert should be evaluated against actual push timestamps;
 saved or sparse frames do not establish event recall.
 
+For later local-only observation with the reviewed bridge already enabled, run
+the worker in a Pi shell with a **new** events directory for each run:
+
+```sh
+cd ~/barn-owl-candidates/v4-fb557bd9
+../v3-3214f2a0/.venv/bin/python live_worker.py \
+  --socket "$HOME/barn-owl-candidates/live-frames.sock" \
+  --model "$PWD/rat.onnx" \
+  --expected-sha256 fb557bd9c1dafa7466a45afb50ac47668550a666a44f1791af714011a0bf1b27 \
+  --conf 0.70 --iou 0.45 --floor-y 0 --hits 3 --window 1 --cooldown 2 \
+  --events-dir "$PWD/live-observation-NEW-NAME"
+```
+
+Press Ctrl-C in that shell to stop only the worker. It writes `run_stats.json`
+and removes its socket; the dashboard camera agent remains running. The worker
+saves crops locally and has no API or LED output. `received_fps` and
+`processed_fps` include time spent waiting for a viewer, so use a run started
+after the viewer is open for a direct live-rate measurement.
+
 To roll back, remove the service override, restore the exact backed-up agent,
 reload and restart the service, then stop the worker. `live_worker.py` removes its
 socket on clean exit:
