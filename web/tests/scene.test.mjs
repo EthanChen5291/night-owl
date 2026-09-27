@@ -39,6 +39,8 @@ function harness() {
   scene.keys = new Set()
   scene.flight = null
   scene.flightAreas = new Set()
+  scene.renderedHexes = new WeakSet()
+  scene.pendingHexReveal = []
   scene.areaLayerGroup = { visible: true }
   scene.hexGroup = { visible: true }
   scene.locator = null
@@ -592,5 +594,48 @@ test('late borough metadata can resolve an already selected destination', () => 
     s.areas.set('brooklyn', { centre, label: {} })
     s.setActiveArea('brooklyn')
     assert.ok(s.flight.t1.equals(centre))
+  } finally { h.restore() }
+})
+
+
+test('an inward flight anchors shadows at the prefetched destination', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.camera.position.setFromSphericalCoords(36000, 0.42, 0.35)
+    const target = new THREE.Vector3(8000, 0, -5000)
+    s.fly(target, new THREE.Vector3().setFromSphericalCoords(3600, .95, .35).add(target))
+    h.flush()
+    const shadow = s.key.target.position.clone()
+    assert.ok(Math.abs(shadow.x - target.x) <= 256)
+    assert.ok(Math.abs(shadow.z - target.z) <= 256)
+    s.renderer.shadowMap.needsUpdate = false
+    for (let i = 0; i < 20; i++) h.flush()
+    assert.ok(s.key.target.position.equals(shadow))
+    assert.equal(s.renderer.shadowMap.needsUpdate, false)
+  } finally { h.restore() }
+})
+
+
+test('first wide-view hex display is batched nearest the destination, without rebuilding geometry', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.camera.position.setFromSphericalCoords(36000, .42, .35)
+    const entries = Array.from({ length: 250 }, (_, i) => ({
+      mesh: { position: new THREE.Vector3(i, 0, 0), visible: true },
+    }))
+    s.visibleHexes = entries
+    s.fly(new THREE.Vector3(), new THREE.Vector3().setFromSphericalCoords(3600, .95, .35))
+    assert.equal(entries.filter(e => e.mesh.visible).length, 0)
+    // Isolate reveal scheduling from the unrelated colour/height animation loop.
+    s.visibleHexes = []
+    h.flush()
+    assert.equal(entries.filter(e => e.mesh.visible).length, 48)
+    assert.equal(entries[0].mesh.visible, true)
+    assert.equal(entries[249].mesh.visible, false)
+    for (let i = 0; i < 5; i++) h.flush()
+    assert.equal(entries.filter(e => e.mesh.visible).length, 250)
+    assert.equal(s.pendingHexReveal.length, 0)
   } finally { h.restore() }
 })

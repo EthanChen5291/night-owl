@@ -47,8 +47,12 @@ export interface DashboardArtifact {
 }
 export interface ChartSelection { card_id: string; field: string; value: string | number }
 export interface ChatMessage { role: 'user' | 'assistant'; content: string }
+/** One finished tool step in an assistant turn: a query or the dashboard build. */
+export interface AgentStep { text: string; detail?: string; error?: boolean }
 export type DashboardEvent =
   | { type: 'status'; text: string }
+  | { type: 'step'; text: string; detail?: string; error?: boolean }
+  | { type: 'thinking'; text: string }
   | { type: 'delta'; text: string }
   | { type: 'dashboard'; dashboard: DashboardArtifact }
   | { type: 'done' }

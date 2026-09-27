@@ -278,6 +278,8 @@ export class CityScene {
   private index: AddressIndex | null = null
   private flight: Flight | null = null
   private flightAreas = new Set<string>()
+  private renderedHexes = new WeakSet<HexEntry>()
+  private pendingHexReveal: HexEntry[] = []
   private locator: Locator | null = null
   private raf = 0
   private urgentFrame = false
@@ -1161,6 +1163,7 @@ export class CityScene {
    * Inside an area: detailed ground, tiles and coloured prisms; the other boroughs keep their name tags.
    */
   private applyAreaVisibility() {
+    this.pendingHexReveal = []
     const inArea = !!this.activeArea || this.flightAreas.size > 0
     for (const [id, a] of this.areas) {
       a.fill.visible = !inArea
@@ -1181,6 +1184,7 @@ export class CityScene {
       } else if (area === undefined) this.pendingAreaHexes.push(h3)
     }
     else if (!inArea) for (const h3 of this.hexes.keys()) if (!this.cellArea.has(h3)) this.pendingAreaHexes.push(h3)
+    this.queueHexDisplay()
     this.updateBaseMapVisibility()
     this.scheduleHexBuild()
     this.invalidate()
@@ -1215,12 +1219,25 @@ export class CityScene {
     return area
   }
 
+  private queueHexDisplay() {
+    const f = this.flight
+    if (!f || f.duration <= 100 || f.radius0 <= AREA_DISTANCE || f.radius1 > AREA_DISTANCE + 1) return
+    // CPU geometry can already exist for the whole borough, but its first GPU upload
+    // must not happen in a single wide-view frame. Reveal nearest cells during approach.
+    this.pendingHexReveal = this.visibleHexes.filter((entry) => !this.renderedHexes.has(entry))
+    this.pendingHexReveal.sort((a, b) => b.mesh.position.distanceToSquared(f.t1) - a.mesh.position.distanceToSquared(f.t1))
+    for (const entry of this.pendingHexReveal) entry.mesh.visible = false
+  }
+
   private interruptFlight() {
     if (!this.flight) return
     this.flight = null
+    const revealing = this.pendingHexReveal
     this.controls.enabled = true
     this.flightAreas.clear()
     this.applyAreaVisibility()
+    this.pendingHexReveal = revealing.filter((entry) => entry.mesh.visible)
+    for (const entry of this.pendingHexReveal) entry.mesh.visible = false
     this.setTiles(this.requestedTiles)
     this.lastView.x = NaN // resume viewport-driven requests at the user's current position
     this.invalidate()
@@ -1255,6 +1272,7 @@ export class CityScene {
       ),
     }
     this.controls.enabled = false
+    this.queueHexDisplay()
     // Load the destination while the camera moves, without requesting intermediate tiles.
     if (this.viewReportTimer !== null) {
       clearTimeout(this.viewReportTimer)
@@ -1399,7 +1417,12 @@ export class CityScene {
     mesh.scale.z = height
     mesh.userData = { h3: cell.h3 }
     mesh.visible = this.hexVisible(cell.h3)
-    return { mesh, targetHeight: height, targetColour: new THREE.Color(material.color), flashUntil: 0 }
+    const entry = { mesh, targetHeight: height, targetColour: new THREE.Color(material.color), flashUntil: 0 }
+    mesh.onAfterRender = () => {
+      this.renderedHexes.add(entry)
+      mesh.onAfterRender = THREE.Object3D.prototype.onAfterRender
+    }
+    return entry
   }
 
   private retintBuildings() {
@@ -1691,8 +1714,12 @@ export class CityScene {
     const dist = this.camera.position.distanceTo(this.controls.target)
     // The shadow box spans 8.4 km. Move it in 512 m steps so ordinary camera
     // motion reuses the map instead of redrawing every building into it each frame.
-    const shadowX = Math.round(this.controls.target.x / 512) * 512
-    const shadowZ = Math.round(this.controls.target.z / 512) * 512
+    // An overview-to-borough approach loads only destination buildings. Anchor their
+    // shadow box there immediately instead of redrawing it at each intermediate pan step.
+    const shadowTarget = this.flight && this.flight.radius0 > AREA_DISTANCE && this.flight.radius1 <= AREA_DISTANCE + 1
+      ? this.flight.t1 : this.controls.target
+    const shadowX = Math.round(shadowTarget.x / 512) * 512
+    const shadowZ = Math.round(shadowTarget.z / 512) * 512
     if (this.key.target.position.x !== shadowX || this.key.target.position.z !== shadowZ) {
       this.renderer.shadowMap.needsUpdate = true
       this.key.target.position.set(shadowX, 0, shadowZ)
@@ -1806,10 +1833,15 @@ export class CityScene {
       fog.far = this.look.fog[1] * s
     }
     this.reportView(now, dist)
+    // Keep first-time GPU uploads within a small batch even when the camera sees a whole borough.
+    for (let n = 0; n < 48 && this.pendingHexReveal.length; n++) {
+      const entry = this.pendingHexReveal.pop()!
+      entry.mesh.visible = true
+    }
     // Keep the shadow shader variant stable, but skip its map pass at night.
     if (!this.look.sun.shadows && this.key.shadow.map) this.renderer.shadowMap.needsUpdate = false
     this.renderer.render(this.scene, this.camera)
-    if (this.flight || this.keys.size > 0 || this.locator || hexAnimating || controlsChanged || this.nodes.size > 0 || this.spots.length > 0) {
+    if (this.pendingHexReveal.length || this.flight || this.keys.size > 0 || this.locator || hexAnimating || controlsChanged || this.nodes.size > 0 || this.spots.length > 0) {
       this.scheduleFrame()
     }
   }

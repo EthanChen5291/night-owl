@@ -116,6 +116,15 @@ The `/dashboards` page turns a question into interactive charts using the same
 model exports and event store as the map. Follow-up questions include the current
 dashboard and selected chart value. It queries only Night Owl data.
 
+Responses stream as the assistant queries data and builds charts. Each assistant
+turn keeps a dashboard card that can reopen its saved result. New chat cancels
+the current request and prevents late responses from changing the new session.
+Existing browser sessions migrate without deleting their original saved data.
+
+The provider stream uses a bounded queue. Disconnecting stops further tool rounds
+and discards pending output. A socket read already in progress can take up to its
+60-second timeout to finish. HTML exports remain independent of the provider.
+
 Set `XAI_API_KEY` on the API server. `XAI_DASHBOARD_MODEL` defaults to `grok-4.7`.
 Keep credentials out of frontend environment variables and exported files.
 For a local session, put the key in the ignored root `.env`, then run:
