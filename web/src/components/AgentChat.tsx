@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { deleteThread, getThread, listThreads, markdown, streamAgent, type AgentEvent, type ClientCall, type ClientResult, type StoredTurn, type ThreadSummary } from '../agent'
+import { deleteThread, getThread, importLegacyChat, listThreads, markdown, pendingLegacyChat, streamAgent, type AgentEvent, type ClientCall, type ClientResult, type StoredTurn, type ThreadSummary } from '../agent'
+import { ChatGate, ChatRequestIdentity } from '../chatGate'
 import { ChatIcon, CheckIcon, CloseIcon, ListIcon, NewChatIcon, SendIcon, SparkIcon, StopIcon, TrashIcon } from './Icons'
 
 /** What the page can do for the assistant between rounds (things the server can't see). */
@@ -66,6 +67,14 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
   const [showList, setShowList] = useState(false)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [navigating, setNavigating] = useState(true)
+  const [migrating, setMigrating] = useState(true)
+  const [migrationFailed, setMigrationFailed] = useState(false)
+  const [restoreFailed, setRestoreFailed] = useState(false)
+  const restoreFailedRef = useRef(false)
+  const gateRef = useRef(new ChatGate())
+  const migrationSeqRef = useRef(0)
+  const selectionTouchedRef = useRef(false)
   const [zoom, setZoom] = useState<Img | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -76,43 +85,117 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
     toolsRef.current = tools
   }, [tools])
 
-  // reopen the conversation this browser had open last
-  useEffect(() => {
-    const id = threadRef.current
-    if (!id) return
-    getThread(id)
-      .then((t) => setItems((cur) => (cur.length ? cur : toItems(t.turns))))
-      .catch(() => {
-        threadRef.current = null // deleted, or saved under another browser
-        rememberThread(null)
-        setCurrent(null)
-      })
-  }, [])
-
   const refreshThreads = useCallback(() => {
     listThreads().then(setThreads).catch(() => setThreads([]))
   }, [])
 
+  const migrateLegacy = useCallback(async (token: number) => {
+    const seq = ++migrationSeqRef.current
+    const legacy = pendingLegacyChat()
+    if (!legacy) {
+      if (seq === migrationSeqRef.current) {
+        gateRef.current.migrating = false
+        setMigrating((prev) => seq === migrationSeqRef.current ? false : prev)
+      }
+      return
+    }
+    gateRef.current.migrating = true
+    setMigrating((prev) => seq === migrationSeqRef.current ? true : prev)
+    setMigrationFailed((prev) => seq === migrationSeqRef.current ? false : prev)
+    try {
+      const imported = await importLegacyChat(legacy)
+      if (gateRef.current.current(token) && !selectionTouchedRef.current && !threadRef.current) {
+        threadRef.current = imported.thread.id
+        rememberThread(imported.thread.id)
+        setCurrent((prev) => gateRef.current.current(token) && !selectionTouchedRef.current ? imported.thread.id : prev)
+        setItems((prev) => gateRef.current.current(token) && !selectionTouchedRef.current ? toItems(imported.turns) : prev)
+      }
+      refreshThreads()
+    } catch {
+      if (seq === migrationSeqRef.current) setMigrationFailed((prev) => seq === migrationSeqRef.current ? true : prev)
+    } finally {
+      if (seq === migrationSeqRef.current) {
+        gateRef.current.migrating = false
+        setMigrating((prev) => seq === migrationSeqRef.current ? false : prev)
+      }
+    }
+  }, [refreshThreads])
+
+  // Restore the selected server thread, then import older browser-only chat into History.
+  useEffect(() => {
+    const gate = gateRef.current
+    const token = gate.generation
+    gate.navigating = true
+    setNavigating((prev) => gateRef.current.current(token) && gateRef.current.navigating ? true : prev)
+    const id = threadRef.current
+    const restore = async () => {
+      if (id) {
+        try {
+          const t = await getThread(id)
+          if (gate.current(token)) setItems((prev) => gate.current(token) ? toItems(t.turns) : prev)
+        } catch (e) {
+          // Network and server errors are transient. Only a confirmed missing thread clears the pointer.
+          if (gate.current(token) && (e as { status?: number }).status === 404) {
+            threadRef.current = null
+            rememberThread(null)
+            setCurrent((prev) => gate.current(token) ? null : prev)
+          } else if (gate.current(token)) {
+            restoreFailedRef.current = true
+            setRestoreFailed(true)
+          }
+        }
+      }
+      if (gate.navigationDone(token)) setNavigating((prev) => gate.current(token) && !gate.navigating ? false : prev)
+      await migrateLegacy(token)
+    }
+    void restore()
+    return () => { gate.reset() }
+  }, [migrateLegacy])
+
   const openThread = useCallback(async (id: string) => {
-    if (busy) return
-    const t = await getThread(id).catch(() => null)
-    setShowList(false)
-    if (!t) return refreshThreads()
-    threadRef.current = id
-    rememberThread(id)
-    setCurrent(id)
-    setItems(toItems(t.turns))
-  }, [busy, refreshThreads])
+    const token = gateRef.current.navigate()
+    if (token === null) return
+    selectionTouchedRef.current = true
+    setNavigating((prev) => gateRef.current.current(token) && gateRef.current.navigating ? true : prev)
+    try {
+      const t = await getThread(id)
+      if (!gateRef.current.current(token)) return
+      setShowList(false)
+      threadRef.current = id
+      rememberThread(id)
+      restoreFailedRef.current = false
+      setRestoreFailed((prev) => gateRef.current.current(token) ? false : prev)
+      setCurrent((prev) => gateRef.current.current(token) ? id : prev)
+      setItems((prev) => gateRef.current.current(token) ? toItems(t.turns) : prev)
+    } catch {
+      if (gateRef.current.current(token)) refreshThreads()
+    } finally {
+      if (gateRef.current.navigationDone(token)) setNavigating((prev) => gateRef.current.current(token) && !gateRef.current.navigating ? false : prev)
+    }
+  }, [refreshThreads])
 
   const removeThread = useCallback(async (id: string) => {
-    await deleteThread(id).catch(() => {})
-    if (threadRef.current === id) {
-      threadRef.current = null
-      rememberThread(null)
-      setCurrent(null)
-      setItems([])
+    const token = gateRef.current.navigate()
+    if (token === null) return
+    selectionTouchedRef.current = true
+    setNavigating((prev) => gateRef.current.current(token) && gateRef.current.navigating ? true : prev)
+    try {
+      await deleteThread(id)
+      if (!gateRef.current.current(token)) return
+      if (threadRef.current === id) {
+        threadRef.current = null
+        rememberThread(null)
+        restoreFailedRef.current = false
+        setRestoreFailed((prev) => gateRef.current.current(token) ? false : prev)
+        setCurrent((prev) => gateRef.current.current(token) ? null : prev)
+        setItems((prev) => gateRef.current.current(token) ? [] : prev)
+      }
+      refreshThreads()
+    } catch {
+      if (gateRef.current.current(token)) refreshThreads()
+    } finally {
+      if (gateRef.current.navigationDone(token)) setNavigating((prev) => gateRef.current.current(token) && !gateRef.current.navigating ? false : prev)
     }
-    refreshThreads()
   }, [refreshThreads])
 
   // stick to the bottom while the answer streams
@@ -167,12 +250,13 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
     return () => window.removeEventListener('keydown', onKey)
   }, [zoom, open, busy])
 
-  const patchBot = useCallback((fn: (b: Extract<Item, { kind: 'bot' }>) => Extract<Item, { kind: 'bot' }>) => {
-    setItems((prev) => {
+  const patchBot = useCallback((token: number, fn: (b: Extract<Item, { kind: 'bot' }>) => Extract<Item, { kind: 'bot' }>) => {
+    // React may apply this functional updater after a reset or another navigation.
+    setItems(gateRef.current.guard(token, (prev: Item[]) => {
       const last = prev[prev.length - 1]
       if (!last || last.kind !== 'bot') return prev
       return [...prev.slice(0, -1), fn(last)]
-    })
+    }))
   }, [])
 
   const runClientTool = useCallback(async (c: ClientCall): Promise<ClientResult> => {
@@ -192,84 +276,109 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
   const send = useCallback(
     async (text: string) => {
       const q = text.trim()
-      if (!q || busy) return
-      setInput('')
-      setBusy(true)
-      setItems((prev) => [...prev, { kind: 'user', text: q }, { kind: 'bot', text: '', steps: [], images: [], busy: true }])
+      if (!q || restoreFailedRef.current) return
+      const token = gateRef.current.send()
+      if (token === null) return
+      const patchCurrentBot = (fn: (b: Extract<Item, { kind: 'bot' }>) => Extract<Item, { kind: 'bot' }>) => patchBot(token, fn)
+      selectionTouchedRef.current = true
+      setInput((prev) => gateRef.current.current(token) ? '' : prev)
+      setBusy((prev) => gateRef.current.current(token) ? true : prev)
+      setItems(gateRef.current.guard(token, (prev: Item[]) => [...prev, { kind: 'user', text: q }, { kind: 'bot', text: '', steps: [], images: [], busy: true }]))
       const ctl = new AbortController()
       abortRef.current = ctl
       setShowList(false)
-      let body: Parameters<typeof streamAgent>[0] = { thread_id: threadRef.current, text: q, month, plan_k: planBudget }
+      const request = new ChatRequestIdentity(threadRef.current)
+      let body: Parameters<typeof streamAgent>[0] = { thread_id: request.threadId, text: q, month, plan_k: planBudget }
       try {
         for (let round = 0; round < 6; round++) {
+          if (ctl.signal.aborted || !gateRef.current.current(token)) break
           let next: ClientCall[] = []
           let pending: Img[] = []
           await streamAgent(
             body,
             (e: AgentEvent) => {
-              if (e.type === 'delta') patchBot((b) => ({ ...b, text: b.text + e.text }))
+              if (ctl.signal.aborted || !gateRef.current.current(token)) return
+              if (e.type === 'delta') patchCurrentBot((b) => ({ ...b, text: b.text + e.text }))
               else if (e.type === 'thinking') {
                 if (e.state === 'start') {
                   const id = `think-${++thinkSeq.current}`
-                  patchBot((b) => ({ ...b, steps: [...b.steps, { id, label: 'Thinking', state: 'start' }] }))
+                  patchCurrentBot((b) => ({ ...b, steps: [...b.steps, { id, label: 'Thinking', state: 'start' }] }))
                 } else {
                   const id = `think-${thinkSeq.current}`
-                  patchBot((b) => ({ ...b, steps: b.steps.map((s) => (s.id === id ? { ...s, state: 'done' } : s)) }))
+                  patchCurrentBot((b) => ({ ...b, steps: b.steps.map((s) => (s.id === id ? { ...s, state: 'done' } : s)) }))
                 }
               } else if (e.type === 'tool')
-                patchBot((b) => {
+                patchCurrentBot((b) => {
                   const has = b.steps.some((s) => s.id === e.id)
                   // text before a tool call ("Let me check…") and the answer after it are separate paragraphs
                   const text = !has && b.text && !b.text.endsWith('\n\n') ? b.text + '\n\n' : b.text
                   return { ...b, text, steps: has ? b.steps.map((s) => (s.id === e.id ? { ...s, state: e.state } : s)) : [...b.steps, { id: e.id, label: e.label, state: e.state }] }
                 })
-              else if (e.type === 'image') patchBot((b) => ({ ...b, images: [...b.images, { src: e.src, caption: e.caption }] }))
+              else if (e.type === 'image') patchCurrentBot((b) => ({ ...b, images: [...b.images, { src: e.src, caption: e.caption }] }))
               else if (e.type === 'client_tools') {
                 next = e.calls
                 pending = e.pending_images ?? []
               } else if (e.type === 'thread') {
-                threadRef.current = e.id // a new conversation gets its id with the first answer
-                rememberThread(e.id)
-                setCurrent(e.id)
-              } else if (e.type === 'error') patchBot((b) => ({ ...b, error: e.text }))
+                // A new conversation gets its id with the first answer. Keep that id for every tool continuation.
+                if (!request.acceptThread(e.id, e.answer_id)) return
+                threadRef.current = request.threadId
+                rememberThread(request.threadId)
+                setCurrent((prev) => gateRef.current.current(token) ? request.threadId : prev)
+              } else if (e.type === 'error') patchCurrentBot((b) => ({ ...b, error: e.text }))
             },
             ctl.signal,
           )
+          if (ctl.signal.aborted || !gateRef.current.current(token)) break
           if (!next.length) break
+          const continuation = request.continuation()
           // run the page's tools, show what they produced, and go again
           const results: ClientResult[] = []
-          patchBot((b) => (b.text && !b.text.endsWith('\n\n') ? { ...b, text: b.text + '\n\n' } : b))
+          patchCurrentBot((b) => (b.text && !b.text.endsWith('\n\n') ? { ...b, text: b.text + '\n\n' } : b))
           for (const c of next) {
-            patchBot((b) => ({ ...b, steps: [...b.steps, { id: c.id, label: c.label, state: 'start' }] }))
+            if (ctl.signal.aborted || !gateRef.current.current(token)) break
+            patchCurrentBot((b) => ({ ...b, steps: [...b.steps, { id: c.id, label: c.label, state: 'start' }] }))
             const r = await runClientTool(c)
+            if (ctl.signal.aborted || !gateRef.current.current(token)) break
             results.push(r)
             if (r.image) {
               const img = r.image
-              patchBot((b) => ({ ...b, images: [...b.images, { src: img, caption: 'Your map view' }] }))
+              patchCurrentBot((b) => ({ ...b, images: [...b.images, { src: img, caption: 'Your map view' }] }))
             }
-            patchBot((b) => ({ ...b, steps: b.steps.map((s) => (s.id === c.id ? { ...s, state: r.content.includes('"error"') ? 'error' : 'done' } : s)) }))
+            patchCurrentBot((b) => ({ ...b, steps: b.steps.map((s) => (s.id === c.id ? { ...s, state: r.content.includes('"error"') ? 'error' : 'done' } : s)) }))
           }
-          body = { thread_id: threadRef.current, month, plan_k: planBudget, client_results: results, pending_images: pending }
+          if (ctl.signal.aborted || !gateRef.current.current(token)) break
+          body = { ...continuation, month, plan_k: planBudget, client_results: results, pending_images: pending }
         }
       } catch (e) {
-        if ((e as Error).name !== 'AbortError') patchBot((b) => ({ ...b, error: `Couldn’t reach the assistant (${(e as Error).message}).` }))
+        if (gateRef.current.current(token) && !ctl.signal.aborted && (e as Error).name !== 'AbortError')
+          patchCurrentBot((b) => ({ ...b, error: `Couldn’t reach the assistant (${(e as Error).message}).` }))
       } finally {
-        patchBot((b) => ({ ...b, busy: false, steps: b.steps.map((s) => (s.state === 'start' ? { ...s, state: 'error' } : s)) }))
-        setBusy(false)
-        abortRef.current = null
+        if (gateRef.current.sendDone(token)) {
+          patchCurrentBot((b) => ({ ...b, busy: false, steps: b.steps.map((s) => (s.state === 'start' ? { ...s, state: 'error' } : s)) }))
+          setBusy((prev) => gateRef.current.current(token) ? false : prev)
+          abortRef.current = null
+        }
       }
     },
-    [busy, month, planBudget, patchBot, runClientTool],
+    [month, planBudget, patchBot, runClientTool],
   )
 
   const reset = () => {
     abortRef.current?.abort()
+    abortRef.current = null
+    gateRef.current.reset()
+    const token = gateRef.current.generation
+    selectionTouchedRef.current = true
+    restoreFailedRef.current = false
+    setRestoreFailed((prev) => gateRef.current.current(token) ? false : prev)
+    setBusy((prev) => gateRef.current.current(token) ? false : prev)
+    setNavigating((prev) => gateRef.current.current(token) ? false : prev)
     threadRef.current = null // the next question starts a new saved thread
     rememberThread(null)
-    setCurrent(null)
+    setCurrent((prev) => gateRef.current.current(token) ? null : prev)
     setShowList(false)
-    setItems([])
-    setInput('')
+    setItems(gateRef.current.guard<Item[]>(token, () => []))
+    setInput((prev) => gateRef.current.current(token) ? '' : prev)
     inputRef.current?.focus()
   }
 
@@ -305,7 +414,7 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
           >
             <ListIcon size={16} />
           </button>
-          <button className="icon-btn" title="New chat" onClick={reset} disabled={!items.length && !busy}>
+          <button className="icon-btn" title="New chat" onClick={reset} disabled={!items.length && !busy && !navigating}>
             <NewChatIcon size={16} />
           </button>
           <button className="icon-btn" title="Close" onClick={() => setOpen(false)}>
@@ -316,6 +425,9 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
         {showList && (
           <div className="agent-threads">
             <div className="agent-threads-head muted small">Saved chats on this browser</div>
+            {migrationFailed && (
+              <div className="agent-error">Older chat could not be imported. <button onClick={() => void migrateLegacy(gateRef.current.generation)} disabled={migrating || busy || navigating}>Retry</button></div>
+            )}
             {threads === null ? (
               <div className="muted small">Loading…</div>
             ) : !threads.length ? (
@@ -323,13 +435,13 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
             ) : (
               threads.map((t) => (
                 <div key={t.id} className={`agent-thread ${t.id === current ? 'current' : ''}`}>
-                  <button className="agent-thread-open" onClick={() => void openThread(t.id)} disabled={busy}>
+                  <button className="agent-thread-open" onClick={() => void openThread(t.id)} disabled={busy || navigating || migrating}>
                     <b>{t.title}</b>
                     <span className="muted small">
                       {since(t.updated_at)} · {t.questions} question{t.questions === 1 ? '' : 's'}
                     </span>
                   </button>
-                  <button className="icon-btn" title="Delete chat" onClick={() => void removeThread(t.id)} disabled={busy && t.id === current}>
+                  <button className="icon-btn" title="Delete chat" onClick={() => void removeThread(t.id)} disabled={busy || navigating || migrating}>
                     <TrashIcon size={14} />
                   </button>
                 </div>
@@ -339,6 +451,12 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
         )}
 
         <div className="agent-body" ref={listRef}>
+          {restoreFailed && (
+            <div className="agent-error">Saved chat could not be loaded. <button onClick={() => { if (threadRef.current) void openThread(threadRef.current) }} disabled={busy || navigating || migrating}>Retry</button></div>
+          )}
+          {migrationFailed && !showList && (
+            <div className="agent-error">Older chat could not be imported. <button onClick={() => void migrateLegacy(gateRef.current.generation)} disabled={migrating || busy || navigating}>Retry</button></div>
+          )}
           {!items.length && (
             <div className="agent-hello">
               <div className="agent-hello-icon">
@@ -348,7 +466,7 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
               <p className="muted">Ask about a block, the track record, or what you are looking at. Camera questions work when an owl is connected.</p>
               <div className="agent-suggest">
                 {SUGGESTIONS.map((s) => (
-                  <button key={s} onClick={() => void send(s)}>
+                  <button key={s} onClick={() => void send(s)} disabled={busy || navigating || migrating || restoreFailed}>
                     {s}
                   </button>
                 ))}
@@ -417,7 +535,7 @@ function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; 
               <StopIcon size={16} />
             </button>
           ) : (
-            <button type="submit" className="agent-send" title="Send" disabled={!input.trim()}>
+            <button type="submit" className="agent-send" title="Send" disabled={!input.trim() || navigating || migrating || restoreFailed}>
               <SendIcon size={16} />
             </button>
           )}

@@ -110,6 +110,29 @@ fixtures/backtest.json       synthetic backtest (make_backtest.py regenerates it
 tests/test_api.py    pytest + httpx TestClient
 ```
 
+## Agent chat and iMessage deployment
+
+Set `XAI_API_KEY` for agent replies. Set `NIGHT_OWL_CHAT_DB` to a persistent,
+writable local path outside the checkout, for example `/var/lib/poc/chat.db`.
+Keep that directory on persistent storage: SQLite may also create `chat.db-wal`
+and `chat.db-shm` beside the database. Use SQLite's backup API for a live backup,
+or stop writes and checkpoint before copying the database.
+
+Set the same `NIGHT_OWL_CHAT_BOT_TOKEN` value in the API and iMessage bot
+processes. The bot sends it in `x-chat-bot-token` for both `POST /agent/chat`
+with `imessage_space` and `POST /agent/imessage/reset` with
+`{"imessage_space":"..."}`. Missing API token configuration returns 503;
+a missing or mismatched request token returns 403. Web chat uses its existing
+browser session flow.
+
+The bot defaults to `http://127.0.0.1:8772/agent/chat`. Verify the API's
+listening port in the deployment configuration. If it differs, set the bot's
+`NIGHT_OWL_AGENT_URL` to the full chat endpoint. The bot also accepts the
+existing `BARN_OWL_AGENT_URL` as a fallback. A remote URL must use HTTPS,
+and the matching reset path must reach the same API instance and chat database.
+The bot acknowledges a reset after the API creates the new thread. These
+deployment settings have not been verified on a running server.
+
 ## Dashboard assistant
 
 The `/dashboards` page turns a question into interactive charts using the same
