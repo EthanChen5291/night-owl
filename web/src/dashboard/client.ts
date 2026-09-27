@@ -28,6 +28,10 @@ export async function renderDashboard(spec: DashboardSpec, version: number, sign
   return response.json() as Promise<DashboardArtifact>
 }
 
+export function refreshDashboard(artifact: DashboardArtifact, signal?: AbortSignal): Promise<DashboardArtifact> {
+  return renderDashboard(artifact.spec, artifact.version + 1, signal)
+}
+
 export interface ChatRequest {
   message: string
   history: ChatMessage[]
@@ -36,11 +40,19 @@ export interface ChatRequest {
   version?: number
 }
 
+function historyContent(content: string): string {
+  const limit = 4000
+  if (content.length <= limit) return content
+  const marker = '\n…\n'
+  const head = 1500
+  return content.slice(0, head) + marker + content.slice(-(limit - head - marker.length))
+}
+
 export async function streamDashboardChat(body: ChatRequest, onEvent: (event: DashboardEvent) => void, signal: AbortSignal): Promise<void> {
   const response = await fetch(`${base}/chat`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, history: body.history.slice(-12).map((entry) => ({ ...entry, content: historyContent(entry.content) })) }),
     signal,
   })
   if (!response.ok) throw await responseError(response)

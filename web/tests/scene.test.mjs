@@ -44,6 +44,9 @@ function harness() {
   scene.nodes = new Map()
   scene.spots = []
   scene.areas = new Map()
+  scene.cityLayerGroup = { visible: true }
+  scene.areaLayerMeshes = new Map()
+  scene.transitioningArea = false
   scene.pointerDirty = false
   scene.activeArea = null
   scene.hoveredArea = null
@@ -54,6 +57,10 @@ function harness() {
   scene.scene = { fog: null, traverse() {} }
   scene.renderer.info = { render: { calls: 0, triangles: 0 }, memory: { geometries: 0, textures: 0 } }
   scene.hexes = new Map()
+  scene.pendingHexes = []
+  scene.pendingAreaHexes = []
+  scene.pendingPriorityHexes = 0
+  scene.tileAreas = {}
   scene.tiles = new Map()
   scene.tileRequests = new Map()
   scene.tileInFlight = null
@@ -153,6 +160,38 @@ test('controls continue until settled; animated frames are capped but urgent cha
   } finally { h.restore() }
 })
 
+test('a close borough flight keeps city ground visible until destination ground is ready', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.activeArea = 'source'
+    s.transitioningArea = false
+    s.cityLayerGroup = { visible: false }
+    s.areaLayerGroup = { visible: true }
+    s.areaLayerMeshes = new Map()
+    s.hexGroup = { visible: true }
+    s.areas.set('destination', {
+      centre: new THREE.Vector3(10_000, 0, 0),
+      fill: { visible: false }, rim: { visible: false }, label: { visible: true },
+    })
+    s.camera.position.set(0, 174, 244)
+    s.pick = () => {}
+
+    s.setActiveArea('destination')
+    assert.equal(s.cityLayerGroup.visible, true)
+    assert.ok(Math.abs(s.flight.radius0 - 300) < 1)
+    assert.ok(Math.abs(s.flight.radius1 - 300) < 1, 'the crossing stays close without a zoom-out arc')
+
+    s.flight.start = performance.now() - s.flight.duration
+    h.flush()
+    assert.equal(s.flight, null)
+    assert.equal(s.cityLayerGroup.visible, true, 'city ground remains while borough ground loads')
+    s.buildLayers = (_group, meshes) => meshes.set('land', {})
+    s.setAreaLayers({ land: [], parks: [], water: [] })
+    assert.equal(s.cityLayerGroup.visible, true)
+  } finally { h.restore() }
+})
+
 
 test('a stale tile reply starts the current request without restoring old geometry', () => {
   const h = harness()
@@ -193,6 +232,64 @@ test('an old-area reply is dropped and disposal terminates tile work', () => {
   } finally { h.restore() }
 })
 
+test('switching areas cancels obsolete tile geometry before dispatching the new area', () => {
+  const h = harness()
+  const previousWorker = globalThis.Worker
+  const sent = []
+  let terminated = false
+  globalThis.Worker = class {
+    postMessage(message) { sent.push(message) }
+    terminate() {}
+  }
+  try {
+    h.scene.tileWorker = { terminate() { terminated = true } }
+    h.scene.tileInFlight = 1
+    h.scene.activeArea = 'brooklyn'
+    h.scene.tileRequests.set('old', { id: 1, area: 'manhattan', buildings: [], roads: [], trees: [] })
+    h.scene.setTiles(new Map([['new', { buildings: [], roads: [], trees: [] }]]))
+    assert.equal(terminated, true)
+    assert.equal(sent.length, 1)
+    assert.equal(sent[0].tileId, 'new')
+  } finally {
+    globalThis.Worker = previousWorker
+    h.restore()
+  }
+})
+
+test('cells removed while hex construction is pending leave the map', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.cells = new Map()
+    s.pendingHexes = []
+    s.scheduleHexBuild = s.applyAreaVisibility = s.retintBuildings = () => {}
+    s.setCells([{ h3: 'pending' }], 'a')
+    assert.equal(s.cells.has('pending'), true)
+    assert.equal(s.pendingHexes.length, 1)
+    s.setCells([], 'a')
+    assert.equal(s.cells.has('pending'), false)
+    assert.equal(s.pendingHexes.length, 0)
+  } finally { h.restore() }
+})
+
+test('borough entry defers uncached cell classification beyond the click task', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.activeArea = 'manhattan'
+    s.areaLayerGroup = { visible: false }
+    s.hexGroup = { visible: false }
+    s.cellArea = new Map()
+    s.scheduleHexBuild = () => {}
+    s.areaOfCell = () => assert.fail('polygon classification ran synchronously')
+    for (let i = 0; i < 100; i++) s.hexes.set(String(i), { mesh: { visible: true } })
+    s.applyAreaVisibility()
+    assert.equal(s.pendingAreaHexes.length, 100)
+    assert.equal(s.visibleHexes.length, 0)
+    assert.equal([...s.hexes.values()].every((entry) => !entry.mesh.visible), true)
+  } finally { h.restore() }
+})
+
 test('camera motion reuses shadows until it crosses a shadow-box boundary', () => {
   const h = harness()
   try {
@@ -214,7 +311,7 @@ test('camera motion reuses shadows until it crosses a shadow-box boundary', () =
   } finally { h.restore() }
 })
 
-test('lighting changes keep geometry and shader configuration intact', () => {
+test('lighting changes keep building shader configuration intact', () => {
   const h = harness()
   try {
     const s = h.scene
@@ -231,27 +328,39 @@ test('lighting changes keep geometry and shader configuration intact', () => {
     s.buildingTheme = installBuildingTheme([s.wallMaterial, s.roofMaterial])
     s.cityLayerMeshes = new Map()
     s.areaLayerMeshes = new Map()
-    s.fieldNeutral = { value: new THREE.Color() }
-    s.fieldMix = { value: 0 }
-    const geometry = new THREE.BufferGeometry()
-    s.field = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial())
-    s.rebuildField = s.retintBuildings = s.setPlan = s.setSpots = () => assert.fail('lighting rebuilt scene data')
+    s.retintBuildings = s.setPlan = s.setSpots = () => assert.fail('lighting rebuilt scene data')
     const materialVersion = s.wallMaterial.version
     s.setPreset('night')
     assert.equal(s.key.castShadow, true)
     assert.equal(s.key.shadow.intensity, 0)
-    assert.equal(s.field.geometry, geometry)
-    assert.equal(s.field.material.opacity, 0.84)
-    assert.equal(s.fieldMix.value, 0.25)
     s.setPreset('day')
     assert.equal(s.key.shadow.intensity, 1)
-    assert.equal(s.field.geometry, geometry)
-    assert.equal(s.field.material.opacity, 0.9)
     assert.equal(s.wallMaterial.version, materialVersion)
   } finally { h.restore() }
 })
 
-test('a borough flight zooms inward continuously without a mid-flight climb', () => {
+test('borough risk cells retain their coloured height and h3 pick identity', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    s.mode = 'a'
+    s.look = { hexOpacity: 0.56 }
+    s.projector = { xy: (lat, lon) => [lon * 1000, lat * 1000] }
+    s.hexVisible = () => true
+    const cell = { h3: '892a100d2c3ffff', pct_a: 80 }
+    const entry = s.makeHex(cell)
+    assert.equal(entry.mesh.geometry.type, 'BufferGeometry')
+    assert.equal(entry.mesh.geometry.index.count > 0, true)
+    assert.equal(entry.mesh.material.opacity, 0.56)
+    assert.equal(entry.mesh.userData.h3, cell.h3)
+    assert.equal(entry.targetHeight, 102)
+    assert.equal(entry.mesh.scale.z, 102)
+    entry.mesh.geometry.dispose()
+    entry.mesh.material.dispose()
+  } finally { h.restore() }
+})
+
+test('citywide borough entry starts nearby and settles without a long zoom', () => {
   const h = harness()
   try {
     h.scene.camera.position.setFromSphericalCoords(36000, 0.42, 0.35)
@@ -261,7 +370,10 @@ test('a borough flight zooms inward continuously without a mid-flight climb', ()
     h.scene.areas.set('brooklyn', { centre: target, label: { visible: false } })
     h.scene.applyAreaVisibility = () => {}
     h.scene.setActiveArea('brooklyn')
-    let radius = 36000
+    assert.equal(h.scene.flight.duration, 360)
+    assert.ok(h.scene.controls.target.distanceTo(target) < 1e-6, 'entry begins at the borough')
+    let radius = h.scene.camera.position.distanceTo(h.scene.controls.target)
+    assert.ok(radius < 4500, 'entry skips the 36 km overview zoom')
     let height = h.scene.camera.position.y
     for (let i = 0; h.scene.flight && i < 100; i++) {
       h.flush()
@@ -274,6 +386,33 @@ test('a borough flight zooms inward continuously without a mid-flight climb', ()
     assert.equal(h.scene.flight, null)
     assert.ok(h.scene.camera.position.distanceTo(destination) < 1e-6)
     assert.ok(h.scene.controls.target.distanceTo(target) < 1e-6)
+  } finally { h.restore() }
+})
+
+test('back to city starts near the overview and settles without a street-level sweep', () => {
+  const h = harness()
+  try {
+    const s = h.scene
+    const borough = new THREE.Vector3(8000, 0, -5000)
+    s.activeArea = 'brooklyn'
+    s.controls.target.copy(borough)
+    s.camera.position.copy(new THREE.Vector3(0, 174, 244).add(borough))
+    s.pick = () => {}
+    s.applyAreaVisibility = () => {}
+
+    s.setActiveArea(null)
+    assert.equal(s.flight.duration, 240)
+    assert.ok(s.controls.target.length() < 1e-6, 'return begins at the city centre')
+    let radius = s.camera.position.distanceTo(s.controls.target)
+    assert.ok(radius > 30_000, 'return skips the street-to-overview sweep')
+    while (s.flight) {
+      h.flush()
+      const nextRadius = s.camera.position.distanceTo(s.controls.target)
+      assert.ok(nextRadius >= radius - 1e-6)
+      radius = nextRadius
+    }
+    assert.ok(Math.abs(radius - 36_000) < 1e-6)
+    assert.ok(s.controls.target.length() < 1e-6)
   } finally { h.restore() }
 })
 

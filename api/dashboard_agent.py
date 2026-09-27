@@ -5,11 +5,14 @@ import asyncio
 import json
 import math
 import os
+import queue
+import threading
 import time
 import urllib.error
 import urllib.request
 from collections import defaultdict, deque
-from typing import Any, AsyncIterator
+from contextlib import aclosing
+from typing import Any, AsyncIterator, Callable
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -23,6 +26,9 @@ MAX_ROUNDS = 5
 MAX_TOOL_CALLS = 10
 MAX_HISTORY = 12
 MAX_QUERY_PREVIEW = 40
+MAX_TEXT = 6000
+MAX_THINKING = 2000
+MAX_SSE_EVENT_BYTES = 1_000_000
 RATE_PER_MIN, RATE_PER_DAY = 10, 100
 _hits: dict[str, deque[float]] = defaultdict(deque)
 
@@ -82,23 +88,142 @@ def _rate_ok(ip: str) -> bool:
     return True
 
 
-def _provider(body: dict) -> dict:
-    """Kept separate so tests never call xAI and request cancellation can stop later rounds."""
+def _provider(body: dict, emit: Callable[[str, str], None] = lambda _kind, _text: None) -> dict:
+    """Streams one Responses round, handing text and reasoning-summary deltas to emit(); returns the completed response.
+
+    Kept separate so tests never call xAI. It runs in a worker thread, so emit must be thread-safe."""
     key = os.environ.get("XAI_API_KEY")
     if not key:
         raise DashboardError("dashboard assistant is not configured")
-    request = urllib.request.Request(XAI_RESPONSES_URL, data=json.dumps(body).encode(), method="POST",
-                                     headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+    request = urllib.request.Request(XAI_RESPONSES_URL, data=json.dumps({**body, "stream": True}).encode(), method="POST",
+                                     headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
+                                              "Accept": "text/event-stream"})
+    result = None
+    text_sent = thinking_sent = 0
+
+    def handle_event(data: str) -> bool:
+        nonlocal result, text_sent, thinking_sent
+        if data == "[DONE]":
+            return True
+        event = json.loads(data)
+        kind = event.get("type") if isinstance(event, dict) else None
+        if kind == "response.output_text.delta" and isinstance(event.get("delta"), str):
+            piece = event["delta"][:MAX_TEXT - text_sent]
+            text_sent += len(piece)
+            if piece:
+                emit("delta", piece)
+        elif kind == "response.reasoning_summary_text.delta" and isinstance(event.get("delta"), str):
+            piece = event["delta"][:MAX_THINKING - thinking_sent]
+            thinking_sent += len(piece)
+            if piece:
+                emit("thinking", piece)
+        elif kind == "response.completed":
+            result = event.get("response")
+            return True
+        elif kind in ("response.failed", "response.incomplete", "error"):
+            raise DashboardError("xAI response did not complete")
+        return False
+
     try:
         with urllib.request.build_opener(_NoRedirect).open(request, timeout=60) as response:
-            result = json.load(response)
+            data_lines: list[str] = []
+            event_bytes = 0
+            for raw in response:
+                if callable(cancelled := getattr(emit, "cancelled", None)) and cancelled():
+                    raise _RoundStopped()
+                if len(raw) > MAX_SSE_EVENT_BYTES:
+                    raise DashboardError("xAI returned an oversized stream event")
+                line = raw.decode("utf-8", "strict").rstrip("\r\n")
+                if not line:
+                    if data_lines:
+                        complete = handle_event("\n".join(data_lines))
+                        data_lines.clear()
+                        event_bytes = 0
+                        if complete:
+                            break
+                elif line.startswith("data:"):
+                    part = line[5:].lstrip(" ")
+                    event_bytes += len(raw)
+                    if event_bytes > MAX_SSE_EVENT_BYTES:
+                        raise DashboardError("xAI returned an oversized stream event")
+                    data_lines.append(part)
+            if data_lines:
+                handle_event("\n".join(data_lines))
     except urllib.error.HTTPError as exc:
         raise DashboardError(f"xAI request returned HTTP {exc.code}") from exc
     except (urllib.error.URLError, TimeoutError) as exc:
         raise DashboardError("xAI request timed out or could not connect") from exc
+    except DashboardError:
+        raise
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise DashboardError("xAI returned an invalid stream") from exc
     if not isinstance(result, dict) or not isinstance(result.get("output"), list):
         raise DashboardError("xAI returned an invalid response")
     return result
+
+
+async def _round(body: dict) -> AsyncIterator[tuple[str, Any]]:
+    """Yields ("delta" | "thinking", text) while one provider round streams, then ("response", completed)."""
+    events: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=64)
+    stopped = threading.Event()
+
+    def offer(item: tuple[str, Any]) -> None:
+        while not stopped.is_set():
+            try:
+                events.put(item, timeout=0.1)
+                return
+            except queue.Full:
+                continue
+        raise _RoundStopped()
+
+    def work() -> None:
+        try:
+            item = ("response", _provider(body, _RoundEmitter(offer, stopped)))
+        except _RoundStopped:
+            return
+        except Exception as exc:  # noqa: BLE001 - re-raised on the event loop
+            item = ("raise", exc)
+        if not stopped.is_set():
+            try:
+                offer(item)
+            except _RoundStopped:
+                pass
+
+    threading.Thread(target=work, daemon=True).start()
+    try:
+        while True:
+            try:
+                kind, value = await asyncio.to_thread(events.get, True, 0.1)
+            except queue.Empty:
+                continue
+            if kind == "raise":
+                raise value
+            yield kind, value
+            if kind == "response":
+                return
+    finally:
+        stopped.set()
+
+
+class _RoundStopped(Exception):
+    """The SSE consumer disconnected while the provider round was running."""
+
+
+class _RoundEmitter:
+    def __init__(self, offer: Callable[[tuple[str, Any]], None], stopped: threading.Event):
+        self.offer = offer
+        self.cancelled = stopped.is_set
+
+    def __call__(self, kind: str, value: str) -> None:
+        self.offer((kind, value))
+
+
+def _query_detail(result: dict) -> str:
+    query, labels = result["query"], {column["key"]: column["label"] for column in result["columns"]}
+    metrics = ", ".join(labels.get(metric, metric) for metric in query["metrics"] if metric != "records") or "Record count"
+    parts = [metrics, f"by {labels.get(query['group_by'], query['group_by']).lower()}" if query.get("group_by") else "",
+             query.get("borough") or "", f"{result['total_rows']} row{'s' if result['total_rows'] != 1 else ''}"]
+    return " · ".join(part for part in parts if part)
 
 
 def _output_text(response: dict) -> str:
@@ -159,17 +284,37 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
         message += "\nSelected chart value: " + json.dumps(body["selection"], separators=(",", ":"))
     context.append({"role": "user", "content": message})
     artifact = None
-    final_text = ""
+    text = ""
     calls_used = 0
     for round_index in range(MAX_ROUNDS):
-        yield {"type": "status", "text": "Working with Night Owl data…"}
-        response = await asyncio.to_thread(_provider, {"model": model, "input": context, "tools": tools,
-                                                       "store": False, "max_output_tokens": 2500})
+        yield {"type": "status", "text": "Thinking"}
+        round_text = ""
+        response: dict = {}
+        async with aclosing(_round({"model": model, "input": context, "tools": tools,
+                                    "store": False, "max_output_tokens": 2500})) as provider_stream:
+            async for kind, value in provider_stream:
+                if kind == "response":
+                    response = value
+                elif kind == "thinking":
+                    yield {"type": "thinking", "text": value}
+                elif kind == "delta" and len(text) < MAX_TEXT:
+                    separator = "\n\n" if not round_text and text and not text.endswith("\n") else ""
+                    piece = (separator + value)[:MAX_TEXT - len(text)]
+                    if piece:
+                        round_text += piece
+                        text += piece
+                        yield {"type": "delta", "text": piece}
         output = response["output"]
         context.extend(output)
         calls = [item for item in output if isinstance(item, dict) and item.get("type") == "function_call"]
         if not calls:
-            final_text = _output_text(response)
+            if not round_text:  # final text may be unstreamed after an earlier tool round streamed prose
+                final = _output_text(response).strip()[:MAX_TEXT - len(text)]
+                if final:
+                    if text and not text.endswith("\n"):
+                        final = ("\n\n" + final)[:MAX_TEXT - len(text)]
+                    text += final
+                    yield {"type": "delta", "text": final}
             break
         calls_used += len(calls)
         if calls_used > MAX_TOOL_CALLS:
@@ -183,33 +328,41 @@ async def agent_events(store: Store, body: dict) -> AsyncIterator[dict]:
                 if not isinstance(args, dict):
                     raise DashboardError("tool arguments must be an object")
                 if name == "query_data":
+                    raw_query = args.get("query")
+                    dataset = raw_query.get("dataset") if isinstance(raw_query, dict) else None
+                    label = DATASETS.get(dataset, {}).get("label", "Data") if isinstance(dataset, str) else "Data"
+                    label = label[:1].lower() + label[1:]
+                    yield {"type": "status", "text": f"Querying {label}"}
                     result = run_query(store, args.get("query"))
+                    yield {"type": "step", "text": f"Queried {label}", "detail": _query_detail(result)}
                     result = {**result, "rows": result["rows"][:MAX_QUERY_PREVIEW],
                               "preview_rows": min(len(result["rows"]), MAX_QUERY_PREVIEW)}
-                    yield {"type": "status", "text": "Queried " + result["source"]["label"]}
                 elif name == "publish_dashboard":
+                    yield {"type": "status", "text": "Building dashboard"}
                     artifact = render_dashboard(store, args.get("spec"), body["version"])
+                    count = len(artifact["results"])
+                    yield {"type": "step", "text": "Built dashboard", "detail": f"{count} chart{'s' if count != 1 else ''}"}
+                    yield {"type": "dashboard", "dashboard": artifact}
                     result = {"ok": True, "id": artifact["id"], "cards": list(artifact["results"]),
                               "total_rows": {key: value["total_rows"] for key, value in artifact["results"].items()}}
-                    yield {"type": "status", "text": "Dashboard ready"}
                 else:
                     result = {"error": "unknown tool"}
-            except (DashboardError, TypeError, ValueError) as exc:
+            except DashboardError as exc:
+                yield {"type": "step", "text": "Dashboard rejected" if name == "publish_dashboard" else "Query rejected",
+                       "detail": str(exc)[:160], "error": True}
                 result = {"error": str(exc)[:300]}
+            except Exception:  # noqa: BLE001 - provider tool arguments must never expose internal errors
+                yield {"type": "step", "text": "Dashboard rejected" if name == "publish_dashboard" else "Query rejected",
+                       "detail": "The data tool failed", "error": True}
+                result = {"error": "The data tool failed"}
             context.append({"type": "function_call_output", "call_id": call_id,
                             "output": json.dumps(result, separators=(",", ":"), allow_nan=False)})
         if round_index == MAX_ROUNDS - 1:
             if artifact is None:
                 raise DashboardError("dashboard reasoning limit reached")
             break
-    text = final_text.strip()
     if artifact is not None and not text:
-        text = "Dashboard ready: " + artifact["spec"]["title"] + "."
-    if artifact is not None:
-        yield {"type": "dashboard", "dashboard": artifact}
-    if text:
-        for offset in range(0, len(text), 500):
-            yield {"type": "delta", "text": text[offset:offset + 500]}
+        yield {"type": "delta", "text": "Dashboard ready: " + artifact["spec"]["title"] + "."}
     if artifact is None and not text:
         yield {"type": "error", "text": "The assistant did not produce a dashboard or answer. Try a more specific request."}
     yield {"type": "done"}
@@ -250,10 +403,11 @@ def mount_dashboards(app: FastAPI, store: Store) -> None:
 
         async def stream():
             try:
-                async for event in agent_events(store, body):
-                    if await request.is_disconnected():
-                        break
-                    yield "data: " + json.dumps(event, separators=(",", ":"), allow_nan=False) + "\n\n"
+                async with aclosing(agent_events(store, body)) as events:
+                    async for event in events:
+                        if await request.is_disconnected():
+                            break
+                        yield "data: " + json.dumps(event, separators=(",", ":"), allow_nan=False) + "\n\n"
             except asyncio.CancelledError:
                 raise
             except DashboardError as exc:

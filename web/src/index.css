@@ -1,16 +1,16 @@
 /* Day and night theme tokens for the map panels. */
 :root {
-  --bg: #d6dfe6;
-  --glass: rgba(255, 255, 255, 0.56);
-  --glass-strong: rgba(255, 255, 255, 0.82);
-  --glass-line: rgba(255, 255, 255, 0.78);
-  --glass-shadow: 0 10px 32px rgba(20, 40, 60, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --bg: #dce5e9;
+  --glass: rgba(249, 250, 248, 0.96);
+  --glass-strong: #fafbf9;
+  --glass-line: rgba(42, 61, 76, 0.12);
+  --glass-shadow: 0 4px 18px rgba(30, 48, 61, 0.08);
   --ink: #16202b;
   --muted: #5f6d7b;
   --line: rgba(22, 32, 43, 0.1);
   --field: rgba(255, 255, 255, 0.65);
-  --row: rgba(255, 255, 255, 0.45);
-  --row-hot: rgba(255, 255, 255, 0.75);
+  --row: rgba(52, 77, 96, 0.045);
+  --row-hot: rgba(52, 77, 96, 0.09);
   --active: #ffffff;
   --active-ink: #111;
   --accent: #c8731e;
@@ -35,10 +35,10 @@
 }
 :root[data-theme='night'] {
   --bg: #07080d;
-  --glass: rgba(16, 19, 28, 0.6);
-  --glass-strong: rgba(16, 19, 28, 0.86);
+  --glass: rgba(20, 29, 40, 0.97);
+  --glass-strong: #141d28;
   --glass-line: rgba(255, 255, 255, 0.12);
-  --glass-shadow: 0 10px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
   --ink: #e6e8ef;
   --muted: #8f95a6;
   --line: rgba(255, 255, 255, 0.1);
@@ -78,8 +78,6 @@ button { font: inherit; color: inherit; }
   border: 1px solid var(--glass-line);
   border-radius: var(--r);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(18px) saturate(1.5);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5);
 }
 .icon-btn {
   display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; border: 0; background: transparent; color: var(--muted); cursor: pointer;
@@ -205,8 +203,8 @@ button { font: inherit; color: inherit; }
 /* ---------- panel tabs (the arrows on the borders) ---------- */
 .tab {
   position: absolute; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--glass-line);
-  background: var(--glass-strong); color: var(--muted); cursor: pointer; box-shadow: var(--glass-shadow); backdrop-filter: blur(18px) saturate(1.5);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5); transition: color 0.15s;
+  background: var(--glass-strong); color: var(--muted); cursor: pointer; box-shadow: var(--glass-shadow);
+  transition: color 0.15s;
 }
 .tab:hover { color: var(--ink); }
 .tab-left { left: -30px; top: 50%; transform: translateY(-50%); width: 30px; height: 64px; border-right: 0; border-radius: 12px 0 0 12px; }
@@ -214,14 +212,14 @@ button { font: inherit; color: inherit; }
 
 /* ---------- owls (right) ---------- */
 .nodes {
-  position: absolute; top: 64px; right: 12px; bottom: 12px; width: 272px; padding: 10px 12px; z-index: 5; display: flex; flex-direction: column;
-  transition: transform 0.45s var(--ease), bottom 0.4s var(--ease);
+  position: absolute; top: var(--nodes-top, 64px); right: 12px; width: 272px; height: fit-content; max-height: calc(100% - var(--nodes-top, 64px) - 12px); padding: 10px 12px; z-index: 5; display: flex; flex-direction: column;
+  transition: transform 0.2s var(--ease);
 }
 .nodes.collapsed { transform: translateX(calc(100% + 12px)); }
-.app.agent-shown .nodes { bottom: 80px; } /* lifts clear of the assistant button while it is out */
+.app.agent-shown .nodes { max-height: calc(100% - var(--nodes-top, 64px) - 80px); } /* lifts clear of the assistant button while it is out */
 .nodes-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .nodes-title { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 14px; }
-.nodes-body { overflow-y: auto; flex: 1; min-height: 0; }
+.nodes-body { overflow-y: auto; flex: 0 1 auto; min-height: 0; }
 .empty {
   display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; padding: 22px 12px; border-radius: var(--r-sm); border: 1px dashed var(--line);
   background: transparent; color: var(--muted); cursor: pointer; text-align: center;
@@ -235,6 +233,10 @@ button { font: inherit; color: inherit; }
 }
 .owl:hover { background: var(--row-hot); }
 .owl.selected { border-color: var(--red); background: var(--row-hot); }
+.owl-card { position: relative; }
+.owl-select { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 0 26px 0 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.owl-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
+.owl-remove { position: absolute; top: 8px; right: 8px; }
 .owl.done { opacity: 0.55; }
 .owl-text { flex: 1; min-width: 0; }
 .owl-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
@@ -286,7 +288,7 @@ button { font: inherit; color: inherit; }
   .toolbar { top: 64px; }
   .modebar { top: 64px; left: auto; right: 12px; transform: none; }
   .picker, .cellcard, .logs { top: 116px; }
-  .nodes { top: 150px; }
+  .nodes { --nodes-top: 150px; }
   .backtest { right: 12px; }
   .app.agent-shown .backtest { right: 80px; }
 }
@@ -295,7 +297,7 @@ button { font: inherit; color: inherit; }
   .header { top: 62px; left: 12px; right: auto; }
   .status { height: auto; flex-wrap: wrap; border-radius: 14px; gap: 5px 8px; max-width: min(340px, calc(100vw - 24px)); }
   .modebar { top: 12px; left: auto; right: 12px; transform: none; align-items: flex-end; }
-  .nodes { top: 140px; bottom: 12px; width: min(280px, calc(100vw - 55px)); }
+  .nodes { --nodes-top: 140px; width: min(280px, calc(100vw - 55px)); }
   .cellcard, .picker, .logs { top: 140px; width: min(320px, calc(100vw - 24px)); max-height: calc(100vh - 190px); overflow-y: auto; }
   .backtest { left: 12px; right: 12px; max-height: 44vh; overflow-y: auto; }
   .kpis { flex-wrap: wrap; }
@@ -307,7 +309,8 @@ button { font: inherit; color: inherit; }
   .search, .header-status { width: 100%; }
   .search-field, .search-field:focus-within { width: 100%; }
   .status { max-width: 100%; }
-  .nodes, .cellcard, .picker, .logs { top: 190px; }
+  .nodes { --nodes-top: 190px; }
+  .cellcard, .picker, .logs { top: 190px; }
 }
 
 /* Assistant button and chat panel. */

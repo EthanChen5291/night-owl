@@ -69,20 +69,20 @@ export default function NodesPanel({ nodes, sightings, rates, selected, plan, op
             const s = sightings.get(n.id) ?? []
             const last = s[0]
             return (
-              <li key={n.id} className={`owl ${selected === n.id ? 'selected' : ''}`} onClick={() => onSelect(selected === n.id ? null : n.id)}>
-                <Gauge value={rates.get(n.id) ?? 0} label={s.length} />
-                <div className="owl-text">
-                  <div className="owl-row">
-                    <b>{n.name}</b>
-                    <button className="icon-btn" title="Remove owl" aria-label={`Remove ${n.name}`} onClick={(e) => (e.stopPropagation(), onRemove(n.id))}>
-                      <TrashIcon size={15} />
-                    </button>
+              <li key={n.id} className={`owl owl-card ${selected === n.id ? 'selected' : ''}`}>
+                <button type="button" className="owl-select" aria-label={`Fly to ${n.name}`} aria-pressed={selected === n.id} onClick={() => onSelect(selected === n.id ? null : n.id)}>
+                  <Gauge value={rates.get(n.id) ?? 0} label={s.length} />
+                  <div className="owl-text">
+                    <div className="owl-row"><b>{n.name}</b></div>
+                    <div className="owl-addr">{n.addr}</div>
+                    <div className="owl-row small muted">
+                      <span>{last ? `last sighting ${ago(last.ts)}` : 'no sightings yet'}</span>
+                    </div>
                   </div>
-                  <div className="owl-addr">{n.addr}</div>
-                  <div className="owl-row small muted">
-                    <span>{last ? `last sighting ${ago(last.ts)}` : 'no sightings yet'}</span>
-                  </div>
-                </div>
+                </button>
+                <button type="button" className="icon-btn owl-remove" title="Remove owl" aria-label={`Remove ${n.name}`} onClick={() => onRemove(n.id)}>
+                  <TrashIcon size={15} />
+                </button>
               </li>
             )
           })}
