@@ -148,12 +148,12 @@ const LOOKS: Record<Preset, Look> = {
     exposure: 1.05,
     layers: { ground: 0x6d9dbb, water: 0x6d9dbb, land: 0xd2cec5, roads: 0xbbb8b0, parks: 0x9ab97c, trees: 0x4e8a48 },
     facades: [0xb59782, 0xcdc4b3, 0x9fb4c6],
-    buildingTint: 0.38,
-    tintLift: 0.5,
+    buildingTint: 0.5,
+    tintLift: 0.3,
     windows: 0,
     windowColour: 0xffffff,
-    hexOpacity: 0.46,
-    field: { neutral: 0xe6e4de, mix: 0.3, opacity: 0.86 },
+    hexOpacity: 0.56,
+    field: { neutral: 0xe6e4de, mix: 0.12, opacity: 0.9 },
     area: { fill: 0xffffff, rim: 0xffffff, ink: '#16202b' },
   },
   night: {
@@ -172,7 +172,7 @@ const LOOKS: Record<Preset, Look> = {
     windows: 0.3,
     windowColour: 0xdfe7f7, // lit windows read as a pale cool white, so the skyline stays blue-grey, not amber
     hexOpacity: 0.8,
-    field: { neutral: 0x171b26, mix: 0.42, opacity: 0.8 },
+    field: { neutral: 0x171b26, mix: 0.25, opacity: 0.84 },
     area: { fill: 0x9fc4ff, rim: 0xbfd8ff, ink: '#e6e8ef' },
   },
 }

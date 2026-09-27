@@ -144,3 +144,11 @@ export const RatIcon = ({ size, ...r }: P) => (
     <path d="M3 18.5c1.5 0 2.5-.6 3.2-1.6" />
   </svg>
 )
+
+/** Address search: a magnifier. */
+export const SearchIcon = ({ size, ...r }: P) => (
+  <svg {...base(size, r)}>
+    <circle cx="10.5" cy="10.5" r="6" />
+    <path d="m15.5 15.5 4.5 4.5" />
+  </svg>
+)

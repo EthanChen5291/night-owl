@@ -1,9 +1,10 @@
-import type { OwlNode, RatEvent } from '../types'
+import type { Cell, OwlNode, RatEvent } from '../types'
 import { CloseIcon, RatIcon } from './Icons'
 
 interface Props {
   events: RatEvent[] // newest first
   nodes: OwlNode[]
+  cells: Map<string, Cell> // for an owl outside the borough you are in: its neighbourhood instead of a raw cell id
   selected: string | null
   onClose: () => void
   onSelect: (id: string) => void
@@ -15,7 +16,11 @@ const fmt = (iso: string) => {
 }
 
 /** Every sighting with its crop, address and time; filtered to the selected owl when there is one. */
-export default function LogsDrawer({ events, nodes, selected, onClose, onSelect }: Props) {
+export default function LogsDrawer({ events, nodes, cells, selected, onClose, onSelect }: Props) {
+  const placeOf = (h3: string) => {
+    const c = cells.get(h3)
+    return c?.neighborhood ? `${c.neighborhood}${c.borough ? `, ${c.borough}` : ''}` : `block ${h3.slice(-5)}`
+  }
   const byNodeId = new Map(nodes.map((n) => [n.nodeId, n]))
   const owl = selected ? nodes.find((n) => n.id === selected) : null
   const rows = owl ? events.filter((e) => e.node_id === owl.nodeId) : events
@@ -44,7 +49,7 @@ export default function LogsDrawer({ events, nodes, selected, onClose, onSelect 
                   <b>{n?.name ?? e.node_id}</b>
                   <span className="muted small">{fmt(e.ts)}</span>
                 </div>
-                <div className="owl-addr">{n?.addr ?? e.h3}</div>
+                <div className="owl-addr">{n?.addr ?? placeOf(e.h3)}</div>
                 <div className="small muted">
                   {e.class} · {Math.round(e.conf * 100)}% · {e.n_hits} frames
                 </div>

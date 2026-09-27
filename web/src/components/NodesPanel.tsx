@@ -95,7 +95,7 @@ export default function NodesPanel({ nodes, sightings, rates, selected, plan, op
                     <span className="rank">{p.rank}</span>
                     <div className="owl-text">
                       <div className="owl-row">
-                        <b>silence +{Math.round(p.silence)}</b>
+                        <b>silence {(p.silence > 0 ? '+' : '') + Math.round(p.silence)}</b>
                         <span className="muted small">gain {p.expected_gain.toFixed(2)}</span>
                       </div>
                       <div className="small muted">{placedCells.has(p.h3) ? 'owl placed' : isOpen ? 'spots inside this hexagon' : 'click for spots inside this hexagon'}</div>
