@@ -144,24 +144,31 @@ export default function App() {
   }, [])
 
   // ---- the mode bar is centred, the header hugs the right: when the header grows (the search field opening) or the
-  // window narrows, the mode bar slides left by exactly the overlap so the two never touch
+  // window narrows, the mode bar slides left by exactly the overlap so the two never touch. It never slides into the
+  // toolbar on the left (which widens inside a borough): when there is no room between the two it drops a row instead.
   useEffect(() => {
     const header = document.querySelector<HTMLElement>('.header')
     const bar = document.querySelector<HTMLElement>('.modebar')
+    const toolbar = document.querySelector<HTMLElement>('.toolbar')
     if (!header || !bar) return
     const GAP = 12
+    const TOP_ROW = 12 + 40 // where the bar sits undropped: top 12px, 40px pills
     const update = () => {
       const h = header.getBoundingClientRect()
-      const b = bar.getBoundingClientRect()
-      // the bar's natural right edge (its transform is centre-based, so offsetWidth is the untransformed width)
+      // the bar's natural edges (its transform is centre-based, so offsetWidth is the untransformed width)
+      const naturalLeft = window.innerWidth / 2 - bar.offsetWidth / 2
       const naturalRight = window.innerWidth / 2 + bar.offsetWidth / 2
-      const sameRow = b.top < h.bottom && b.bottom > h.top
+      const sameRow = h.top < TOP_ROW
       const shift = sameRow ? Math.max(0, naturalRight + GAP - h.left) : 0
-      bar.style.setProperty('--modebar-shift', `${Math.round(shift)}px`)
+      const room = toolbar ? naturalLeft - (toolbar.getBoundingClientRect().right + GAP) : Infinity
+      const dropped = shift > room
+      bar.classList.toggle('dropped', dropped)
+      bar.style.setProperty('--modebar-shift', `${dropped ? 0 : Math.round(shift)}px`)
     }
     const ro = new ResizeObserver(update)
     ro.observe(header)
     ro.observe(bar)
+    if (toolbar) ro.observe(toolbar)
     window.addEventListener('resize', update)
     update()
     return () => {
