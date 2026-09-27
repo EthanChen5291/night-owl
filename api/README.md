@@ -24,7 +24,20 @@ API=http://192.168.7.1:8000 ./api/fake_event.sh
 
 Reset between rehearsals: `curl -X DELETE -H 'X-Demo-Reset: yes' localhost:8000/events`
 
-`fake_sightings.py` and `fixtures/events.fake.json` contain invented demo sightings. Running the script posts them to the live event endpoint and changes its persisted queue and posterior. Use it only against an isolated rehearsal API, reset afterward, and never treat those events as Pi detections or evaluation evidence.
+The scripts below post staged sightings with fresh timestamps. Both change the API's persisted queue and
+posterior. Use them only against an isolated rehearsal API, reset afterward, and never treat their
+events as Pi detections or evaluation evidence.
+
+```
+./api/fake_sightings.py        # 15 sightings: grayscale crops of the rat prop from the team's own footage
+./api/real_sightings.py        # 17 sightings: real wild rats and house mice in daylight, dusk, flash, torchlight and unlit subway track
+```
+
+`fake_sightings.py` uses rat-prop crops from team footage. `real_sightings.py` cuts openly licensed
+Wikimedia Commons photos to the node's crop format (grayscale by default,
+`--colour` to keep colour). The photos themselves are re-downloaded with `--fetch` into `api/fixtures/rodents/`
+(gitignored); the crops are baked into `fixtures/events.real.json`, and `fixtures/rodents.credits.json` has the
+author and licence of every photo. Attribute CC BY and CC BY-SA images if a crop appears on a slide.
 
 ## Endpoints (contract §6)
 
