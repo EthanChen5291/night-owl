@@ -80,6 +80,9 @@ How to work:
 - Use the tools for every number; never invent data. Say which borough and neighbourhood a hexagon is in.
 - Find places with geocode, then search_cells near the point. Rank with search_cells.
 - Show the map when it helps (screenshot_map), and camera frames when asked about the node (camera_image).
+- Rats the Pi itself saw (its on-device model) are rat_sightings, not recent_sightings (that is the map's event log).
+  When asked for a rat picture, use rat_sightings: give the time, confidence and whether Solana verifies it
+  (Tiger row, picture and on-chain hash all match), with the explorer link. Never say a hash was "decoded".
 - Be brief: a sentence or two, then a short list or small table. Markdown is rendered. Round sensibly.
 - The map screenshot shows the user's current view; get_app_state says which borough and mode that is.
 - You can drive the user's map: fly_to a place (after geocode or a hexagon lookup), set_map_mode, enter_borough,
@@ -330,6 +333,74 @@ def t_pi_activity(d: Data, a: dict) -> tuple[Any, list]:
     return act, []
 
 
+def _chain_memos(rpc: str, sig: str) -> tuple[list[str], str | None, int | None]:
+    """The memos a Solana transaction carries (from its logs), its signer and its block time, read from the chain."""
+    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "getTransaction",
+                       "params": [sig, {"encoding": "json", "commitment": "confirmed", "maxSupportedTransactionVersion": 0}]}).encode()
+    req = urllib.request.Request(rpc, data=body, headers={"content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        t = json.loads(r.read()).get("result")
+    if not t:
+        return [], None, None
+    memos = [m.group(1) for line in t["meta"].get("logMessages") or [] for m in [re.search(r'Memo \(len \d+\): "(.*)"$', line)] if m]
+    return memos, t["transaction"]["message"]["accountKeys"][0], t.get("blockTime")
+
+
+def _verify_sighting(sol: dict) -> dict:
+    """Three checks, none of which trusts the dashboard's own word: the Tiger Data row still hashes to the anchored
+    hash, the stored picture still hashes to the hash inside that row, and the Solana transaction (read from the
+    chain) carries that hash, signed by the node's key."""
+    v = _dash("/api/solana?verify=" + urllib.parse.quote(sol["id"]))
+    now = v.get("now") or {}
+    out = {"tiger_row_unchanged": now.get("hash") == sol["hash"] if now.get("ok") else False}
+    if now.get("picture"):
+        out["picture_unchanged"] = bool(now["picture"].get("ok"))
+    if sol.get("sig") and v.get("rpc"):
+        try:
+            memos, signer, block_time = _chain_memos(v["rpc"], sol["sig"])
+            out["on_chain"] = f"owl1 det {sol['hash']}" in memos and signer == v.get("address")
+            if block_time:
+                out["anchored_at"] = datetime.fromtimestamp(block_time, timezone.utc).strftime("%b %d %H:%M:%S UTC")
+        except Exception as e:  # noqa: BLE001
+            out["on_chain"] = None
+            out["chain_error"] = str(e)[:120]
+        out["explorer"] = f"https://explorer.solana.com/tx/{sol['sig']}?cluster={v.get('cluster', 'devnet')}"
+    else:
+        out["on_chain"] = None  # not sent yet
+    out["verified"] = bool(out["tiger_row_unchanged"] and out.get("on_chain") and out.get("picture_unchanged", True))
+    return out
+
+
+def t_rat_sightings(d: Data, a: dict) -> tuple[Any, list]:
+    rows = _dash("/api/detections")
+    if a.get("since_minutes"):
+        cut = time.time() - float(a["since_minutes"]) * 60
+        rows = [r for r in rows if datetime.fromisoformat(r["ts"].replace("Z", "+00:00")).timestamp() >= cut]
+    total = len(rows)
+    limit = max(1, min(int(a.get("limit") or 5), 20))
+    rows = rows[:limit]
+    want_pics = a.get("with_images", True)
+    out, imgs = [], []
+    for i, r in enumerate(rows):
+        when = datetime.fromisoformat(r["ts"].replace("Z", "+00:00"))
+        item = {"time": when.strftime("%b %d %H:%M:%S UTC"), "ago": _ago(when.timestamp() * 1000), "label": r["label"],
+                "confidence": round(r["confidence"], 3), "box_xywh": [round(r[k], 3) for k in "xywh"] if r.get("x") is not None else None,
+                "model": r.get("model"), "recording": r.get("recording"), "has_picture": bool(r.get("image_sha256"))}
+        sol = r.get("solana")
+        item["solana"] = {"status": sol["status"], "hash": sol["hash"]} if sol else None
+        if sol and i < 3 and a.get("verify", True):
+            item["solana"].update(_verify_sighting(sol))
+        out.append(item)
+        if want_pics and r.get("image_sha256") and len(imgs) < 3:
+            jpg = _dash_bytes("/api/detections?image=" + r["image_sha256"])
+            tick = " · ✓ verified on Solana" if (item["solana"] or {}).get("verified") else ""
+            imgs.append({"src": "data:image/jpeg;base64," + base64.b64encode(jpg).decode(),
+                         "caption": f"{r['label']} {round(r['confidence'] * 100)}% · {item['time']}{tick}"})
+    return {"total_in_window": total, "sightings": out,
+            "note": "Sightings before the picture feature have no picture. Hashes can't be reversed: verification recomputes them "
+                    "from the stored row and picture and compares with the hash written on Solana."}, imgs
+
+
 def t_pi_recordings(d: Data, a: dict) -> tuple[Any, list]:
     limit = max(1, min(int(a.get("limit") or 10), 30))
     r = _dash("/api/recordings")
@@ -395,6 +466,11 @@ SERVER_TOOLS: dict[str, tuple[Callable[[Data, dict], tuple[Any, list]], str, dic
     "pi_activity": (t_pi_activity, "Querying Tiger Data", _fn(
         "pi_activity", "The Pi's motion activity over time from Tiger Data (TimescaleDB): per-minute motion share, detections, motion events, CPU temperature.",
         {"range_minutes": {"type": "number", "enum": [15, 60, 360, 1440, 10080]}})),
+    "rat_sightings": (t_rat_sightings, "Checking the Pi's rat sightings", _fn(
+        "rat_sightings", "Rats the Pi's on-device model (V5) confirmed, newest first: time, confidence, box, the boxed camera "
+        "picture, and a Solana check (Tiger Data row + picture re-hashed and matched against the hash written on chain). "
+        "Use for 'show me the last rat', 'how many rats today', 'is it verified'.",
+        {"limit": NUM, "since_minutes": NUM, "with_images": BOOL, "verify": BOOL})),
     "pi_recordings": (t_pi_recordings, "Listing recordings", _fn(
         "pi_recordings", "The Pi's recordings stored in MongoDB (newest first) with totals.", {"limit": NUM})),
     "camera_image": (t_camera_image, "Getting a camera frame", _fn(
