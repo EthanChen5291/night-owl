@@ -9,7 +9,7 @@ const SKILL_DIR = '/Users/utsavsharma/.codex/plugins/cache/openai-primary-runtim
 const PYTHON = '/Users/utsavsharma/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3';
 const TMP = path.join(WORKSPACE, '.build');
 const OUT = path.join(WORKSPACE, 'out');
-const version = process.env.DECK_VERSION || 'v13';
+const version = process.env.DECK_VERSION || 'v16';
 const FINAL = path.join(OUT, `barn-owl-three-minute-pitch-${version}.pptx`);
 const { applyPresentationChartFont, finalizePresentation } = await import(
   pathToFileURL(path.join(SKILL_DIR, 'container_tools/artifact_tool_utils.mjs')).href
@@ -113,7 +113,7 @@ function notes(slide,text,source='') {
   const steps=[
     {y:158,n:'1',t:'Pick a site',d:'Rank risk and the data gap; select a tree pit'},
     {y:250,n:'2',t:'Capture',d:'Physical owl rig: Pi 5 camera and PIR sensor'},
-    {y:342,n:'3',t:'Detect',d:'Room-lit plush model; live Pi test pending'},
+    {y:342,n:'3',t:'Detect',d:'Room-lit plush model; live positive test pending'},
     {y:434,n:'4',t:'Update the map',d:'Accepted events update a chosen prior'},
   ];
   for(const q of steps){
@@ -128,7 +128,7 @@ function notes(slide,text,source='') {
   txt(slide,'Earlier replay',80,579,200,49,25,c.teal,true);
   txt(slide,'1 event · score 9.2% → 13.0% · rank 11 → 2',280,577,900,70,27,c.ink);
   notes(slide,
-    'The planner has 20 candidate tree sites in its current export. The table prop is room-lit. In an earlier local Mac replay using the V2 detector, original camera footage from zoom15_b at 59–63 seconds passed through the exported ONNX model, the Pi Detector class and its three-hit rules, crop generation, and the local API. Exactly one event at confidence 0.860 was accepted. The served cell score moved from 0.0923 to 0.1297; the plan candidate moved from rank 11 to 2. The frontend screenshot showed the crop, one sighting, and rank 2. V4 has separate frozen detector testing but has not been verified through the same API path. This is a verified saved-video software loop, not a physical Pi inference test or the formal 20-push/three-minute-negative event gate. PIR only wakes capture; the detector decides. Team-reported IR capture does not validate the model under IR. An accepted event updates a chosen Beta prior and can rerank candidates; it does not retrain Model B. If demonstrating from recorded footage on stage, name it as recorded. A physical Pi trigger can be shown only if it works in a fresh test.',
+    'The planner has 20 candidate tree sites in its current export. The table prop is room-lit. In an earlier local Mac replay using the V2 detector, original camera footage from zoom15_b at 59–63 seconds passed through the exported ONNX model, the Pi Detector class and its three-hit rules, crop generation, and the local API. Exactly one event at confidence 0.860 was accepted. The served cell score moved from 0.0923 to 0.1297; the plan candidate moved from rank 11 to 2. The frontend screenshot showed the crop, one sighting, and rank 2. V5 has separate detector development results but has not been verified through the same API path. The earlier software loop used saved video on a Mac. V5 also ran on a saved frame on the physical Pi; positive live-camera detection remains unverified. PIR only wakes capture; the detector decides. Team-reported IR capture does not validate the model under IR. An accepted event updates a chosen Beta prior and can rerank candidates; it does not retrain Model B. If demonstrating from recorded footage on stage, name it as recorded. A physical Pi trigger can be shown only if it works in a fresh test.',
     'vision/replay_video.py; vision/RUNBOOK.md; vision/TRAINING_RESULTS.md; model/out/plan.json; api/posterior.py; team local replay and frontend screenshot 2026-09-26; team physical-rig photo IMG_1788.jpeg 2026-09-26');
 }
 
@@ -136,16 +136,16 @@ function notes(slide,text,source='') {
 {
   const slide=base('What is real today',5);
   txt(slide,'Real',80,173,190,56,36,c.teal,true);
-  txt(slide,'NYC data and sweep outcomes\nCell models and a 119-month backtest\nPi camera, PIR and IR capture\nverified by onsite team',80,242,530,241,27,c.ink);
+  txt(slide,'NYC data and sweep outcomes\nCell models and a 119-month backtest\nPi camera and PIR at the hackathon\nSaved-frame ONNX inference on Pi',80,242,530,241,27,c.ink);
   line(slide,638,175,2,c.pale,352);
   txt(slide,'Demo and open work',696,173,480,56,36,c.coral,true);
-  txt(slide,'V4 rat AP50: .926 on 59 reserved frames\nSame camera and capture session\nEarlier footage → API → map verified\nNew-room and live Pi tests pending\nNo field deployment or rat population count',696,242,485,240,24,c.ink);
+  txt(slide,'V5 development: .961 worst-clip rat AP50\nV4 new-room test: .883, below target\nFresh independent V5 test pending\nEarlier footage → API → map verified\nNo field deployment or rat count',696,242,485,240,24,c.ink);
   line(slide,80,531,1100,c.pale,2);
-  txt(slide,'Next test',80,558,173,50,28,c.teal,true);
-  txt(slide,'A supervised 50-node pilot, checked against later sweeps.',251,553,935,69,31,c.navy);
+  txt(slide,'Next',80,558,173,50,28,c.teal,true);
+  txt(slide,'Fresh detector test, then a 50-node pilot checked against later sweeps.',251,553,935,69,29,c.navy);
   notes(slide,
-    'Here is the honest state. The data exports, model scores, and sweep backtest exist. Teammates report working Pi 5 camera, PIR, and infrared capture. The prop footage is room-lit. V4 selected the epoch-33 balanced checkpoint after 150 training epochs. Matching PyTorch and ONNX scored rat AP50 .958333 on 49 fixed clips reused during tuning. The locked V4 model then scored rat AP50 .925806 and person AP50 .876444 on 59 reserved frames from four previously unused adjacent clips under the square-416 AP protocol. The runtime confidence .70 was selected earlier on development footage; AP50 uses the standard low confidence threshold to rank boxes. These clips share the camera, table, and session with training material, so they do not show new-room generalization. AP50 is a box detection measure, not 92.6 percent accuracy or event recall. A separate earlier Mac replay using V2 saved camera footage carried one accepted event through the Pi detector rules and local API to the visible map. The V4 saved-frame Pi timing check measured median 56.32 milliseconds, but live throughput is unverified. The formal 20-push/3-minute-negative event gate and physical live-camera inference have not been evaluated. The event posterior uses a chosen prior; an accepted event updates the served score and can change candidate order, but does not retrain the city model. There is no field deployment or rat population estimate. A supervised 50-node pilot would need later proactive sweeps and false-event checks.',
-    'vision/runs/modal-rat-v4-20260926/weak_test_once/verification/verification_report.json; candidate_lock.json; pi_smoke_2026-09-27.json; model/out/backtest.json; node/DEBRIEF-utsav.md; api/posterior.py; plan/master-plan.md §12');
+    'Here is the honest state. The data exports, model scores, and sweep backtest exist. Teammates report working Pi 5 camera, PIR, and infrared capture; the prop footage is room-lit. The prior V4 model scored rat AP50 .925806 on 59 previously unused adjacent frames from the same camera session, then .882675 on 439 reviewed frames in a newly recorded room, below the .90 box target. Its recorded replay missed a parked plush and fired once on a dark case. We trained V5 using those prior new-room clips as development data. The locked V5 checkpoint reached .960806 rat AP50 on its weakest selected development clip and .975279 combined rat AP50 across 146 development frames, with exact matched-shape PyTorch/ONNX AP parity. These are tuned development scores; the independent fresh V5 test is pending. At fixed runtime confidence .70, saved V5 development replays showed repeated plush event firings: 14 on the moving clip, 64 parked, 64 old metal and 44 old floor, with zero events over a 181.21-second negative clip. These are not timed push trials or event recall. The V5 ONNX ran on a saved plush frame on the physical Pi at 60.23 milliseconds median, confidence .931. A separate earlier Mac replay using V2 footage carried one accepted event through detector rules and local API to the visible map. A later Pi live-camera trial had no plush target; positive live-camera detection is pending. The formal 20-push event gate is unmeasured. AP50 is a box detection measure, not accuracy or rat population prevalence. No IR or wild-rat detector test and no field deployment have been done. The event posterior uses a chosen prior and can change candidate order; it does not retrain Model B. A supervised 50-node pilot would need later proactive sweeps and false-event checks.',
+    'vision/artifacts/rat-litroom-v5-development-candidate-20260927.zip: reports/metrics.json, reports/candidate_lock.json, reports/dev_replay, reports/pi_saved_frame_smoke.json; vision/artifacts/rat-litroom-v4-new-room-evaluation-20260927.zip; model/out/backtest.json; api/posterior.py; plan/master-plan.md §12');
 }
 
 const staging=path.join(WORKSPACE,'.codex-finalizer');
