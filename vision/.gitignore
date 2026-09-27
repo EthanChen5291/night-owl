@@ -1,11 +1,29 @@
-# vision workstream: data, weights and wheels never go in git (README §8)
+# Generated data, weights and wheels stay ignored.
+# The user-requested portable candidate ZIP is tracked under artifacts/.
 clips/
 frames/
 frames_pruned/
 frames_aug/
 labels/
+labels_person/
+labels_person_v3/
+labels_person_v4/
+labels_v3/
 labels_aug/
 dataset/
+dataset_v2/
+dataset_v3/
+dataset_v4/
+dataset_v5/
+dataset_v6/
+dataset_v6_superseded/
+dataset_v6_hard_negatives/
+dataset_v6_hard_negatives_draft_superseded/
+final_test/
+v4_test/
+new_room_test/
+v5_fresh_test/
+v5_formal_test/
 runs/
 events/
 *.pt

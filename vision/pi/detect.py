@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Node detector: camera -> ONNX YOLO -> rules -> event -> POST /event -> LED. Runs on the Pi CPU.
+"""Standalone detector: camera -> ONNX YOLO -> rules -> event -> LED. Runs on the Pi CPU.
 
 Only numpy, opencv-python-headless and onnxruntime are needed (the offline wheels in ``wheels/``);
 ``gpiozero`` is optional and only used for the LED. Nothing here imports ultralytics.
@@ -14,7 +14,7 @@ Pipeline per frame (README §4)::
          inside a big one)
       -> hit counter: HITS_NEEDED hits inside HIT_WINDOW_S seconds -> one event
       -> cooldown: at most one event per EVENT_COOLDOWN_S
-      -> POST {API_URL}/event (urllib, 2 s timeout, failures are logged and ignored)
+      -> optional POST {API_URL}/event with --post (urllib, 2 s timeout)
       -> LED blink on LED_PIN
 
 The event body is exactly the contract::
@@ -27,22 +27,22 @@ The event body is exactly the contract::
 The full frame stays in RAM. ``--save-events DIR`` also writes the JSON and the crop locally for
 the deck and for debugging without a server.
 
-Models: ``rat.onnx`` (ours, classes rat/person, produced by ``train.sh``) is the default;
-``--model world_rat_person.onnx`` is the zero-training YOLO-World fallback whose classes are
-``stuffed animal`` / ``person``; both are mapped to ``rat`` / ``person`` here. Set ``GRAY`` to
-match ``make_dataset.py`` for the model in use (the World model was not trained gray; pass
-``--color`` for it).
+Models: ``rat.onnx`` (classes rat/person) is the default. Select
+``--model world_rat_person.onnx`` explicitly for the older YOLO-World model, whose classes are
+``stuffed animal`` / ``person``. Set ``GRAY`` to match ``make_dataset.py`` for the model in use
+(the World model was not trained gray; pass ``--color`` for it).
 
 Examples::
 
-    python3 detect.py --mock ../frames --show --no-post          # Mac
-    python3 detect.py --model world_rat_person.onnx --color      # Pi, hour-6 gate
-    BARN_OWL_API=http://192.168.7.1:8000 python3 detect.py --save-events events
+    python3 detect.py --model rat.onnx --mock ../frames --show
+    python3 detect.py --model world_rat_person.onnx --color --mock ../frames
+    python3 detect.py --model rat.onnx --post --api http://192.168.7.1:8000
 """
 from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import sys
@@ -58,7 +58,9 @@ IMGSZ = 416
 GRAY = True
 CONF = 0.5
 IOU = 0.45
-FLOOR_Y = 0.40
+FLOOR_Y = 0.0  # overhead tabletop view: the whole frame is a possible rat path
+MIN_RAT_WIDTH = 0.01
+MAX_RAT_WIDTH = 0.65
 PERSON_IOU = 0.3        # drop a rat box whose IoU with a person box exceeds this ...
 PERSON_CONTAIN = 0.7    # ... or whose own area is mostly inside a person box (feet standing over it)
 HITS_NEEDED = 3
@@ -267,10 +269,12 @@ def contained_frac(a, b) -> float:
     return (iw * ih) / (a[2] * a[3]) if a[2] * a[3] > 0 else 0.0
 
 
-def apply_rules(dets: list, floor_y: float = FLOOR_Y, person_iou: float = PERSON_IOU, person_contain: float = PERSON_CONTAIN):
+def apply_rules(dets: list, floor_y: float = FLOOR_Y, person_iou: float = PERSON_IOU,
+                person_contain: float = PERSON_CONTAIN, min_width: float = MIN_RAT_WIDTH,
+                max_width: float = MAX_RAT_WIDTH):
     """Floor rule + person suppression. Returns (rats_kept, persons)."""
     persons = [d for d in dets if d.cls == "person"]
-    rats = [d for d in dets if d.cls == "rat" and d.cy > floor_y]
+    rats = [d for d in dets if d.cls == "rat" and d.cy > floor_y and min_width <= d.w <= max_width]
     if persons:
         def clear(r):
             rb = [r.x, r.y, r.w, r.h]
@@ -284,29 +288,29 @@ def apply_rules(dets: list, floor_y: float = FLOOR_Y, person_iou: float = PERSON
 
 
 class EventGate:
-    """HITS_NEEDED hits within HIT_WINDOW_S -> event; then nothing for EVENT_COOLDOWN_S."""
+    """Consecutive frame hits within HIT_WINDOW_S -> event, followed by cooldown."""
 
     def __init__(self, hits_needed: int = HITS_NEEDED, window_s: float = HIT_WINDOW_S, cooldown_s: float = EVENT_COOLDOWN_S):
         self.hits_needed, self.window_s, self.cooldown_s = hits_needed, window_s, cooldown_s
-        self.hits = deque()  # (ts, det)
+        self.hits = deque()  # timestamps of consecutive detected frames
         self.last_event_ts = -1e9
         self.n_events = 0
 
     def update(self, ts: float, best):
         """best: the best rat Det this frame or None. Returns (det, n_hits) when an event fires."""
-        while self.hits and ts - self.hits[0][0] > self.window_s:
-            self.hits.popleft()
-        if best is None:
+        if best is None or ts - self.last_event_ts < self.cooldown_s:
+            self.hits.clear()
             return None
-        self.hits.append((ts, best))
-        if len(self.hits) < self.hits_needed or ts - self.last_event_ts < self.cooldown_s:
+        if self.hits and ts - self.hits[0] > self.window_s:
+            self.hits.clear()
+        self.hits.append(ts)
+        if len(self.hits) < self.hits_needed:
             return None
         n = len(self.hits)
-        top = max((d for _, d in self.hits), key=lambda d: d.conf)
         self.hits.clear()
         self.last_event_ts = ts
         self.n_events += 1
-        return top, n
+        return best, n
 
 
 # ---------------------------------------------------------------- event output
@@ -341,6 +345,7 @@ def make_event(det: Det, n_hits: int, frame, node_id: str = NODE_ID, h3: str = D
 
 
 def post_event(api_url: str, body: dict, timeout: float = 2.0) -> tuple[bool, str]:
+    """Return whether the API changed the score, and its HTTP/acceptance detail."""
     import urllib.error
     import urllib.request
 
@@ -349,7 +354,11 @@ def post_event(api_url: str, body: dict, timeout: float = 2.0) -> tuple[bool, st
                                  headers={"Content-Type": "application/json", "User-Agent": f"barn-owl-node/{FW}"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return True, f"{resp.status}"
+            result = json.load(resp)
+            accepted = result.get("accepted")
+            if not isinstance(accepted, bool):
+                return False, f"HTTP {resp.status} missing accepted flag"
+            return accepted, f"HTTP {resp.status} accepted={str(accepted).lower()}"
     except urllib.error.HTTPError as e:
         return False, f"HTTP {e.code}"
     except Exception as e:  # noqa: BLE001 - network is best effort on stage
@@ -382,12 +391,34 @@ def save_event(out_dir: Path, body: dict, index: int) -> None:
         (out_dir / f"{stem}.jpg").write_bytes(base64.b64decode(body["crop_b64"]))
 
 
+def apply_deployed_config(args, model: Path, argv=None) -> None:
+    """Use thresholds that passed the event gate for the exact deployed model."""
+    if model.name != MODEL:
+        return
+    config_path = model.with_name("rat_config.json")
+    if not config_path.is_file():
+        return
+    config = json.loads(config_path.read_text())
+    digest = hashlib.sha256(model.read_bytes()).hexdigest()
+    if config.get("model_sha256") != digest:
+        raise ValueError(f"{config_path} does not match {model}")
+    raw = list(sys.argv[1:] if argv is None else argv)
+    flags = {"conf": "--conf", "floor_y": "--floor-y", "min_rat_width": "--min-rat-width",
+             "max_rat_width": "--max-rat-width", "hits": "--hits", "window": "--window",
+             "cooldown": "--cooldown"}
+    for key, flag in flags.items():
+        if not any(value == flag or value.startswith(flag + "=") for value in raw):
+            setattr(args, key, config[key])
+    if "--gray" not in raw and "--color" not in raw:
+        args.gray = config["gray"]
+
+
 # ---------------------------------------------------------------- main loop
-def draw(frame_bgr, rats, persons, dropped, gate: EventGate, fps: float):
+def draw(frame_bgr, rats, persons, dropped, gate: EventGate, fps: float, floor_y: float = FLOOR_Y):
     import cv2
 
     h, w = frame_bgr.shape[:2]
-    cv2.line(frame_bgr, (0, int(FLOOR_Y * h)), (w, int(FLOOR_Y * h)), (80, 80, 80), 1)
+    cv2.line(frame_bgr, (0, int(floor_y * h)), (w, int(floor_y * h)), (80, 80, 80), 1)
     for d, col in [(d, (0, 200, 0)) for d in rats] + [(d, (255, 120, 0)) for d in persons] + [(d, (0, 0, 200)) for d in dropped]:
         x0, y0 = int(d.x * w), int(d.y * h)
         cv2.rectangle(frame_bgr, (x0, y0), (int((d.x + d.w) * w), int((d.y + d.h) * h)), col, 2)
@@ -402,11 +433,13 @@ def main(argv=None) -> int:
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     add_camera_args(ap)
-    ap.add_argument("--model", default=MODEL, help=f"ONNX file (default {MODEL}; fallback {FALLBACK_MODEL})")
+    ap.add_argument("--model", default=MODEL, help=f"ONNX file (default {MODEL}; bare names also searched beside this script)")
     ap.add_argument("--names", help="comma-separated class names if the model is neither of the known two")
     ap.add_argument("--conf", type=float, default=CONF)
     ap.add_argument("--iou", type=float, default=IOU)
     ap.add_argument("--floor-y", type=float, default=FLOOR_Y)
+    ap.add_argument("--min-rat-width", type=float, default=MIN_RAT_WIDTH)
+    ap.add_argument("--max-rat-width", type=float, default=MAX_RAT_WIDTH)
     ap.add_argument("--person-iou", type=float, default=PERSON_IOU)
     ap.add_argument("--person-contain", type=float, default=PERSON_CONTAIN)
     ap.add_argument("--hits", type=int, default=HITS_NEEDED)
@@ -417,7 +450,9 @@ def main(argv=None) -> int:
     ap.add_argument("--api", default=API_URL, help="server base URL (env BARN_OWL_API)")
     ap.add_argument("--node-id", default=NODE_ID)
     ap.add_argument("--h3", default=DEMO_H3)
-    ap.add_argument("--no-post", action="store_true", help="never POST (Mac testing)")
+    posting = ap.add_mutually_exclusive_group()
+    posting.add_argument("--post", action="store_true", help="POST events to --api (default: local only)")
+    posting.add_argument("--no-post", action="store_true", help="local only (compatibility alias for the default)")
     ap.add_argument("--save-events", metavar="DIR", help="write event JSON + crop here")
     ap.add_argument("--show", action="store_true", help="cv2.imshow with boxes (Mac / desktop)")
     ap.add_argument("--max-frames", type=int, default=0, help="stop after N frames (0 = run until ^C / mock ends)")
@@ -428,15 +463,19 @@ def main(argv=None) -> int:
 
     model = Path(args.model)
     if not model.is_file():
-        here = Path(__file__).resolve().parent / model.name
-        if here.is_file():
-            model = here
-        elif Path(FALLBACK_MODEL).is_file() or (Path(__file__).resolve().parent / FALLBACK_MODEL).is_file():
-            print(f"{args.model} not found, using fallback {FALLBACK_MODEL}", file=sys.stderr)
-            model = Path(FALLBACK_MODEL) if Path(FALLBACK_MODEL).is_file() else Path(__file__).resolve().parent / FALLBACK_MODEL
-        else:
-            print(f"no model: {args.model} (train.sh makes pi/rat.onnx; the World fallback is {FALLBACK_MODEL})", file=sys.stderr)
+        if args.model == model.name:
+            here = Path(__file__).resolve().parent / model.name
+            if here.is_file():
+                print(f"resolved bare model name {args.model} to {here}", file=sys.stderr)
+                model = here
+        if not model.is_file():
+            print(f"no model: {args.model}", file=sys.stderr)
             return 2
+    try:
+        apply_deployed_config(args, model, argv)
+    except (ValueError, KeyError) as exc:
+        print(f"invalid deployed model config: {exc}", file=sys.stderr)
+        return 2
     try:
         import cv2  # noqa: F401
         import numpy  # noqa: F401
@@ -453,7 +492,7 @@ def main(argv=None) -> int:
     save_dir = Path(args.save_events) if args.save_events else None
     print(f"model {model.name} classes {det.names} imgsz {det.imgsz} gray={args.gray} conf {args.conf} "
           f"floor_y {args.floor_y} hits {args.hits}/{args.window}s cooldown {args.cooldown}s "
-          f"api {'(off)' if args.no_post else args.api} node {args.node_id} h3 {args.h3}", flush=True)
+          f"api {args.api if args.post else '(off)'} node {args.node_id} h3 {args.h3}", flush=True)
 
     n = 0
     t_start = time.monotonic()
@@ -465,7 +504,8 @@ def main(argv=None) -> int:
             img = fr.gray if args.gray else fr.bgr
             t0 = time.monotonic()
             dets = det.infer(img)
-            rats, persons = apply_rules(dets, args.floor_y, args.person_iou, args.person_contain)
+            rats, persons = apply_rules(dets, args.floor_y, args.person_iou, args.person_contain,
+                                        args.min_rat_width, args.max_rat_width)
             dropped = [d for d in dets if d.cls == "rat" and d not in rats]
             best = rats[0] if rats else None
             fired = gate.update(fr.ts, best)
@@ -476,9 +516,9 @@ def main(argv=None) -> int:
                 top, n_hits = fired
                 body = make_event(top, n_hits, fr.bgr if fr.has_color else fr.gray, args.node_id, args.h3, fr.ts)
                 status = "no-post"
-                if not args.no_post:
-                    ok, status = post_event(args.api, body)
-                    status = ("POST ok " if ok else "POST FAIL ") + status
+                if args.post:
+                    updated, status = post_event(args.api, body)
+                    status = ("POST score updated " if updated else "POST no score update ") + status
                 if save_dir:
                     save_event(save_dir, body, gate.n_events)
                 led.blink()
@@ -487,7 +527,8 @@ def main(argv=None) -> int:
 
             if args.show:
                 import cv2
-                view = draw(fr.bgr.copy() if fr.has_color else cv2.cvtColor(fr.gray, cv2.COLOR_GRAY2BGR), rats, persons, dropped, gate, fps)
+                view = draw(fr.bgr.copy() if fr.has_color else cv2.cvtColor(fr.gray, cv2.COLOR_GRAY2BGR),
+                            rats, persons, dropped, gate, fps, args.floor_y)
                 cv2.imshow("detect", view)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break

@@ -13,6 +13,7 @@ interface Props {
   onOpenRank: (rank: number | null) => void
   onFlySpot: (spot: Spot) => void
   onPlaceSpot: (spot: Spot) => void
+  onPlacePlan: (site: PlanNode) => void
   inArea: boolean
   source: Source
   streaming: boolean
@@ -35,7 +36,7 @@ const ago = (iso: string | undefined) => {
 }
 
 /** Right side: one card per owl with its activity ring around a node icon; suggested sites underneath. Slides away on its tab. */
-export default function NodesPanel({ nodes, sightings, rates, selected, plan, openRank, openSpots, onOpenRank, onFlySpot, onPlaceSpot, inArea, source, streaming, open, onToggle, onSelect, onRemove, onStartPlacing }: Props) {
+export default function NodesPanel({ nodes, sightings, rates, selected, plan, openRank, openSpots, onOpenRank, onFlySpot, onPlaceSpot, onPlacePlan, inArea, source, streaming, open, onToggle, onSelect, onRemove, onStartPlacing }: Props) {
   const placedCells = new Set(nodes.map((n) => n.h3))
   return (
     <aside className={`nodes panel ${open ? '' : 'collapsed'}`}>
@@ -48,7 +49,7 @@ export default function NodesPanel({ nodes, sightings, rates, selected, plan, op
           Owls
           <span className="count">{nodes.length}</span>
         </span>
-        <span className={`pill ${source === 'live' ? 'live' : 'fixture'}`}>{source === 'live' ? (streaming ? 'live' : 'polling') : 'offline'}</span>
+        <span className={`pill ${source === 'live' ? 'live' : 'fixture'}`}>{source === 'live' ? (streaming ? 'streaming' : 'polling') : source}</span>
       </div>
       <div className="nodes-body">
         {nodes.length === 0 && (
@@ -73,7 +74,7 @@ export default function NodesPanel({ nodes, sightings, rates, selected, plan, op
                   </div>
                   <div className="owl-addr">{n.addr}</div>
                   <div className="owl-row small muted">
-                    <span>{last ? `last rat ${ago(last.ts)}` : 'quiet'}</span>
+                    <span>{last ? `last event ${ago(last.ts)}` : 'no events'}</span>
                     <span>{n.nodeId}</span>
                   </div>
                 </div>
@@ -84,9 +85,9 @@ export default function NodesPanel({ nodes, sightings, rates, selected, plan, op
         {inArea && (
           <div className="suggested">
             <div className="suggested-head muted small">
-              <SparkIcon size={14} /> suggested by the model
+              <SparkIcon size={14} /> suggested sites
             </div>
-            {plan.length === 0 && <div className="small muted">No suggested hexagons in this borough.</div>}
+            {plan.length === 0 && <div className="small muted">No suggested sites for this view.</div>}
             <ul className="owl-list compact">
               {plan.map((p) => {
                 const isOpen = openRank === p.rank
@@ -95,10 +96,11 @@ export default function NodesPanel({ nodes, sightings, rates, selected, plan, op
                     <span className="rank">{p.rank}</span>
                     <div className="owl-text">
                       <div className="owl-row">
-                        <b>silence {(p.silence > 0 ? '+' : '') + Math.round(p.silence)}</b>
+                        <b>silence {p.silence > 0 ? '+' : ''}{Math.round(p.silence)}</b>
                         <span className="muted small">gain {p.expected_gain.toFixed(2)}</span>
                       </div>
                       <div className="small muted">{placedCells.has(p.h3) ? 'owl placed' : isOpen ? 'spots inside this hexagon' : 'click for spots inside this hexagon'}</div>
+                      {isOpen && !placedCells.has(p.h3) && <button className="plan-place" onClick={(e) => (e.stopPropagation(), onPlacePlan(p))}>Place at planned tree</button>}
                       {isOpen && (
                         <ul className="spots" onClick={(e) => e.stopPropagation()}>
                           {openSpots === undefined && <li className="small muted">finding street trees…</li>}

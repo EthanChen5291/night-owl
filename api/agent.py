@@ -24,6 +24,7 @@ import base64
 import json
 import math
 import os
+import re
 import threading
 import time
 import urllib.error
@@ -129,8 +130,10 @@ def _ago(ms: float | None) -> str | None:
 class Data:
     """Model output, loaded through the Store (so /cells' live posterior overlay applies) plus cell centres."""
 
-    def __init__(self, store: Store):
+    def __init__(self, store: Store, month: str | None = None, plan_k: int | None = None):
         self.store = store
+        self.month = month
+        self.plan_k = plan_k
         self._centres: dict[str, list[float]] | None = None
 
     def centres(self) -> dict[str, list[float]]:
@@ -142,7 +145,7 @@ class Data:
         return self._centres
 
     def cells(self) -> tuple[str, list[dict]]:
-        data, _ = self.store.cells(None)
+        data, _ = self.store.cells(self.month)
         return data.get("month", "?"), data.get("cells", [])
 
     def model_file(self, name: str) -> dict:
@@ -179,14 +182,19 @@ def t_city_overview(d: Data, a: dict) -> tuple[Any, list]:
         b["complaints_12m"] += c.get("n_complaints_12m") or 0
     by_b = {k: {"hexagons": v["hexagons"], "silent_blocks": v["silent_blocks"], "complaints_12m": v["complaints_12m"],
                 "mean_p_active_rat_signs": round(v["risk_sum"] / v["hexagons"], 4)} for k, v in boroughs.items()}
-    hot = d.model_file("hotspots.json")
-    slim = lambda xs: [{k: x.get(k) for k in ("rank", "neighborhood", "borough", "h3", "lat", "lon", "rat_risk", "silence")} for x in xs[:8]]
+    def top(sort_key: str) -> list[dict]:
+        ranked = sorted(cells, key=lambda c: float(c.get(sort_key) or 0), reverse=True)[:8]
+        return [{"rank": rank, "neighborhood": c.get("neighborhood"), "borough": c.get("borough"),
+                 "h3": c["h3"], "lat": (d.centres().get(c["h3"]) or [None, None])[0],
+                 "lon": (d.centres().get(c["h3"]) or [None, None])[1],
+                 "rat_risk": c.get("score_b"), "silence": c.get("silence")}
+                for rank, c in enumerate(ranked, 1)]
     return {"month": month, "hexagons": len(cells), "by_borough": by_b,
-            "top_rat_risk": slim(hot.get("top_risk", [])), "top_silent_blocks": slim(hot.get("top_silent", []))}, []
+            "top_rat_risk": top("score_b"), "top_silent_blocks": top("silence")}, []
 
 
 def t_search_cells(d: Data, a: dict) -> tuple[Any, list]:
-    _, cells = d.cells()
+    month, cells = d.cells()
     borough = (a.get("borough") or "").lower().strip()
     hood = (a.get("neighborhood") or "").lower().strip()
     sort = a.get("sort_by") or "rat_risk"
@@ -215,11 +223,11 @@ def t_search_cells(d: Data, a: dict) -> tuple[Any, list]:
     else:
         field = {"pct_b": "rat_risk_pct", "silence": "silence", "pct_a": "complaints_pct"}[key]
         rows.sort(key=lambda r: -(r[field] if r[field] is not None else -1e9))
-    return {"matched": len(rows), "sort_by": sort, "results": rows[:limit]}, []
+    return {"month": month, "matched": len(rows), "sort_by": sort, "results": rows[:limit]}, []
 
 
 def t_get_cell(d: Data, a: dict) -> tuple[Any, list]:
-    _, cells = d.cells()
+    month, cells = d.cells()
     by = {c["h3"]: c for c in cells}
     h3 = (a.get("h3") or "").lower().strip()
     if not h3 and a.get("lat") is not None and a.get("lon") is not None:
@@ -231,14 +239,17 @@ def t_get_cell(d: Data, a: dict) -> tuple[Any, list]:
     if not c:
         return {"error": "no modelled hexagon there (outside NYC's modelled area, or water/park)"}, []
     out = d.row(c)
+    out["month"] = month
     out["top_reasons"] = c.get("reasons", [])
     out["ci_p_active_rat_signs"] = c.get("ci_b")
     out["inspections"] = c.get("n_inspections")
     out["community_district"] = c.get("cd")
-    blds = d.model_file("buildings.json").get("cells", {}).get(h3)
+    buildings = d.model_file("buildings.json")
+    blds = buildings.get("cells", {}).get(h3) if buildings.get("month") == month else None
     if blds:
         out["riskiest_buildings"] = blds[:5]
-    spots = d.model_file("placements.json").get("cells", {}).get(h3)
+    placements = d.model_file("placements.json")
+    spots = placements.get("cells", {}).get(h3) if placements.get("month") == month else None
     if spots:
         out["owl_mount_spots"] = [{k: s.get(k) for k in ("rank", "mount_address", "lat", "lon", "score", "reasons")} for s in spots[:3]]
     return out, []
@@ -258,10 +269,11 @@ def t_geocode(d: Data, a: dict) -> tuple[Any, list]:
 
 
 def t_node_sites(d: Data, a: dict) -> tuple[Any, list]:
-    plan = d.model_file("plan.json")
+    plan, _ = d.store.plan(d.month, d.plan_k)
     _, cells = d.cells()
     by = {c["h3"]: c for c in cells}
-    spots = d.model_file("placements.json").get("cells", {})
+    placements = d.model_file("placements.json")
+    spots = placements.get("cells", {}) if placements.get("month") == plan.get("month") else {}
     borough = (a.get("borough") or "").lower().strip()
     limit = max(1, min(int(a.get("limit") or 8), 20))
     out = []
@@ -275,7 +287,8 @@ def t_node_sites(d: Data, a: dict) -> tuple[Any, list]:
                     "why": n.get("reason"), "best_mount": s[0].get("mount_address") if s else None})
         if len(out) >= limit:
             break
-    return {"month": plan.get("month"), "sites": out}, []
+    return {"month": plan.get("month"), "requested_month": plan.get("requested_month"),
+            "source": plan.get("source"), "replanned": plan.get("replanned"), "sites": out}, []
 
 
 def t_model_quality(d: Data, a: dict) -> tuple[Any, list]:
@@ -590,8 +603,6 @@ def _rate_ok(ip: str) -> bool:
 
 
 def mount_agent(app: FastAPI, store: Store) -> None:
-    data = Data(store)
-
     @app.get("/agent/health")
     async def agent_health():
         return {"ok": bool(os.environ.get("XAI_API_KEY")), "model": MODEL, "node_connected": bool(os.environ.get("AGENT_TOKEN")),
@@ -604,6 +615,15 @@ def mount_agent(app: FastAPI, store: Store) -> None:
         if not _rate_ok(request.client.host if request.client else "?"):
             raise HTTPException(429, "slow down: too many questions, try again in a minute")
         body = await request.json()
+        if not isinstance(body, dict):
+            raise HTTPException(400, "request body must be an object")
+        month = body.get("month")
+        if month is not None and (not isinstance(month, str) or not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month)):
+            raise HTTPException(400, "month must be YYYY-MM")
+        plan_k = body.get("plan_k")
+        if plan_k is not None and (type(plan_k) is not int or not 0 <= plan_k <= 10_000):
+            raise HTTPException(400, "plan_k must be an integer from 0 to 10000")
+        data = Data(store, month, plan_k)
         messages = _clean_history(body.get("messages"))
         # results of browser tools from the previous round
         results = body.get("client_results") or []

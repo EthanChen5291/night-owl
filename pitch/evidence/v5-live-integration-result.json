@@ -1,0 +1,52 @@
+{
+  "scope": "One observed live V5 plush event, Pi relay to loopback Mac API; five other saved events were not posted.",
+  "visual_review": "Root and API agent viewed all six saved crops; each showed the same plush visible in the live camera.",
+  "event_utc": "2026-09-27T04:52:03.340Z",
+  "event_json_sha256": "e16e83522a2f0e3e4bcffd28bc52d91b5fcbbe86201ccb8de754348af5a13bd2",
+  "event_crop_sha256": "cb0d5b5294b3c95dd7bc1372bdb05ad6c560c401bb8c39f38bfdd77974ce3474",
+  "event_file": "vision/runs/modal-rat-v5-20260927/relay-one-20260927-045203/event_0001_2026-09-27T045203340Z.json",
+  "crop_file": "vision/runs/modal-rat-v5-20260927/relay-one-20260927-045203/event_0001_2026-09-27T045203340Z.jpg",
+  "worker_stats": {
+    "elapsed_s": 89.859,
+    "packets_received": 1347,
+    "frames_received": 1346,
+    "frames_inferred": 1346,
+    "backlog_dropped": 1,
+    "stale_frames": 0,
+    "events": 6,
+    "received_fps": 14.99,
+    "processed_fps": 14.98,
+    "inference_ms_mean": 59.15
+  },
+  "relay": {
+    "attempts": 1,
+    "receipts": 1,
+    "outcome": "accepted",
+    "accepted": true,
+    "http_status": 200,
+    "journal_sha256": "89601b1eb285519ad7e97903c103ad38c65a1982c664e1b06ceb1c17c9e202e6",
+    "same_dir_second_scan_new_attempts": 0
+  },
+  "before": {
+    "api_events": 1,
+    "score_b": 0.1297,
+    "posterior_n_events": 1,
+    "plan_rank": 2,
+    "expected_gain": 0.12344,
+    "store_sha256": "c56d498b292e5f25e60e5051b99d4ccad3a8b95f8f780257c637b800ae66bc8a"
+  },
+  "after": {
+    "api_events": 2,
+    "score_b": 0.1618,
+    "posterior_n_events": 2,
+    "plan_rank": 1,
+    "expected_gain": 0.147,
+    "store_sha256": "726fbae0f5bd3f327d37a5cf605730ad7bce0cf7de26732537b33b74810aa890"
+  },
+  "cleanup": {
+    "worker_count": 0,
+    "detector_socket": "absent",
+    "reverse_loopback_port_18000": "absent"
+  },
+  "posting": "Only event_0001 posted; initial dry run did not POST; one accepted receipt; all other saved event JSONs stayed out of relay directory."
+}

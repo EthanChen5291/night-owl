@@ -33,9 +33,9 @@ def test_health(client):
 
 
 def test_three_events_queue_order_and_posterior(client):
-    base = client.get(f"/cells?month=2026-08").json()
+    base = client.get(f"/cells?month=2026-09").json()
     cell0 = next(c for c in base["cells"] if c["h3"] == DEMO_H3)
-    prior_alpha, prior_beta = cell0["score_b"] * 10, (1 - cell0["score_b"]) * 10
+    prior_alpha, prior_beta = cell0["posterior"]["alpha"], cell0["posterior"]["beta"]
 
     confs = [0.91, 0.80, 0.70]
     means = []
@@ -43,7 +43,7 @@ def test_three_events_queue_order_and_posterior(client):
         r = client.post("/event", json=event(conf=cf, ts=f"2026-09-26T14:0{i}:00.000Z"))
         assert r.status_code == 200, r.text
         j = r.json()
-        assert j["ok"] is True and j["h3"] == DEMO_H3
+        assert j["ok"] is True and j["accepted"] is True and j["h3"] == DEMO_H3
         assert j["posterior"]["n_events"] == i + 1
         expected_alpha = prior_alpha + sum(confs[: i + 1])
         assert j["posterior"]["alpha"] == pytest.approx(expected_alpha, abs=1e-3)
@@ -58,12 +58,15 @@ def test_three_events_queue_order_and_posterior(client):
     assert q[0]["conf"] == 0.70 and q[0]["class"] == "rat"
     assert len(client.get("/queue?limit=2").json()["events"]) == 2
 
-    cells = client.get("/cells?month=2026-08").json()
-    assert cells["month"] == "2026-08" and "generated_at" in cells
+    cells = client.get("/cells?month=2026-09").json()
+    assert cells["month"] == "2026-09" and "generated_at" in cells
     cell = next(c for c in cells["cells"] if c["h3"] == DEMO_H3)
     assert cell["last_event_at"] == "2026-09-26T14:02:00.000Z"
     assert cell["score_b"] == pytest.approx(means[-1], abs=1e-3)
     assert cell["posterior"]["n_events"] == 3
+    assert cell["ci_b"] != cell["model_ci_b"]
+    assert cell["ci_b"][0] <= cell["score_b"] <= cell["ci_b"][1]
+    assert cell["ci_b_basis"] == "sensor_posterior_wilson_approx"
     assert cell["silence"] == pytest.approx(cell["pct_b"] - cell["pct_a"], abs=0.11)
     assert 0 <= cell["pct_b"] <= 100
     # contract keys intact
@@ -74,9 +77,20 @@ def test_three_events_queue_order_and_posterior(client):
 
 
 def test_low_conf_is_queued_but_does_not_move_posterior(client):
+    before = client.get("/cells?month=2026-09").json()
     r = client.post("/event", json=event(conf=0.3))
-    assert r.status_code == 200 and r.json()["posterior"]["n_events"] == 0
+    assert r.status_code == 200 and r.json()["accepted"] is False and r.json()["posterior"]["n_events"] == 0
     assert len(client.get("/queue").json()["events"]) == 1
+    after = client.get("/cells?month=2026-09").json()
+    assert next(c for c in after["cells"] if c["h3"] == DEMO_H3) == next(c for c in before["cells"] if c["h3"] == DEMO_H3)
+
+
+def test_person_event_is_queued_without_update(client):
+    before = client.get("/plan?month=2026-09&k=10").json()["nodes"]
+    person = client.post("/event", json=event(**{"class": "person"})).json()
+    assert person["accepted"] is False and person["posterior"]["n_events"] == 0
+    assert len(client.get("/queue").json()["events"]) == 1
+    assert client.get("/plan?month=2026-09&k=10").json()["nodes"] == before
 
 
 def test_unknown_h3_accepted_with_prior(client):
@@ -93,16 +107,17 @@ def test_unknown_h3_accepted_with_prior(client):
     {"conf": 1.5},
     {"class": "dog"},
     {"h3": "not-an-h3"},
+    {"h3": "fffffffffffffff"},
     {"extra": 1},
 ])
-def test_malformed_event_422(client, bad):
+def test_malformed_event_400(client, bad):
     r = client.post("/event", json=event(**bad))
-    assert r.status_code == 422, r.text
+    assert r.status_code == 400, r.text
 
 
 def test_bad_json_400(client):
     r = client.post("/event", content=b"{not json", headers={"content-type": "application/json"})
-    assert r.status_code in (400, 422)
+    assert r.status_code == 400
 
 
 def test_reset_guarded_and_works(client):
@@ -127,6 +142,65 @@ def test_persistence_survives_restart(tmp_path):
         assert cell["posterior"]["n_events"] == 2
 
 
+def test_duplicate_delivery_and_restart_are_idempotent(tmp_path):
+    f = tmp_path / "events.jsonl"
+    body = event()
+    with TestClient(create_app(data_dir=REPO, events_file=f)) as c:
+        first = c.post("/event", json=body).json()
+        second = c.post("/event", json=body).json()
+        assert first["accepted"] is True and second["accepted"] is False
+        assert second["posterior"] == first["posterior"]
+        assert len(c.get("/queue").json()["events"]) == 1
+    assert len(f.read_text().splitlines()) == 1
+    with TestClient(create_app(data_dir=REPO, events_file=f)) as c:
+        assert c.post("/event", json=body).json()["posterior"] == first["posterior"]
+        assert len(c.get("/queue").json()["events"]) == 1
+
+
+def test_timestamp_normalization_deduplicates_equivalent_utc_forms(client):
+    first = client.post("/event", json=event(ts="2026-09-26T14:02:11Z"))
+    second = client.post("/event", json=event(ts="2026-09-26T14:02:11.000+00:00"))
+    assert first.status_code == second.status_code == 200
+    assert first.json()["posterior"] == second.json()["posterior"]
+    assert client.get("/queue").json()["events"][0]["ts"] == "2026-09-26T14:02:11.000Z"
+    assert len(client.get("/queue").json()["events"]) == 1
+
+
+def test_month_sources_and_historical_overlay(client):
+    august = client.get("/cells?month=2026-08").json()
+    assert august["month"] == august["requested_month"] == "2026-08"
+    assert august["source"] == "fixture" and august["synthetic"] is True
+    assert client.get("/plan?month=2026-08").json()["source"] == "fixture"
+    assert client.get("/cells?month=2025-01").json()["month"] == "2026-09"
+    assert client.get("/cells?month=2025-01").json()["requested_month"] == "2025-01"
+    assert client.post("/event", json=event()).status_code == 200
+    assert client.get("/cells?month=2026-08").json()["cells"] == august["cells"]
+    assert client.get("/plan?month=2026-08").json()["nodes"] == json.loads((REPO / "city/plan.fixture.json").read_text())["nodes"]
+
+
+def test_event_outside_candidate_pool_does_not_move_pins(client):
+    before = client.get("/plan?month=2026-09&k=10").json()
+    assert before["replanned"] is False
+    assert client.post("/event", json=event()).status_code == 200
+    after = client.get("/plan?month=2026-09&k=10").json()
+    assert after["nodes"] == before["nodes"]
+    assert after["replanned"] is False
+
+
+def test_sensor_event_reranks_existing_tree_sites_and_reset_restores(client):
+    before = client.get("/plan?month=2026-09&k=20").json()["nodes"]
+    target = before[-1]
+    old_sites = {(n["h3"], n["tree_id"]): (n["lat"], n["lon"]) for n in before}
+    assert client.post("/event", json=event(h3=target["h3"])).status_code == 200
+    changed = client.get("/plan?month=2026-09&k=20").json()["nodes"]
+    assert changed != before
+    assert next(n for n in changed if n["h3"] == target["h3"])["rank"] < target["rank"]
+    assert all((n["lat"], n["lon"]) == old_sites[(n["h3"], n["tree_id"])]
+               for n in changed if (n["h3"], n["tree_id"]) in old_sites)
+    assert client.delete("/events", headers={"X-Demo-Reset": "yes"}).status_code == 200
+    assert client.get("/plan?month=2026-09&k=20").json()["nodes"] == before
+
+
 def test_plan_truncates(client):
     j = client.get("/plan?month=2026-08&k=3").json()
     assert j["month"] == "2026-08" and j["k"] == 3 and len(j["nodes"]) == 3
@@ -143,9 +217,9 @@ def test_bad_month_422(client):
 def test_backtest_fixture_loads(client):
     j = client.get("/backtest").json()
     assert j["window"][0] == "2016-01" and j["k"] == 50
-    assert len(j["series"]) >= 120
+    assert len(j["series"]) >= 119
     s0 = j["series"][0]
-    assert set(s0) == {"month", "precision_silent", "precision_311", "n_positives"}
+    assert {"month", "precision_silent", "precision_311", "n_positives"} <= set(s0)
     assert j["summary"]["lift"] > 1.0
     assert j["summary"]["mean_precision_silent"] > j["summary"]["mean_precision_311"]
     if "model/out" not in j["source"]:

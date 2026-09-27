@@ -57,7 +57,7 @@ def frame_names() -> dict[str, list[str]]:
     return by_scene
 
 
-def real_crop(rng: random.Random, name: str) -> tuple[str, list[float]]:
+def prop_crop(rng: random.Random, name: str) -> tuple[str, list[float]]:
     """A grayscale thumbnail around the labelled rat in frame `name`, at a random zoom; returns (jpeg b64, bbox x y w h)."""
     raw = subprocess.run(["git", "show", f"{FRAMES_COMMIT}:string_review/rat/{name}.jpg"], cwd=HERE.parent, capture_output=True, check=True).stdout
     img = ImageOps.grayscale(Image.open(io.BytesIO(raw)))
@@ -99,7 +99,7 @@ def make_events(seed: int = 26) -> list[dict]:
         for _ in range(n):
             scene = next(scenes)
             names = by_scene[scene]
-            crop_b64, bbox = real_crop(rng, names[len(names) // 2])
+            crop_b64, bbox = prop_crop(rng, names[len(names) // 2])
             ts = now - timedelta(hours=rng.uniform(0.3, 40))
             ts = ts.replace(hour=rng.choice([21, 22, 23, 0, 1, 2, 3, 4]))  # rats work nights
             if ts > now:

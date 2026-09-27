@@ -1,4 +1,4 @@
-// The Barn Owl assistant's wire protocol (api/agent.py): POST /api/agent/chat, Server-Sent Events back.
+// Assistant chat streams responses from POST /api/agent/chat using Server-Sent Events.
 // The browser keeps the history and runs the "client tools" (things only the page knows) between rounds.
 
 export type AgentEvent =
@@ -26,7 +26,7 @@ export interface ClientResult {
 export type WireMessage = { role: 'user' | 'assistant' | 'tool'; content: string; tool_calls?: unknown[]; tool_call_id?: string }
 
 export async function streamAgent(
-  body: { messages: WireMessage[]; client_results?: ClientResult[]; pending_images?: { src: string }[] },
+  body: { messages: WireMessage[]; month: string; plan_k: number; client_results?: ClientResult[]; pending_images?: { src: string }[] },
   onEvent: (e: AgentEvent) => void,
   signal: AbortSignal,
 ): Promise<void> {

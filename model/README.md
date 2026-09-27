@@ -1,9 +1,9 @@
 # model/ — where are the rats nobody reports?
 
-Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 17:15** (Q&A, research, data sources, glossary, ethics, future work).
+Sanjavan's node-location pipeline for Barn Owl. Written on 2026-09-26 (event day). Last updated **Sat 23:31** (plain-language accuracy for Models A and B).
 
 **Contents:** [In one minute](#in-one-minute) · [The models](#the-models) · [Architecture](#architecture) ·
-[For teammates](#for-teammates-start-here) · [Headline results](#headline-results) · [Honest limits](#honest-limits-say-these-before-a-judge-does) ·
+[For teammates](#for-teammates-start-here) · [Headline results](#headline-results) · [Accuracy](#model-accuracy-plain-language) · [Honest limits](#honest-limits-say-these-before-a-judge-does) ·
 [Q&A for judges](#qa-for-judges) · [Pipeline](#pipeline) · [Key decisions](#key-decisions) ·
 [Research](#research-and-sources-we-relied-on) · [Data sources](#data-sources) · [Glossary](#glossary) ·
 [Ethics](#ethics-and-privacy) · [Future work](#future-work)
@@ -195,6 +195,27 @@ About 5 minutes on an M-series Mac (the backtests are the slow part).
 
 Backtests are scored **only on cells DOHMH actually swept that month**. Silent blocks are rarely
 inspected, so scoring on "any inspection found rats" grades the model on where DOHMH goes, not where rats are.
+
+## Model accuracy (plain language)
+
+From `accuracy_report.py` → `out/accuracy.json`: five-fold spatial cross-validation holds out whole community
+districts, then pools the held-out predictions. AUC measures how often a positive unit ranks above a negative one
+(0.50 = chance). We avoid ordinary classification accuracy: only about 10% of swept lots have rat findings, so
+always predicting "no rats" would appear accurate while finding none.
+
+| Model and unit | Pooled held-out AUC | Comparison | Capture among highest scores |
+|---|---:|---|---|
+| **A: cell-month**, positive if it had any rat complaint | **0.870** | Prior 12 months' complaints: **0.842** pooled AUC | Top 20% of cell-months contain **75.2% of complaint count** |
+| **B: swept lot**, assigned its cell-month score; positive if rats were found | **0.630** (lot-weighted) | Chance: **0.500** | Top roughly 20% of swept lots contain **31.7% of positive swept lots** |
+
+For B's capture figure, cell-months are ranked by score and taken whole until they cover at least 20% of swept
+lots, so the final cell-month can take the selected share above 20%. An earlier report, `out/metrics.json`, gives
+the logistic baseline as **0.567 mean fold AUC**; it is not the pooled statistic in this table. A and B have
+different outcomes and units, so their AUCs do not directly measure a reporting gap. B uses building and
+environmental features, season and district trash, plus income and population controls; it uses no complaint
+features. The rolling backtest compares positive rates on lots the city actually swept: **19.5%** for model picks
+versus **15.2%** for complaint-based picks, winning **108 of 119 months**. That is a 28% relative increase in the
+observed positive rate, not a count of rats found on unswept blocks.
 
 ## Why our picks find more rats
 

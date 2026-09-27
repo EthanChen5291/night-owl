@@ -1,4 +1,4 @@
-"""Barn Owl API: the hub between the Pi node (POST /event), the model output (model/out/*.json) and the web app.
+"""Night Owl API: the hub between the Pi node, model output, and web app.
 
 Run:  api/run.sh   or   uv run --project api uvicorn main:app --app-dir api --host 0.0.0.0 --port 8000
 Contract: plan/master-plan.md §6 (frozen). Stage fallback: api/fake_event.sh (plan §9).
@@ -8,10 +8,13 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
+import h3
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
@@ -46,18 +49,30 @@ class Event(BaseModel):
     @field_validator("h3")
     @classmethod
     def _h3_hex(cls, v: str) -> str:
-        if not re.fullmatch(r"[0-9a-fA-F]{15}", v):
-            raise ValueError("h3 must be a 15-hex-char H3 index")
-        return v.lower()
+        v = v.lower()
+        if not re.fullmatch(r"[0-9a-f]{15}", v) or not h3.is_valid_cell(v) or h3.get_resolution(v) != 9:
+            raise ValueError("h3 must be a valid resolution-9 H3 cell")
+        return v
+
+    @field_validator("ts")
+    @classmethod
+    def _utc_timestamp(cls, v: str) -> str:
+        try:
+            parsed = datetime.fromisoformat(v.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("ts must be an ISO 8601 UTC timestamp") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+            raise ValueError("ts must be an ISO 8601 UTC timestamp")
+        return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def create_app(data_dir: Path | None = None, events_file: Path | None = None) -> FastAPI:
     store = Store(data_dir=data_dir, events_file=events_file)
-    app = FastAPI(title="Barn Owl API", version="0.1.0")
+    app = FastAPI(title="Night Owl API", version="0.1.0")
     app.state.store = store
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*", "http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -123,7 +138,8 @@ def create_app(data_dir: Path | None = None, events_file: Path | None = None) ->
         print(f"EVENT node={stored['node_id']} h3={stored['h3']} class={stored['class']} conf={stored['conf']:.2f} "
               f"n_hits={stored['n_hits']} -> posterior mean {post.mean:.3f} "
               f"(a={post.alpha:.2f} b={post.beta:.2f} n={post.n_events}) [{tag}]", flush=True)
-        return {"ok": True, "h3": stored["h3"], "posterior": post.to_dict(), "score_b_updated": round(post.mean, 4)}
+        return {"ok": True, "accepted": accepted, "h3": stored["h3"],
+                "posterior": post.to_dict(), "score_b_updated": round(post.mean, 4)}
 
     @app.delete("/events")
     async def reset(x_demo_reset: str | None = Header(default=None), s: Store = Depends(get_store)):
@@ -153,10 +169,7 @@ def create_app(data_dir: Path | None = None, events_file: Path | None = None) ->
                         yield ": keepalive\n\n"
                         continue
                     kind = "reset" if payload.get("reset") else "event"
-                    slim = {k: v for k, v in payload.items() if k != "crop_b64"}
-                    if "crop_b64" in payload:
-                        slim["crop_b64"] = payload["crop_b64"]  # the web app wants the thumbnail
-                    yield f"event: {kind}\ndata: {json.dumps(slim)}\n\n"
+                    yield f"event: {kind}\ndata: {json.dumps(payload)}\n\n"
                     sent += 1
             finally:
                 s.unsubscribe(q)
@@ -169,6 +182,12 @@ def create_app(data_dir: Path | None = None, events_file: Path | None = None) ->
     @app.exception_handler(json.JSONDecodeError)
     async def _bad_json(_: Request, exc: Exception):
         return JSONResponse({"ok": False, "detail": f"bad JSON: {exc}"}, status_code=400)
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(request: Request, exc: RequestValidationError):
+        if request.url.path == "/event":
+            return JSONResponse({"ok": False, "detail": "invalid event body"}, status_code=400)
+        return JSONResponse({"detail": exc.errors()}, status_code=422)
 
     return app
 

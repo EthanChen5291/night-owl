@@ -1,0 +1,21 @@
+# Night Owl Devpost review
+
+This is a local edit proposal. I read the public [project page](https://devpost.com/software/barn-owl-vm9n3s) on September 26, when it still used the name Barn Owl. The team later chose Night Owl. I have not edited Devpost or confirmed that its current text changed.
+
+## Changes to make before judging
+
+1. **Fix the infrared claim.** The page said the detector trained on infrared footage. It trained on a dark plush rat in room light. The team excluded IR footage because it could not label the plush reliably. A live Pi camera did detect the room-lit prop and send one accepted event to the local map. That says nothing about IR or wild rats. Suggested wording: "We trained YOLO11n on reviewed room-lit plush footage and ran it on a Pi 5 camera. One live prop event reached our local map. IR and wild-rat detection remain untested." [V5 live receipt](evidence/v5-live-integration-result.json) · [V5 fresh result](../vision/V5_FRESH_RESULTS.md).
+
+2. **State the backtest denominator.** The page's "28% more rats" wording reads like a population count. In a 119-month rolling backtest, Model B's top 50 averaged a 19.5% active-sign share of inspected lots, versus 15.2% when ranking by prior 311 calls. Each method ranked only cells the city swept that month. The 28% figure is relative lift in that observed sample. Suggested wording: "Among cells swept each month, Model B's top 50 had a 19.5% average active-sign share of inspected lots, versus 15.2% for prior 311 calls." [Backtest export](../model/out/backtest.json) · [implementation](../model/05_backtest.py).
+
+3. **Define Model B and Silence Score.** Model B estimates active-sign share for swept lots at the cell level. It does not measure rat prevalence in unswept cells. Silence Score is the percentile of modeled active-sign risk minus the percentile of 311 complaints per resident. Say "few reports" unless a cell actually had zero. [Model decisions](../model/README.md) · [cell export](../model/out/cells.json).
+
+4. **Describe what the node sends and changes.** The API event has metadata and a cropped image, not a video stream. An accepted event updates a chosen Beta prior and can rerank site candidates; it does not retrain Model B. In one 89.859-second live V5 Pi observation, reviewers confirmed plush in six saved crops. The team sent one event to the local API. It changed the cell's served score .1297→.1618, sightings 1→2, and site rank 2→1. The other five saved events were not posted. Suggested wording: "A live Pi camera detected our room-lit plush prop. One crop event reached the local API and moved a site from rank 2 to 1 on the map." [API schema](../api/main.py) · [posterior update](../api/posterior.py) · [live receipt](evidence/v5-live-integration-result.json) · [map screenshot](assets/live-pi-map-20260927.png).
+
+## Detector result to disclose
+
+The room-lit detector is a prototype. V5 reached .9608 rat AP50 on its weakest tuned development clip. Its fresh box test scored .6158 as run on 369 frames and did not establish the .90 target. Source review found faulty reference boxes; 31 draft corrections were not adopted or rescored, so no corrected AP50 exists. AP50 measures box detections, not overall accuracy.
+
+A separate fixed recorded event test alerted on 18 of 19 reviewed plush appearances. It also fired 17 false events during 190.409 seconds without plush, above the limit of fewer than .5 per minute. Sixteen alerts targeted one cap; one targeted a shoe. All 60 event crops were reviewed. The formal event test failed. V6 trained for 30 epochs with added hard negatives but missed preset development floors on the table clip and combined person scores. The team did not replay V6 or put it on the Pi. Keep V5 as the labeled demo detector. [V5 formal result](../vision/V5_FORMAL_EVENT_RESULTS.md) · [V5 fresh result](../vision/V5_FRESH_RESULTS.md) · [V6 selection check](evidence/v6-checkpoint-selection.json).
+
+The [rig photo](assets/physical-prototype.jpeg) and [live event screenshot](assets/live-pi-map-20260927.png) can illustrate the working prototype. The [V5 recorded montage](v5-montage.md) is development footage; its closing "fresh test pending" card is dated. Label it as recorded replay if used. No gallery asset demonstrates IR or wild-rat detection.

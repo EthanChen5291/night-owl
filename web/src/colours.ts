@@ -1,17 +1,13 @@
 import type { Cell, Mode } from './types'
 
-// Two ramps, both colourblind-safe and a little muted so the night lighting keeps the mood:
-//   sequential: viridis-like, for the two percentile modes (0..100)
-//   diverging:  blue - neutral - orange, centred on 0, for silence (-100..100);
-//               silent blocks (high B, low A) are the strong orange end.
-// full-strength viridis for the percentile modes: the earlier muted ramp put everything from the 50th to the 95th
-// percentile in one yellow-green, so a whole borough read as one colour. The warm end of silence is a clay orange.
+// Percentile modes use a five-stop sequential ramp. Silence uses blue through neutral to orange,
+// with orange for cells where Model B ranks above Model A.
 const SEQUENTIAL = ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725']
 const DIVERGING = ['#1f5aa6', '#86b3da', '#dedbd3', '#e0964f', '#b8471a']
 
 export const MODES: { id: Mode; label: string; field: 'pct_a' | 'pct_b' | 'silence'; hint: string }[] = [
   { id: 'a', label: 'What the city sees', field: 'pct_a', hint: 'percentile of predicted 311 complaints (Model A)' },
-  { id: 'b', label: "What's there", field: 'pct_b', hint: 'percentile of P(active rats | inspected) (Model B)' },
+  { id: 'b', label: "What's there", field: 'pct_b', hint: 'Likelihood of rat activity on inspected properties' },
   { id: 'silence', label: 'Silence', field: 'silence', hint: 'pct_b - pct_a; orange = silent blocks' },
 ]
 

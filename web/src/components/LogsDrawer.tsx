@@ -15,7 +15,7 @@ const fmt = (iso: string) => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 }
 
-/** Every sighting with its crop, address and time; filtered to the selected owl when there is one. */
+/** Queue events with crops, locations, and times; filtered to the selected owl. */
 export default function LogsDrawer({ events, nodes, cells, selected, onClose, onSelect }: Props) {
   const placeOf = (h3: string) => {
     const c = cells.get(h3)
@@ -29,7 +29,7 @@ export default function LogsDrawer({ events, nodes, cells, selected, onClose, on
       <div className="logs-head">
         <span className="nodes-title">
           <RatIcon size={20} />
-          Sightings
+          Events
           <span className="count">{rows.length}</span>
           {owl && <span className="muted small"> · {owl.name}</span>}
         </span>
@@ -37,13 +37,13 @@ export default function LogsDrawer({ events, nodes, cells, selected, onClose, on
           <CloseIcon size={16} />
         </button>
       </div>
-      {rows.length === 0 && <div className="muted logs-empty">No sightings yet. When an owl sees a rat, the crop lands here.</div>}
+      {rows.length === 0 && <div className="muted logs-empty">No events yet. Queue events and their crops appear here.</div>}
       <ul className="logs-list">
         {rows.map((e) => {
           const n = byNodeId.get(e.node_id)
           return (
             <li key={`${e.node_id}|${e.ts}`} className="log" onClick={() => n && onSelect(n.id)}>
-              {e.crop_b64 ? <img className="log-crop" alt="rat crop" src={`data:image/jpeg;base64,${e.crop_b64}`} /> : <div className="log-crop empty" />}
+              {e.crop_b64 ? <img className="log-crop" alt="event crop" src={`data:image/jpeg;base64,${e.crop_b64}`} /> : <div className="log-crop empty" />}
               <div className="log-text">
                 <div className="owl-row">
                   <b>{n?.name ?? e.node_id}</b>

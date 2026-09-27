@@ -32,6 +32,8 @@ export interface Cell {
 export interface CellsResponse {
   month: string
   generated_at: string
+  source?: string
+  synthetic?: boolean
   cells: Cell[]
 }
 
@@ -61,6 +63,8 @@ export interface Spot {
 export interface PlanResponse {
   month: string
   k: number
+  source?: string
+  synthetic?: boolean
   nodes: PlanNode[]
 }
 
@@ -74,6 +78,7 @@ export interface RatEvent {
   bbox: [number, number, number, number]
   crop_b64: string
   fw: string
+  accepted?: boolean
   received_at?: string
 }
 
@@ -85,6 +90,8 @@ export interface BacktestPoint {
   month: string
   precision_silent: number
   precision_311: number
+  precision_positives?: number
+  precision_random?: number
   n_positives: number
 }
 
@@ -98,7 +105,7 @@ export interface BacktestResponse {
 
 export type Mode = 'a' | 'b' | 'silence'
 export type Preset = 'day' | 'night'
-export type Source = 'live' | 'fixture'
+export type Source = 'live' | 'fixture' | 'stale'
 
 // ---------------------------------------------------------------- city bake (city/build_city.py, city/make_tiles.py)
 

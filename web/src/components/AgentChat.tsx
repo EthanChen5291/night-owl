@@ -45,7 +45,7 @@ function load(): { items: Item[]; history: WireMessage[] } {
 
 const CORNER = 150 // px from the bottom-right corner that wakes the button
 
-export default function AgentChat({ tools, onShown }: { tools: ClientTools; onShown?: (shown: boolean) => void }) {
+export default function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; month: string; planBudget: number; onShown?: (shown: boolean) => void }) {
   const [open, setOpen] = useState(false)
   const [near, setNear] = useState(false)
   // no hover on touch screens: there the button just stays out
@@ -153,7 +153,7 @@ export default function AgentChat({ tools, onShown }: { tools: ClientTools; onSh
       setItems((prev) => [...prev, { kind: 'user', text: q }, { kind: 'bot', text: '', steps: [], images: [], busy: true }])
       const ctl = new AbortController()
       abortRef.current = ctl
-      let body: Parameters<typeof streamAgent>[0] = { messages: [...historyRef.current, { role: 'user', content: q }] }
+      let body: Parameters<typeof streamAgent>[0] = { messages: [...historyRef.current, { role: 'user', content: q }], month, plan_k: planBudget }
       try {
         for (let round = 0; round < 6; round++) {
           let next: ClientCall[] = []
@@ -195,7 +195,7 @@ export default function AgentChat({ tools, onShown }: { tools: ClientTools; onSh
             }
             patchBot((b) => ({ ...b, steps: b.steps.map((s) => (s.id === c.id ? { ...s, state: r.content.includes('"error"') ? 'error' : 'done' } : s)) }))
           }
-          body = { messages: historyRef.current, client_results: results, pending_images: pending }
+          body = { messages: historyRef.current, month, plan_k: planBudget, client_results: results, pending_images: pending }
         }
       } catch (e) {
         if ((e as Error).name !== 'AbortError') patchBot((b) => ({ ...b, error: `Couldn’t reach the assistant (${(e as Error).message}).` }))
@@ -205,7 +205,7 @@ export default function AgentChat({ tools, onShown }: { tools: ClientTools; onSh
         abortRef.current = null
       }
     },
-    [busy, patchBot, runClientTool],
+    [busy, month, planBudget, patchBot, runClientTool],
   )
 
   const reset = () => {
@@ -228,14 +228,14 @@ export default function AgentChat({ tools, onShown }: { tools: ClientTools; onSh
 
   return (
     <>
-      <section className={`agent panel ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="Barn Owl assistant">
+      <section className={`agent panel ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="Night Owl assistant">
         <header className="agent-head">
           <span className="agent-avatar">
             <SparkIcon size={16} />
           </span>
           <div className="agent-title">
-            <b>Barn Owl assistant</b>
-            <span className="muted small">Grok · reads the model, the node and your map</span>
+            <b>Night Owl assistant</b>
+            <span className="muted small">Grok · map, model and node tools</span>
           </div>
           <button className="icon-btn" title="New chat" onClick={reset} disabled={!items.length && !busy}>
             <NewChatIcon size={16} />
@@ -252,7 +252,7 @@ export default function AgentChat({ tools, onShown }: { tools: ClientTools; onSh
                 <ChatIcon size={26} />
               </div>
               <b>Ask about rats, blocks and owls</b>
-              <p className="muted">I can rank hexagons, explain why a block scores high, check the Pi and its camera, and look at your map.</p>
+              <p className="muted">Ask about ranked cells, the backtest, or this map. Pi tools work when the node dashboard is connected.</p>
               <div className="agent-suggest">
                 {SUGGESTIONS.map((s) => (
                   <button key={s} onClick={() => void send(s)}>
@@ -329,14 +329,14 @@ export default function AgentChat({ tools, onShown }: { tools: ClientTools; onSh
             </button>
           )}
         </form>
-        <div className="agent-foot muted">Answers come from the model and live node data. Grok can make mistakes.</div>
+        <div className="agent-foot muted">Answers may use model files and queued events. Check the source labels.</div>
       </section>
 
       <button
         className={`agent-fab panel ${open ? 'open' : ''} ${shown ? 'shown' : ''}`}
         onClick={() => setOpen((o) => !o)}
         onFocus={() => setNear(true)}
-        title={open ? 'Close assistant' : 'Ask Barn Owl'}
+        title={open ? 'Close assistant' : 'Ask Night Owl'}
         aria-expanded={open}
       >
         <span className="fab-icon chat">

@@ -1,5 +1,4 @@
-/* Liquid-glass shell over the city. Day (default) is light frosted glass on a hazy sky; night is the
-   stage preset. Only the tokens change between the two: every panel reads from them. */
+/* Day and night theme tokens for the map panels. */
 :root {
   --bg: #d6dfe6;
   --glass: rgba(255, 255, 255, 0.56);
@@ -89,13 +88,19 @@ button { font: inherit; color: inherit; }
 .pill { padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid transparent; }
 .pill.live { background: var(--ok-bg); color: var(--ok); }
 .pill.fixture { background: var(--warn-bg); color: var(--warn); }
+.pill.stale { background: var(--warn-bg); color: var(--warn); }
 .pill.loading { color: var(--muted); border-color: var(--line); }
 .count { margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: var(--row-hot); font-size: 11px; font-weight: 600; }
 
-/* ---------- header (top right): month, cells, live ---------- */
+/* Header: search, month, plan budget, and source. */
 .header { position: absolute; top: 12px; right: 12px; z-index: 6; display: flex; align-items: flex-start; gap: 8px; }
 .status { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: 999px; height: 40px; }
 .month input { background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font: inherit; }
+.budget { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.budget select { background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 3px 5px; font: inherit; }
+.month-note { margin-top: 5px; padding: 6px 10px; border-radius: 8px; color: var(--warn); font-size: 11px; text-align: right; }
+.demo-link, .plan-place { border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); cursor: pointer; padding: 3px 7px; font-size: 11px; white-space: nowrap; }
+.demo-link:hover, .plan-place:hover { background: var(--row-hot); }
 
 /* ---------- address search (top right, left of the month) ---------- */
 .search { position: relative; }
@@ -182,6 +187,8 @@ button { font: inherit; color: inherit; }
 .stat-fill.silence.neg { background: var(--neg); }
 .stat-val { text-align: right; }
 .cellcard-row { display: flex; justify-content: space-between; margin-top: 6px; }
+.cellcard-detail { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; color: var(--muted); }
+.cellcard-detail b { color: var(--ink); text-align: right; }
 .popup-reasons { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
 .reason { display: grid; grid-template-columns: 120px 1fr 52px; gap: 6px; align-items: center; font-size: 11px; margin: 2px 0; }
 .reason-bar { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
@@ -232,6 +239,7 @@ button { font: inherit; color: inherit; }
 .suggested-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .owl.compact { padding: 6px 8px; }
 .owl.compact.open { background: var(--row-hot); border-color: var(--glass-line); }
+.plan-place { margin-top: 6px; }
 .spots { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
 .spot { display: flex; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 8px; background: var(--glass); cursor: pointer; }
 .spot:hover { background: var(--row); }
@@ -264,22 +272,44 @@ button { font: inherit; color: inherit; }
 .kpi-sub { font-size: 11px; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 .chart { position: relative; }
-.chart-labels { position: absolute; right: 0; top: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; text-align: left; width: 88px; }
+.chart-labels { position: absolute; right: 0; top: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; text-align: left; width: 110px; }
 .badge { margin-left: 8px; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
 .badge.synthetic { background: var(--warn-bg); color: var(--warn); }
+.backtest-note { margin-left: 8px; }
 
 @media (max-width: 1100px) {
-  .modebar { top: 64px; }
-  .nodes { top: 116px; }
+  .toolbar { top: 64px; }
+  .modebar { top: 64px; left: auto; right: 12px; transform: none; }
+  .picker, .cellcard, .logs { top: 116px; }
+  .nodes { top: 150px; }
   .backtest { right: 12px; }
   .app.agent-shown .backtest { right: 80px; }
 }
+@media (max-width: 800px) {
+  .toolbar { top: 12px; }
+  .header { top: 62px; left: 12px; right: auto; }
+  .status { height: auto; flex-wrap: wrap; border-radius: 14px; gap: 5px 8px; max-width: min(340px, calc(100vw - 24px)); }
+  .modebar { top: 12px; left: auto; right: 12px; transform: none; align-items: flex-end; }
+  .nodes { top: 140px; bottom: 12px; width: min(280px, calc(100vw - 55px)); }
+  .cellcard, .picker, .logs { top: 140px; width: min(320px, calc(100vw - 24px)); max-height: calc(100vh - 190px); overflow-y: auto; }
+  .backtest { left: 12px; right: 12px; max-height: 44vh; overflow-y: auto; }
+  .kpis { flex-wrap: wrap; }
+  .kpi { min-width: 100px; }
+  .legend.lifted { bottom: min(48vh, 380px); }
+}
+@media (max-width: 600px) {
+  .header { right: 12px; flex-wrap: wrap; }
+  .search, .header-status { width: 100%; }
+  .search-field, .search-field:focus-within { width: 100%; }
+  .status { max-width: 100%; }
+  .nodes, .cellcard, .picker, .logs { top: 190px; }
+}
 
-/* ---------- assistant (bottom right): a glass button, and the chat panel that grows out of it ---------- */
+/* Assistant button and chat panel. */
 .agent-fab {
   position: absolute; right: 12px; bottom: 12px; z-index: 13; width: 56px; height: 56px; border-radius: 50%; padding: 0; cursor: pointer;
   display: grid; place-items: center; color: var(--ink);
-  /* hidden: parked past the right edge; .shown glides it in (the corner hover, an open chat, or a touch screen) */
+  /* The button appears on corner hover, when chat is open, or on a touch screen. */
   transform: translateX(84px); opacity: 0; pointer-events: none;
   transition: transform 0.45s var(--ease), opacity 0.3s, background 0.2s, color 0.2s;
 }
@@ -287,7 +317,7 @@ button { font: inherit; color: inherit; }
 .agent-fab.shown:hover { transform: translateY(-2px) scale(1.04); }
 .agent-fab.shown:active { transform: scale(0.96); }
 .agent-fab.open { background: var(--active); color: var(--active-ink); }
-.agent-fab::after { /* a soft accent glow so the one entry point reads as the assistant */
+.agent-fab::after { /* accent ring */
   content: ''; position: absolute; inset: -1px; border-radius: 50%; pointer-events: none;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 6px 22px color-mix(in srgb, var(--accent) 30%, transparent);
   opacity: 0.9; transition: opacity 0.2s;
@@ -300,7 +330,7 @@ button { font: inherit; color: inherit; }
 
 .agent {
   position: absolute; right: 12px; bottom: 80px; z-index: 12; width: 400px; max-width: calc(100vw - 24px); height: min(640px, calc(100% - 156px));
-  display: flex; flex-direction: column; background: rgba(250, 252, 253, 0.94); overflow: hidden; /* near-opaque: it sits over the owls and the chart */
+  display: flex; flex-direction: column; background: rgba(250, 252, 253, 0.94); overflow: hidden; /* covers map markers and the chart */
   transform-origin: calc(100% - 28px) calc(100% + 40px); transform: translateY(12px) scale(0.92); opacity: 0; pointer-events: none;
   transition: transform 0.32s var(--ease), opacity 0.22s;
 }
@@ -393,7 +423,7 @@ button { font: inherit; color: inherit; }
   .agent { right: 8px; left: 8px; width: auto; bottom: 76px; height: calc(100% - 150px); }
 }
 
-/* panels the assistant (or a click) pulls up slide in rather than pop */
+/* Panel entrance animation. */
 .logs { animation: panel-in-left 0.35s var(--ease); }
 .cellcard { animation: panel-in-left 0.3s var(--ease); }
 @keyframes panel-in-left { from { opacity: 0; transform: translateX(-14px); } }

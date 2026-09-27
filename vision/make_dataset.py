@@ -4,8 +4,7 @@
 Frames from one clip are near-duplicates of each other (3 fps, same floor, same lighting, same
 person), so a random frame-level split leaks and reports a mAP that means nothing (HANDOFF Q2/Q3).
 This script splits by *tag*: val is whole clips. Give them explicitly with ``--val-tags stair_e,new_f``
-or let ``--val-frac`` pick tags (greedy, largest tags into train first, until val holds about that
-share of frames). Tags with zero rat boxes are never chosen automatically for val.
+or let ``--val-frac`` pick tags. Both splits must include rat boxes and reviewed empty negatives.
 
 Augmented frames (``--extra frames_aug:labels_aug``) go to train only, and any augmented frame whose
 rat source *or* background source is a val tag is dropped, using ``labels_aug/_sources.csv``.
@@ -14,9 +13,10 @@ rat source *or* background source is a val tag is dropped, using ``labels_aug/_s
 the NoIR/IR footage share one domain (README decision 7). It must match ``GRAY`` in
 ``pi/detect.py``; the value is also written into ``data.yaml`` as a comment so a mismatch is visible.
 
-Empty-label frames are kept as negatives (``--drop-empty`` removes them; ``--max-empty-ratio``
-caps them relative to positives). Prints per split and per tag counts and the share of frames with
-a box, which is the number to quote when someone asks how big the training set is.
+Only frames listed in ``labels/_reviewed.txt`` are included by default; every selected frame
+needs a label file, which may be empty for a reviewed negative. ``--allow-unreviewed`` is an
+explicit demo override. Prints counts by split and tag and writes ``dataset/manifest.json``.
+An existing output directory is left untouched unless ``--replace`` is given.
 
 Example::
 
@@ -25,12 +25,13 @@ Example::
 from __future__ import annotations
 
 import argparse
+import json
 import random
 import shutil
 import sys
 from pathlib import Path
 
-from common import CLASS_NAMES, label_path, list_frames, parse_tag_list, read_csv_rows, read_labels, source_tag, tag_of
+from common import CLASS_NAMES, label_path, list_frames, parse_tag_list, read_csv_rows, source_tag, tag_of
 
 GRAY = True  # must match pi/detect.py
 
@@ -38,23 +39,57 @@ GRAY = True  # must match pi/detect.py
 def to_gray3(src: Path, dst: Path, cv2) -> None:
     img = cv2.imread(str(src))
     if img is None:
-        shutil.copy2(src, dst)
-        return
+        raise ValueError(f"cannot decode image: {src}")
     g = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    cv2.imwrite(str(dst), cv2.cvtColor(g, cv2.COLOR_GRAY2BGR), [cv2.IMWRITE_JPEG_QUALITY, 92])
+    if not cv2.imwrite(str(dst), cv2.cvtColor(g, cv2.COLOR_GRAY2BGR), [cv2.IMWRITE_JPEG_QUALITY, 92]):
+        raise OSError(f"cannot write grayscale image: {dst}")
 
 
 def pick_val_tags(per_tag: dict[str, list], frac: float, rng: random.Random) -> list[str]:
     total = sum(len(v) for v in per_tag.values())
-    cands = [t for t, items in per_tag.items() if any(int(b[0]) == 0 for _, boxes in items for b in boxes)]
+    cands = list(per_tag)
     rng.shuffle(cands)
-    val, n = [], 0
+    # Reserve whole clips that contain a rat and reviewed empty frames.
+    positive = [t for t in cands if any(int(b[0]) == 0 for _, boxes in per_tag[t] for b in boxes)]
+    negative = [t for t in cands if any(not boxes for _, boxes in per_tag[t])]
+    if not positive or not negative:
+        return []
+    val = [positive[0]]
+    if not any(not boxes for _, boxes in per_tag[val[0]]):
+        other = next((t for t in negative if t not in val), None)
+        if other:
+            val.append(other)
+    n = sum(len(per_tag[t]) for t in val)
     for t in cands:
+        if t in val:
+            continue
         if n >= frac * total:
             break
         val.append(t)
         n += len(per_tag[t])
     return sorted(val)
+
+
+def check_label(path: Path) -> list[list[float]]:
+    if not path.is_file():
+        raise ValueError(f"missing label: {path}; an empty file is required for a reviewed negative")
+    boxes = []
+    for line_no, line in enumerate(path.read_text().splitlines(), 1):
+        parts = line.split()
+        if len(parts) != 5:
+            raise ValueError(f"{path}:{line_no}: expected class cx cy w h")
+        try:
+            cls = int(parts[0])
+            values = [float(x) for x in parts[1:]]
+        except ValueError as exc:
+            raise ValueError(f"{path}:{line_no}: invalid number") from exc
+        cx, cy, w, h = values
+        if cls not in (0, 1) or not (0 < w <= 1 and 0 < h <= 1 and
+                                   0 <= cx - w / 2 and cx + w / 2 <= 1 and
+                                   0 <= cy - h / 2 and cy + h / 2 <= 1):
+            raise ValueError(f"{path}:{line_no}: invalid class or box outside image")
+        boxes.append([cls, *values])
+    return boxes
 
 
 def main(argv=None) -> int:
@@ -64,13 +99,14 @@ def main(argv=None) -> int:
     ap.add_argument("--extra", action="append", default=[], metavar="FRAMES:LABELS",
                     help="extra (augmented) frames+labels, train only; repeatable")
     ap.add_argument("--out", default="dataset")
+    ap.add_argument("--replace", action="store_true", help="delete and rebuild an existing output directory")
     ap.add_argument("--val-tags", help="comma-separated tags that form val (whole clips)")
     ap.add_argument("--val-frac", type=float, default=0.2, help="target val share when --val-tags is not given")
     ap.add_argument("--gray", dest="gray", action="store_true", default=GRAY)
     ap.add_argument("--color", dest="gray", action="store_false", help="keep colour (must match detect.py)")
     ap.add_argument("--drop-empty", action="store_true", help="drop frames with no boxes")
     ap.add_argument("--max-empty-ratio", type=float, default=1.0, help="max empty frames per positive frame in train")
-    ap.add_argument("--unreviewed-ok", action="store_true", default=True, help="(default) include frames not in _reviewed.txt")
+    ap.add_argument("--allow-unreviewed", action="store_true", help="exploratory build only; training gate rejects it")
     ap.add_argument("--reviewed-only", action="store_true", help="only frames listed in labels/_reviewed.txt")
     ap.add_argument("--link", action="store_true", help="hard-link instead of copy (only without --gray)")
     ap.add_argument("--seed", type=int, default=0)
@@ -95,7 +131,14 @@ def main(argv=None) -> int:
     for f in list_frames(frames_dir):
         if args.reviewed_only and f.stem not in reviewed:
             continue
-        boxes = read_labels(label_path(labels_dir, f))
+        if f.stem not in reviewed and not args.allow_unreviewed:
+            print(f"unreviewed frame: {f.name}; review it or use --allow-unreviewed for exploration", file=sys.stderr)
+            return 2
+        try:
+            boxes = check_label(label_path(labels_dir, f))
+        except ValueError as exc:
+            print(exc, file=sys.stderr)
+            return 2
         if args.drop_empty and not boxes:
             continue
         per_tag.setdefault(tag_of(f.stem), []).append((f, boxes))
@@ -109,6 +152,9 @@ def main(argv=None) -> int:
         print(f"val tags not present in frames: {missing}  (have: {sorted(per_tag)})", file=sys.stderr)
         return 2
     val_set = set(val_tags)
+    if not val_set or val_set == set(per_tag):
+        print("need distinct train and validation clip tags", file=sys.stderr)
+        return 2
 
     split: dict[str, list] = {"train": [], "val": []}
     for tag, items in per_tag.items():
@@ -124,6 +170,14 @@ def main(argv=None) -> int:
             neg = neg[:cap]
         split["train"] = pos + neg
 
+    for s, items in split.items():
+        if not any(any(int(b[0]) == 0 for b in boxes) for _, boxes in items):
+            print(f"{s} has no reviewed rat boxes", file=sys.stderr)
+            return 2
+        if not any(not boxes for _, boxes in items):
+            print(f"{s} has no reviewed empty negatives", file=sys.stderr)
+            return 2
+
     # augmented extras: train only, no val contamination
     n_extra, n_extra_dropped = 0, 0
     for spec in args.extra:
@@ -135,16 +189,42 @@ def main(argv=None) -> int:
         ef, el = Path(ef), Path(el)
         sources = {r["frame"]: r for r in read_csv_rows(el / "_sources.csv")}
         for f in list_frames(ef):
-            s = sources.get(f.name, {})
+            if f.name not in sources:
+                print(f"missing augmentation source: {f.name}", file=sys.stderr)
+                return 2
+            s = sources[f.name]
             touches = {source_tag(tag_of(f.stem)), s.get("rat_source", ""), s.get("bg_source", "")}
             if touches & val_set:
                 n_extra_dropped += 1
                 continue
-            split["train"].append((f, read_labels(label_path(el, f))))
+            try:
+                boxes = check_label(label_path(el, f))
+            except ValueError as exc:
+                print(exc, file=sys.stderr)
+                return 2
+            split["train"].append((f, boxes))
             n_extra += 1
 
+    names_by_split = {s: [f.name for f, _ in items] for s, items in split.items()}
+    all_names = names_by_split["train"] + names_by_split["val"]
+    if len(set(all_names)) != len(all_names):
+        print("duplicate frame filename in dataset sources", file=sys.stderr)
+        return 2
+
     # write
-    if out.is_dir():
+    if out.exists() or out.is_symlink():
+        if not args.replace:
+            print(f"output already exists: {out}; choose a new --out or pass --replace", file=sys.stderr)
+            return 2
+        if not out.is_dir() or out.is_symlink():
+            print(f"--replace requires a real output directory: {out}", file=sys.stderr)
+            return 2
+        source_dirs = [frames_dir, labels_dir]
+        source_dirs.extend(Path(part) for spec in args.extra for part in spec.split(":"))
+        output_path = out.resolve()
+        if any(source.resolve().is_relative_to(output_path) for source in source_dirs):
+            print(f"refusing to replace {out}: it contains a source directory", file=sys.stderr)
+            return 2
         shutil.rmtree(out)
     for s in split:
         (out / "images" / s).mkdir(parents=True)
@@ -168,6 +248,13 @@ def main(argv=None) -> int:
     (out / "data.yaml").write_text(
         f"# built by make_dataset.py  gray={args.gray}  val_tags={','.join(val_tags)}\n"
         f"path: {out.resolve()}\ntrain: images/train\nval: images/val\nnc: {len(CLASS_NAMES)}\nnames:\n{names}")
+    manifest = {"gray": args.gray, "reviewed_only": not args.allow_unreviewed,
+                "train_tags": sorted(set(per_tag) - val_set), "val_tags": val_tags,
+                "train_frames": len(split["train"]), "val_frames": len(split["val"]),
+                "train_empty": sum(not boxes for _, boxes in split["train"]),
+                "val_empty": sum(not boxes for _, boxes in split["val"]),
+                "extra_train_frames": n_extra, "frames": names_by_split}
+    (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
     # report
     def summarise(items):

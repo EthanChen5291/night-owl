@@ -12,7 +12,7 @@ interface Props {
   placing: boolean
 }
 
-const MODE_UNIT: Record<Mode, string> = { a: 'city sees', b: "what's there", silence: 'silence' }
+const MODE_UNIT: Record<Mode, string> = { a: 'city sees', b: 'rat activity percentile', silence: 'silence' }
 
 /** A chip above the cursor: the address (or what would happen on click), the cell's value underneath. */
 export default function HoverTip({ info, mode, cell, node, area, placing }: Props) {
@@ -47,7 +47,7 @@ export default function HoverTip({ info, mode, cell, node, area, placing }: Prop
       {v !== null && (
         <div className="hovertip-sub muted">
           {MODE_UNIT[mode]} <b>{mode === 'silence' ? (v > 0 ? '+' : '') + v.toFixed(0) : v.toFixed(0) + '%'}</b>
-          {cell && cell.posterior.n_events > 0 && <span> · {cell.posterior.n_events} sightings</span>}
+          {cell && cell.posterior.n_events > 0 && <span> · {cell.posterior.n_events} accepted events</span>}
         </div>
       )}
     </div>
