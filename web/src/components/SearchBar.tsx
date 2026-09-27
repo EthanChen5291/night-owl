@@ -87,13 +87,13 @@ export default function SearchBar({ cells, onPick }: Props) {
       const id = q.toLowerCase()
       if (!cellIds.has(id)) return []
       const [lat, lon] = cellToLatLng(id)
-      return [{ label: `Hexagon ${id}`, sub: 'model cell', lat, lon, borough: null, h3: id, kind: 'hexagon' }]
+      return [{ label: `Block ${id.slice(-5)}`, sub: 'block id', lat, lon, borough: null, h3: id, kind: 'hexagon' }]
     }
     const starts = hoods.filter((h) => h.name.toLowerCase().startsWith(q))
     const within = hoods.filter((h) => !h.name.toLowerCase().startsWith(q) && h.name.toLowerCase().includes(q))
     return [...starts, ...within].slice(0, MAX_LOCAL).map((h) => ({
       label: h.name,
-      sub: `neighbourhood · ${h.n} hexagons${h.borough ? ` · ${h.borough}` : ''}`,
+      sub: `neighbourhood · ${h.n} blocks${h.borough ? ` · ${h.borough}` : ''}`,
       lat: h.lat,
       lon: h.lon,
       borough: h.borough,
@@ -170,7 +170,7 @@ export default function SearchBar({ cells, onPick }: Props) {
   const showList = open && text.length >= 2
   return (
     <div ref={boxRef} className="search">
-      <label className="search-field panel" title="Find the hexagon for an address, place or neighbourhood">
+      <label className="search-field panel" title="Find a block by address, place or neighbourhood">
         <SearchIcon size={16} />
         <input
           ref={inputRef}

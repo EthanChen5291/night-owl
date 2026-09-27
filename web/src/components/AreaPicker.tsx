@@ -22,7 +22,7 @@ export default function AreaPicker({ areas, hovered, onPick }: Props) {
           </button>
         ))}
       </div>
-      <div className="muted small picker-hint">Select a borough to load its city tiles. Click another name tag to move across. Use WASD to move and J/K to change height.</div>
+      <div className="muted small picker-hint">Pick a borough to see its streets. WASD moves, J and K change height.</div>
     </div>
   )
 }

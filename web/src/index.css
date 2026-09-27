@@ -97,7 +97,7 @@ button { font: inherit; color: inherit; }
 .status { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: 999px; height: 40px; }
 .month input { background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font: inherit; }
 .budget { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; white-space: nowrap; }
-.budget select { background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 3px 5px; font: inherit; }
+.budget select, .budget-select { background: var(--field); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 3px 5px; font: inherit; }
 .month-note { margin-top: 5px; padding: 6px 10px; border-radius: 8px; color: var(--warn); font-size: 11px; text-align: right; }
 .demo-link, .plan-place { border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--ink); cursor: pointer; padding: 3px 7px; font-size: 11px; white-space: nowrap; }
 .demo-link:hover, .plan-place:hover { background: var(--row-hot); }
@@ -427,3 +427,11 @@ button { font: inherit; color: inherit; }
 .logs { animation: panel-in-left 0.35s var(--ease); }
 .cellcard { animation: panel-in-left 0.3s var(--ease); }
 @keyframes panel-in-left { from { opacity: 0; transform: translateX(-14px); } }
+
+.suggested-head .budget-select { margin-left: auto; font-size: 11px; padding: 1px 4px; }
+
+.cellcard-more { margin-top: 8px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 2px; }
+.cellcard-more:hover { color: var(--ink); }
+.cellcard-more-body { margin-top: 4px; }
+.cellcard-hint { margin-top: 6px; line-height: 1.35; }
+.nodes-sub { font-weight: 400; margin-left: 4px; }

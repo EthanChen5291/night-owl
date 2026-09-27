@@ -69,7 +69,7 @@ function writeHash(mode: Mode, area: string | null) {
 export default function App() {
   const [mode, setModeState] = useState<Mode>(modeFromHash)
   const [preset, setPreset] = useState<Preset>('day')
-  const [month, setMonth] = useState(DEFAULT_MONTH)
+  const [month] = useState(DEFAULT_MONTH) // the month picker is gone from the UI; the latest export is what people see
   const [cells, setCells] = useState<Cell[]>([])
   const [cellsSource, setCellsSource] = useState<Source | null>(null)
   const [servedMonth, setServedMonth] = useState<string | null>(null)
@@ -78,8 +78,8 @@ export default function App() {
   const [planBudget, setPlanBudget] = useState(DEFAULT_PLAN_BUDGET)
   const [showPlan, setShowPlan] = useState(true)
   const [events, setEvents] = useState<RatEvent[]>([])
-  const [queueSource, setQueueSource] = useState<Source>('fixture')
-  const [streaming, setStreaming] = useState(false)
+  const [, setQueueSource] = useState<Source>('fixture') // kept for the owls panel if it ever needs it again
+  const [, setStreaming] = useState(false)
   const [flash, setFlash] = useState<{ h3: string; seq: number } | null>(null)
   const [focus, setFocus] = useState<{ lat: number; lon: number; distance?: number; seq: number } | null>(null)
   const [locate, setLocate] = useState<{ h3: string; seq: number } | null>(null) // the searched hexagon, pointed out once the flight lands
@@ -213,16 +213,6 @@ export default function App() {
   useEffect(() => {
     void loadCells(month)
   }, [month, loadCells])
-  const selectMonth = useCallback((m: string) => {
-    monthRef.current = m
-    liveRef.current.cells = false
-    setCells([])
-    setCellsSource(null)
-    setServedMonth(null)
-    setPlan([])
-    setPlanMonth(null)
-    setMonth(m)
-  }, [])
   const loadPlan = useCallback(async (m: string, k: number) => {
     const request = ++planRequestRef.current
     const { data } = await fetchPlan(m, k)
@@ -473,6 +463,20 @@ export default function App() {
   }, [tiles])
   const cellByH3 = useMemo(() => new Map(cells.map((c) => [c.h3, c])), [cells])
   // suggested sites of the borough you are in (by their r7 tile's area); nothing citywide
+  // citywide averages for the cell card, so its numbers have something to stand against
+  const cityAvg = useMemo(() => {
+    const n = cells.length || 1
+    return { avgB: cells.reduce((a, c) => a + c.score_b, 0) / n, avgPerYear: (cells.reduce((a, c) => a + c.score_a, 0) / n) * 12 }
+  }, [cells])
+
+  // #demo in the URL flies to the stage cell once cells are in (the presenter's shortcut; no button for it).
+  useEffect(() => {
+    if (hashParams().get('demo') === null || !cellByH3.has(DEMO_H3)) return
+    const [lat, lon] = cellToLatLng(DEMO_H3)
+    setFocus({ lat, lon, distance: 800, seq: ++seqRef.current })
+    setPinned({ h3: DEMO_H3, addr: null })
+  }, [cellByH3])
+
   const visiblePlan = useMemo(() => (planMonth && planMonth === servedMonth ? plan : []), [planMonth, servedMonth, plan])
   const noBake = areas.length === 0
   const planHere = useMemo(() => (noBake ? visiblePlan : area ? visiblePlan.filter((p) => tileAreas[cellToParent(p.h3, 7)] === area) : []), [visiblePlan, area, noBake, tileAreas])
@@ -797,7 +801,7 @@ export default function App() {
           />
         )}
         {!ready && <div className="loading">loading map data…</div>}
-        {pendingTiles > 0 && <div className="loading-chip panel">streaming {pendingTiles} tile{pendingTiles === 1 ? '' : 's'}…</div>}
+        {pendingTiles > 0 && <div className="loading-chip panel">loading buildings…</div>}
 
         <Toolbar
           area={activeArea}
@@ -811,18 +815,13 @@ export default function App() {
           noBake={noBake}
         />
         <ModeBar mode={mode} onMode={setMode} preset={preset} onPreset={setPreset} />
-        <Header month={month} servedMonth={servedMonth} cellCount={cells.length} source={cellsSource} planBudget={planBudget} onMonth={selectMonth} cells={cells} onPick={goToPlace} onPlanBudget={(k) => { planBudgetRef.current = k; setPlan([]); setPlanMonth(null); setPlanBudget(k) }} onDemo={() => {
-          if (!cellByH3.has(DEMO_H3)) return
-          const [lat, lon] = cellToLatLng(DEMO_H3)
-          setFocus({ lat, lon, distance: 800, seq: ++seqRef.current })
-          setPinned({ h3: DEMO_H3, addr: null })
-        }} />
+        <Header source={cellsSource} cells={cells} onPick={goToPlace} />
         <Legend mode={mode} lifted={chartOpen} />
 
         {!activeArea && areas.length > 0 && <AreaPicker areas={areas} hovered={hover?.areaId ?? null} onPick={setArea} />}
 
         {hover && hover.kind !== 'ground' && <HoverTip info={hover} mode={mode} cell={hoveredCell} node={hoveredOwl} area={hoveredArea} placing={placing} />}
-        {pinnedCell && <CellPopup cell={pinnedCell} mode={mode} addr={pinned?.addr ?? null} onClose={() => setPinned(null)} />}
+        {pinnedCell && <CellPopup cell={pinnedCell} mode={mode} addr={pinned?.addr ?? null} city={cityAvg} onClose={() => setPinned(null)} />}
 
         <NodesPanel
           nodes={owlsHere}
@@ -841,8 +840,8 @@ export default function App() {
           onPlaceSpot={placeSpot}
           onPlacePlan={placePlan}
           inArea={!!area || noBake}
-          source={queueSource}
-          streaming={streaming}
+          planBudget={planBudget}
+          onPlanBudget={(k) => { planBudgetRef.current = k; setPlan([]); setPlanMonth(null); setPlanBudget(k) }}
           open={owlsOpen}
           onToggle={() => setOwlsOpen((o) => !o)}
           onSelect={selectOwl}

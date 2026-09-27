@@ -23,10 +23,10 @@ type Item = { kind: 'user'; text: string } | { kind: 'bot'; text: string; steps:
 
 const SUGGESTIONS = [
   'Where are the worst silent blocks in the city?',
-  'Is the Pi online? Show me what the camera sees.',
+  'Is the owl online? Show me what it sees.',
   'Screenshot the map and explain what I’m looking at.',
   'Where should we put the next owl in Brooklyn?',
-  'How well does the model beat 311 in the backtest?',
+  'Does this actually find more rats than 311 calls?',
 ]
 const STORE_KEY = 'barnowl.chat.v1'
 
@@ -252,7 +252,7 @@ export default function AgentChat({ tools, month, planBudget, onShown }: { tools
                 <ChatIcon size={26} />
               </div>
               <b>Ask about rats, blocks and owls</b>
-              <p className="muted">Ask about ranked cells, the backtest, or this map. Pi tools work when the node dashboard is connected.</p>
+              <p className="muted">Ask about a block, the track record, or what you are looking at. Camera questions work when an owl is connected.</p>
               <div className="agent-suggest">
                 {SUGGESTIONS.map((s) => (
                   <button key={s} onClick={() => void send(s)}>
@@ -311,7 +311,7 @@ export default function AgentChat({ tools, month, planBudget, onShown }: { tools
             ref={inputRef}
             rows={1}
             value={input}
-            placeholder="Ask about a block, a borough, the node…"
+            placeholder="Ask about a block, a borough, an owl…"
             onChange={(e) => {
               setInput(e.target.value)
               e.target.style.height = 'auto'
