@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BacktestResponse } from '../types'
 import { ChevronIcon } from './Icons'
@@ -21,7 +21,7 @@ const fmtPct = (v: number) => `${Math.round(v * 100)}%`
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
 /** Bottom strip: KPI tiles, then precision per month for the two rankings. Slides away on its tab. */
-export default function BacktestChart({ data, open, onToggle, wide }: Props) {
+function BacktestChart({ data, open, onToggle, wide }: Props) {
   const summary = data?.summary ?? {}
   const lift = num(summary.lift ?? summary.lift_vs_311 ?? summary.mean_lift ?? summary.precision_lift)
   const meanSilent = num(summary.mean_precision_silent)
@@ -105,3 +105,5 @@ export default function BacktestChart({ data, open, onToggle, wide }: Props) {
     </section>
   )
 }
+
+export default memo(BacktestChart)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cellToLatLng, cellToParent, latLngToCell } from 'h3-js'
 import { fetchBacktest, fetchCells, fetchPlacements, fetchPlan, fetchPublic, fetchQueue } from './api'
 import { AddressIndex, offBuilding, pointInRing } from './city/addresses'
@@ -7,7 +7,6 @@ import { TileCache, wantedTiles } from './city/tiles'
 import { sceneHandle } from './city/sceneHandle'
 import AgentChat, { type ClientTools } from './components/AgentChat'
 import AreaPicker from './components/AreaPicker'
-import BacktestChart from './components/BacktestChart'
 import CellPopup from './components/CellPopup'
 import Header from './components/Header'
 import type { Place } from './components/SearchBar'
@@ -44,6 +43,8 @@ const POLL_MS = 2000
 const QUEUE_LIMIT = 50
 const DEFAULT_PLAN_BUDGET = 20
 const DEMO_H3 = '892a100d2c3ffff'
+const EMPTY_SPOTS: Spot[] = []
+const BacktestChart = lazy(() => import('./components/BacktestChart'))
 
 function hashParams(): URLSearchParams {
   return new URLSearchParams(window.location.hash.replace(/^#/, ''))
@@ -114,7 +115,8 @@ export default function App() {
   const cellsRequestRef = useRef(0)
   const planRequestRef = useRef(0)
   const owlsRef = useRef(owls)
-  const cacheRef = useRef(new TileCache())
+  const cacheRef = useRef<TileCache | null>(null)
+  if (cacheRef.current === null) cacheRef.current = new TileCache()
 
   // ---- mode and area in the URL hash so a reload keeps them
   const setMode = useCallback((m: Mode) => setModeState(m), [])
@@ -266,9 +268,10 @@ export default function App() {
   // ---- tiles stream around the camera target, only the active area's: the wanted set changes as the view moves, the cache fills it
   useEffect(() => {
     if (!tilesManifest || !view) return
+    const cache = cacheRef.current
+    if (!cache) return
     const wanted = wantedTiles(tilesManifest, view.lat, view.lon, view.distance, area)
     let alive = true
-    const cache = cacheRef.current
     const apply = () => {
       if (!alive) return
       const next = new Map<string, Tile>()
@@ -631,6 +634,7 @@ export default function App() {
   )
   const onHover = useCallback((info: HoverInfo | null) => setHover(info), [])
   const onView = useCallback((v: ViewInfo) => setView(v), [])
+  const toggleChart = useCallback(() => setChartOpen((open) => !open), [])
 
   // ---- the assistant's browser-side tools: what only this page knows
   const agentState = useRef<() => unknown>(() => null)
@@ -778,7 +782,7 @@ export default function App() {
             preset={preset}
             plan={planHere}
             showPlan={showPlan}
-            spots={showPlan && openSpots ? openSpots : []}
+            spots={showPlan && openSpots ? openSpots : EMPTY_SPOTS}
             cityLayers={cityLayers}
             areaLayers={areaLayers}
             tiles={tiles}
@@ -853,7 +857,9 @@ export default function App() {
           onStartPlacing={() => setPlacing(true)}
         />
         {logsOpen && <LogsDrawer events={events} nodes={owlsHere} cells={cellByH3} selected={selectedOwl?.id ?? null} onClose={() => setLogsOpen(false)} onSelect={selectOwl} />}
-        <BacktestChart data={backtest} open={chartOpen} onToggle={() => setChartOpen((o) => !o)} wide={!owlsOpen} />
+        <Suspense fallback={null}>
+          <BacktestChart data={backtest} open={chartOpen} onToggle={toggleChart} wide={!owlsOpen} />
+        </Suspense>
         <AgentChat tools={agentTools} month={month} planBudget={planBudget} onShown={setAgentShown} />
       </main>
     </div>

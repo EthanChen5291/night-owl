@@ -50,6 +50,14 @@ Placed owls are kept in browser `localStorage`. The first placed owl uses `node_
 
 The optional assistant can inspect the current map, take a screenshot, and drive map controls. Its answers may also use model files and queued events. Check the map's source labels and the underlying evidence before treating an answer as a measurement.
 
+## Performance checks
+
+Run `pnpm dlx react-doctor@latest . --verbose` from `web/` for static React diagnostics. Check each finding against the code; the score is not a frame-rate benchmark.
+
+In development, open `http://localhost:5173/?perf=1` to show render counts, CPU frame times, draw calls, and triangles. Compare the same borough, camera, lighting, and viewport after tiles finish loading. CPU timings exclude GPU execution and browser compositing. The meter is excluded from production builds.
+
+The rendering changes follow the Three.js guides on [rendering on demand](https://threejs.org/manual/en/rendering-on-demand.html) and [shadow-map updates](https://threejs.org/docs/pages/WebGLRenderer.html). Building geometry is already merged by tile and trees use instancing, as described in [optimizing many objects](https://threejs.org/manual/en/optimize-lots-of-objects.html).
+
 ## Main files
 
 | Path | Role |

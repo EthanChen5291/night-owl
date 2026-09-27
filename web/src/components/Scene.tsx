@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef } from 'react'
 import { CityScene, type SceneCallbacks } from '../city/scene'
 import { sceneHandle } from '../city/sceneHandle'
 import type { AddressIndex } from '../city/addresses'
@@ -31,12 +31,14 @@ interface Props {
 }
 
 /** The only component that touches three.js. Owns one CityScene for the life of the canvas. */
-export default function Scene(props: Props) {
+function Scene(props: Props) {
   const { centre, cells, mode, preset, plan, showPlan, spots, cityLayers, areaLayers, tiles, areas, tileAreas, activeArea, nodes, selectedNode, index, flash, focus, locate } = props
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<CityScene | null>(null)
   const cbRef = useRef({ onHover: props.onHover, onClick: props.onClick, onView: props.onView })
-  cbRef.current = { onHover: props.onHover, onClick: props.onClick, onView: props.onView }
+  useLayoutEffect(() => {
+    cbRef.current = { onHover: props.onHover, onClick: props.onClick, onView: props.onView }
+  }, [props.onHover, props.onClick, props.onView])
   const firstArea = useRef(true)
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function Scene(props: Props) {
   }, [preset])
   useEffect(() => {
     sceneRef.current?.setPlan(plan)
-  }, [plan, cells])
+  }, [plan])
   useEffect(() => {
     sceneRef.current?.setPlanVisible(showPlan)
   }, [showPlan])
@@ -114,3 +116,5 @@ export default function Scene(props: Props) {
 
   return <canvas ref={canvasRef} className="scene" />
 }
+
+export default memo(Scene)

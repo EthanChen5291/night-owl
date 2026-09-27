@@ -201,6 +201,73 @@ const LOOKS: Record<Preset, Look> = {
 
 const smoothstep = (t: number) => t * t * (3 - 2 * t)
 
+/** Development-only CPU and renderer counters, enabled with ?perf=1. */
+class PerfOverlay {
+  private element = document.createElement('pre')
+  private frameMs = new Float32Array(120)
+  private renderMs = new Float32Array(120)
+  private frames = 0
+  private lastUpdate = performance.now()
+  private lastFrameCount = 0
+  private lastStats = ''
+  private active = false
+  private latest = { calls: 0, triangles: 0, hexes: 0, tiles: 0, geometries: 0, textures: 0 }
+
+  constructor() {
+    this.element.id = 'city-perf'
+    this.element.setAttribute('aria-label', 'City scene performance')
+    this.element.style.cssText = 'position:fixed;top:140px;left:8px;z-index:10000;margin:0;padding:8px 10px;background:rgba(0,0,0,.82);color:#fff;font:12px/1.45 monospace;pointer-events:none;white-space:pre'
+    document.body.appendChild(this.element)
+  }
+
+  sample(now: number, frameMs: number, renderMs: number, calls: number, triangles: number, hexes: number, tiles: number, geometries: number, textures: number) {
+    const index = this.frames % this.frameMs.length
+    this.frameMs[index] = frameMs
+    this.renderMs[index] = renderMs
+    this.frames++
+    this.latest = { calls, triangles, hexes, tiles, geometries, textures }
+    const elapsed = now - this.lastUpdate
+    if (elapsed < 1000) return
+    this.lastStats = this.formatStats()
+    const fps = (this.frames - this.lastFrameCount) * 1000 / elapsed
+    this.element.textContent = `scene frames ${this.frames}  fps ${fps.toFixed(1)}\n` + this.lastStats
+    this.lastUpdate = now
+    this.lastFrameCount = this.frames
+  }
+
+  private formatStats() {
+    const count = Math.min(this.frames, this.frameMs.length)
+    const summary = (samples: Float32Array) => {
+      const sorted = Array.from(samples.subarray(0, count)).sort((a, b) => a - b)
+      const mean = sorted.reduce((sum, value) => sum + value, 0) / count
+      return `${mean.toFixed(1)} / ${sorted[Math.ceil(count * 0.95) - 1].toFixed(1)} ms`
+    }
+    return `CPU frame mean/p95 ${summary(this.frameMs)}\n` +
+      `CPU render mean/p95 ${summary(this.renderMs)}\n` +
+      `draw calls ${this.latest.calls}  triangles ${this.latest.triangles}\n` +
+      `hexes ${this.latest.hexes}  tiles ${this.latest.tiles}\n` +
+      `GPU geometries ${this.latest.geometries}  textures ${this.latest.textures}`
+  }
+
+  resume() {
+    if (this.active) return
+    this.active = true
+    this.lastUpdate = performance.now()
+    this.lastFrameCount = this.frames
+    this.element.textContent = `scene rendering  frames ${this.frames}\n${this.lastStats}`
+  }
+
+  idle(state = 'idle') {
+    this.active = false
+    if (this.frames > 0) this.lastStats = this.formatStats()
+    this.element.textContent = `scene ${state}  frames ${this.frames}  fps 0\n${this.lastStats}`
+  }
+
+  dispose() {
+    this.element.remove()
+  }
+}
+
 export class CityScene {
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
@@ -217,6 +284,8 @@ export class CityScene {
   private lastView = { x: NaN, z: NaN, wide: false, t: 0 }
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private hexes = new Map<string, HexEntry>()
+  private visibleHexes: HexEntry[] = []
+  private visibleHexMeshes: THREE.Object3D[] = []
   private hexGroup = new THREE.Group()
   private field: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null = null // the citywide 2D colour map
   private fieldCellByFace: string[] = []
@@ -262,8 +331,12 @@ export class CityScene {
   private flight: Flight | null = null
   private locator: Locator | null = null
   private raf = 0
+  private urgentFrame = false
+  private animationFrameDue = 0
+  private viewReportTimer: ReturnType<typeof setTimeout> | null = null
   private disposed = false
   private canvas: HTMLCanvasElement
+  private perf: PerfOverlay | null = null
 
   constructor(canvas: HTMLCanvasElement, centre: LatLon, callbacks: SceneCallbacks) {
     this.canvas = canvas
@@ -273,6 +346,8 @@ export class CityScene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO))
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.renderer.shadowMap.autoUpdate = false
+    this.renderer.shadowMap.needsUpdate = true
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
 
     // near = 20 (minDistance is 150) keeps enough depth precision for the flat layers to stack cleanly
@@ -283,6 +358,7 @@ export class CityScene {
     this.controls.maxPolarAngle = Math.PI * 0.47
     this.controls.minDistance = 150
     this.controls.maxDistance = 40_000
+    this.controls.addEventListener('change', this.invalidate)
     this.controls.target.set(0, 0, 0)
     this.camera.position.copy(orbitPosition(this.controls.target, CITY_DISTANCE, CITY_POLAR, 0.35))
 
@@ -338,10 +414,22 @@ export class CityScene {
     window.addEventListener('resize', this.resize)
     document.addEventListener('visibilitychange', this.handleVisibility)
     this.resize()
-    if (!document.hidden) this.loop()
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('perf') === '1') this.perf = new PerfOverlay()
+    this.invalidate()
   }
 
   // ---------------------------------------------------------------- public API
+
+  private scheduleFrame = () => {
+    if (this.disposed || document.hidden || this.raf) return
+    this.perf?.resume()
+    this.raf = requestAnimationFrame(this.loop)
+  }
+
+  private invalidate = () => {
+    this.urgentFrame = true
+    this.scheduleFrame()
+  }
 
   get centre(): LatLon {
     return this.projector.centre
@@ -349,6 +437,8 @@ export class CityScene {
 
   setAddressIndex(index: AddressIndex | null) {
     this.index = index
+    this.pointerDirty = true
+    this.invalidate()
   }
 
   /** Rebuild (or update) the hex prisms from the contract cells. Geometry is reused across updates. */
@@ -376,8 +466,10 @@ export class CityScene {
         this.cells.delete(h3)
       }
     }
+    this.applyAreaVisibility()
     this.rebuildField()
     this.retintBuildings()
+    this.invalidate()
   }
 
   setMode(mode: Mode) {
@@ -391,6 +483,7 @@ export class CityScene {
     }
     this.rebuildField()
     this.retintBuildings()
+    this.invalidate()
   }
 
   setPreset(preset: Preset) {
@@ -412,6 +505,7 @@ export class CityScene {
     this.key.color.set(L.sun.colour)
     this.key.intensity = L.sun.intensity
     this.key.castShadow = L.sun.shadows
+    this.renderer.shadowMap.needsUpdate = true
     this.renderer.toneMappingExposure = L.exposure
     this.ground.material.color.set(L.layers.ground)
     for (const [name, mesh] of this.cityLayerMeshes) (mesh.material as THREE.MeshStandardMaterial).color.set(L.layers[name])
@@ -434,6 +528,7 @@ export class CityScene {
       a.label.material.needsUpdate = true
     }
     this.retintBuildings()
+    this.invalidate()
   }
 
   setPlan(nodes: PlanNode[]) {
@@ -445,10 +540,12 @@ export class CityScene {
       this.planGroup.add(m.group)
       this.sites.push(m)
     }
+    this.invalidate()
   }
 
   setPlanVisible(visible: boolean) {
     this.planGroup.visible = visible
+    this.invalidate()
   }
 
   /** The spot options (A, B, C) inside the opened suggested hexagon: red pulsing discs on their street trees. */
@@ -461,6 +558,7 @@ export class CityScene {
       this.spotGroup.add(m.group)
       this.sites.push(m)
     })
+    this.invalidate()
   }
 
   private disposeSites(group: THREE.Group) {
@@ -512,6 +610,7 @@ export class CityScene {
     const entry = this.hexes.get(h3)
     if (!entry) return
     entry.flashUntil = performance.now() + FLASH_MS
+    this.invalidate()
   }
 
   /**
@@ -555,6 +654,7 @@ export class CityScene {
     group.visible = false
     this.scene.add(group)
     this.locator = { group, band, edge, h3, start: null, flashesLeft: LOCATE_FLASHES, nextFlashAt: 0 }
+    this.invalidate()
   }
 
   private clearLocator() {
@@ -622,11 +722,13 @@ export class CityScene {
   /** Citywide flat layers (land, parks, water): the map under the colour field, hidden inside an area. */
   setCityLayers(layers: CityLayers) {
     this.buildLayers(this.cityLayerGroup, this.cityLayerMeshes, layers)
+    this.invalidate()
   }
 
   /** The active area's own ground, the only land drawn while you are in it (null clears it). */
   setAreaLayers(layers: CityLayers | null) {
     this.buildLayers(this.areaLayerGroup, this.areaLayerMeshes, layers ?? { land: null, parks: null, water: null })
+    this.invalidate()
   }
 
   private buildLayers(group: THREE.Group, meshes: Map<FlatLayer, THREE.Mesh>, layers: CityLayers) {
@@ -662,8 +764,10 @@ export class CityScene {
 
   /** The streamed tiles: add what is new, drop what left. Each tile is one building mesh, one road mesh, one canopy. */
   setTiles(tiles: Map<string, Tile>) {
+    let changed = false
     for (const [id, t] of this.tiles) {
       if (tiles.has(id)) continue
+      changed = true
       this.tileGroup.remove(t.group)
       t.buildings?.geometry.dispose()
       t.roads?.geometry.dispose()
@@ -672,6 +776,7 @@ export class CityScene {
     }
     for (const [id, tile] of tiles) {
       if (this.tiles.has(id)) continue
+      changed = true
       // a tile on a river holds both banks: only the active area's side is built (tiles are rebuilt on every area switch)
       const mine = (h3: string) => !this.activeArea || this.areaOfCell(h3) === this.activeArea
       const buildingList = tile.buildings.filter((b) => mine(b.h3))
@@ -709,6 +814,10 @@ export class CityScene {
       const entry = { group, buildings, ranges, roads, trees }
       this.tiles.set(id, entry)
       this.retintTile(entry)
+    }
+    if (changed) {
+      this.renderer.shadowMap.needsUpdate = true
+      this.invalidate()
     }
   }
 
@@ -749,6 +858,7 @@ export class CityScene {
     }
     this.cellArea.clear()
     this.applyAreaVisibility()
+    this.invalidate()
   }
 
   /** Which area each r7 tile belongs to (tiles.json): inside an area only that area's prisms stand. */
@@ -756,6 +866,7 @@ export class CityScene {
     this.tileAreas = tileAreas
     this.cellArea.clear()
     this.applyAreaVisibility()
+    this.invalidate()
   }
 
   /** Fly into an area (or out to the city with null). `immediate` snaps, for the first frame. */
@@ -774,6 +885,8 @@ export class CityScene {
       this.controls.target.copy(target)
       this.camera.position.copy(p1)
       this.controls.update()
+      this.renderer.shadowMap.needsUpdate = true
+      this.invalidate()
       return
     }
     this.fly(target, p1, a ? 2200 : 1900)
@@ -809,6 +922,8 @@ export class CityScene {
       }
     }
     for (const [id, m] of this.nodes) m.halo.visible = id === selectedId
+    this.renderer.shadowMap.needsUpdate = true
+    this.invalidate()
   }
 
   /** Client-pixel position of an area's name tag (dev screenshot scripts click these). */
@@ -823,6 +938,7 @@ export class CityScene {
   dispose() {
     this.disposed = true
     cancelAnimationFrame(this.raf)
+    if (this.viewReportTimer !== null) clearTimeout(this.viewReportTimer)
     this.canvas.removeEventListener('pointermove', this.handlePointerMove)
     this.canvas.removeEventListener('pointerleave', this.handlePointerLeave)
     this.canvas.removeEventListener('pointerdown', this.handlePointerDown)
@@ -832,7 +948,12 @@ export class CityScene {
     window.removeEventListener('blur', this.handleBlur)
     window.removeEventListener('resize', this.resize)
     document.removeEventListener('visibilitychange', this.handleVisibility)
+    this.perf?.dispose()
+    this.perf = null
+    this.controls.removeEventListener('change', this.invalidate)
     this.controls.dispose()
+    for (const a of this.areas.values()) a.label.material.map?.dispose()
+    for (const site of this.sites) site.chip.material.map?.dispose()
     this.scene.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Line || o instanceof THREE.Sprite) {
         o.geometry.dispose()
@@ -862,8 +983,17 @@ export class CityScene {
     this.cityLayerGroup.visible = !inArea
     this.areaLayerGroup.visible = inArea
     this.hexGroup.visible = inArea
-    if (inArea) for (const [h3, entry] of this.hexes) entry.mesh.visible = this.hexVisible(h3)
+    this.visibleHexes = []
+    this.visibleHexMeshes = []
+    if (inArea) for (const [h3, entry] of this.hexes) {
+      entry.mesh.visible = this.hexVisible(h3)
+      if (entry.mesh.visible) {
+        this.visibleHexes.push(entry)
+        this.visibleHexMeshes.push(entry.mesh)
+      }
+    }
     if (this.field) this.field.visible = !inArea
+    this.invalidate()
   }
 
   /** A prism stands only inside its own area; a cell no area claims (open water) shows everywhere. */
@@ -975,6 +1105,7 @@ export class CityScene {
       bump: Math.min(9000, p0.distanceTo(position) * 0.28), // climb mid-flight so it reads as flying, not sliding
     }
     this.controls.enabled = false
+    this.invalidate()
   }
 
   /** WASD / arrows slide the view across the ground, J/K lift and lower it. Speed follows the orbit distance. */
@@ -1144,11 +1275,13 @@ export class CityScene {
     this.pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
     this.pointerClient = { x: e.clientX, y: e.clientY }
     this.pointerDirty = true
+    this.invalidate()
   }
 
   private handlePointerLeave = () => {
     this.pointer.set(2, 2)
     this.pointerDirty = true
+    this.invalidate()
   }
 
   private handlePointerDown = (e: PointerEvent) => {
@@ -1170,6 +1303,7 @@ export class CityScene {
       if (m) m.bounceAt = performance.now()
     }
     if (this.lastHover) this.callbacks.onClick(this.lastHover)
+    this.invalidate()
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
@@ -1179,15 +1313,18 @@ export class CityScene {
     if (e.code in KEY_MOVE || e.code in KEY_LIFT) {
       this.keys.add(e.code)
       e.preventDefault()
+      this.invalidate()
     }
   }
 
   private handleKeyUp = (e: KeyboardEvent) => {
     this.keys.delete(e.code)
+    this.invalidate()
   }
 
   private handleBlur = () => {
     this.keys.clear()
+    this.invalidate()
   }
 
   private handleVisibility = () => {
@@ -1195,9 +1332,10 @@ export class CityScene {
       cancelAnimationFrame(this.raf)
       this.raf = 0
       this.keys.clear()
+      this.perf?.idle('hidden')
     } else if (!this.disposed && !this.raf) {
       this.lastFrame = performance.now()
-      this.raf = requestAnimationFrame(this.loop)
+      this.invalidate()
     }
   }
 
@@ -1207,6 +1345,7 @@ export class CityScene {
     this.renderer.setSize(w, h, false)
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
+    this.invalidate()
   }
 
   private pick() {
@@ -1249,7 +1388,7 @@ export class CityScene {
       //    close in they are glass over the street and no longer the thing you point at)
       const dist = this.camera.position.distanceTo(this.controls.target)
       if (!info && this.activeArea && dist > HEX_PICK_DISTANCE) {
-        const hits = this.raycaster.intersectObjects(this.hexGroup.children, false)
+        const hits = this.raycaster.intersectObjects(this.visibleHexMeshes, false)
         if (hits.length) hexHit = hits[0].object.userData.h3 as string
       }
       if (!info && !this.activeArea && this.field) {
@@ -1309,7 +1448,17 @@ export class CityScene {
     const wide = dist > WIDE_DISTANCE
     const moved = Math.hypot(t.x - this.lastView.x, t.z - this.lastView.z)
     if (!(Number.isNaN(this.lastView.x) || moved > 200 || wide !== this.lastView.wide)) return
-    if (now - this.lastView.t < VIEW_REPORT_MS) return
+    if (now - this.lastView.t < VIEW_REPORT_MS) {
+      if (this.viewReportTimer === null) this.viewReportTimer = setTimeout(() => {
+        this.viewReportTimer = null
+        this.invalidate()
+      }, VIEW_REPORT_MS - (now - this.lastView.t))
+      return
+    }
+    if (this.viewReportTimer !== null) {
+      clearTimeout(this.viewReportTimer)
+      this.viewReportTimer = null
+    }
     this.lastView = { x: t.x, z: t.z, wide, t: now }
     const { lat, lon } = this.projector.latLon(t.x, -t.z)
     this.callbacks.onView({ lat, lon, distance: dist })
@@ -1320,8 +1469,17 @@ export class CityScene {
       this.raf = 0
       return
     }
-    this.raf = requestAnimationFrame(this.loop)
+    this.raf = 0
     const now = performance.now()
+    const urgent = this.urgentFrame
+    this.urgentFrame = false
+    if (!urgent && now + 0.5 < this.animationFrameDue) {
+      this.scheduleFrame()
+      return
+    }
+    // Decorative pulses top out near 60 rendered frames/s on high-refresh displays.
+    this.animationFrameDue = urgent ? now + 1000 / 60 : Math.max(this.animationFrameDue + 1000 / 60, now + 1000 / 120)
+    const frameStart = this.perf ? performance.now() : 0
     const dt = Math.min(0.05, (now - this.lastFrame) / 1000)
     this.lastFrame = now
     // camera flight
@@ -1338,6 +1496,8 @@ export class CityScene {
       }
     }
     this.applyKeys(dt)
+    const controlsChanged = this.controls.update()
+    if (this.pointerDirty) this.pick()
     // the search locator starts when the flight lands: wide and bright, then it shrinks onto the cell, holds and fades
     if (this.locator) {
       const L = this.locator
@@ -1374,6 +1534,9 @@ export class CityScene {
     }
     const dist = this.camera.position.distanceTo(this.controls.target)
     // the sun and its shadow box follow the target so shadows exist wherever you fly
+    if (this.key.target.position.x !== this.controls.target.x || this.key.target.position.z !== this.controls.target.z) {
+      this.renderer.shadowMap.needsUpdate = true
+    }
     this.key.target.position.set(this.controls.target.x, 0, this.controls.target.z)
     this.key.position.set(this.controls.target.x - 3200, 4600, this.controls.target.z + 2800)
     // name tags sit on their borough and keep a constant size on screen (so they shrink in world terms as you close in),
@@ -1385,11 +1548,24 @@ export class CityScene {
       const h = this.camera.position.distanceTo(p) * labelK * (id === this.hoveredArea ? 1.1 : 1)
       a.label.scale.set(h * ((a.label.userData.aspect as number) || 4), h, 1)
     }
-    for (const entry of this.hexes.values()) {
+    let hexAnimating = false
+    const heightBlend = 1 - Math.pow(0.88, dt * 60)
+    const colourBlend = 1 - Math.pow(0.85, dt * 60)
+    for (const entry of this.visibleHexes) {
       const m = entry.mesh
-      m.scale.z += (entry.targetHeight - m.scale.z) * 0.12
-      m.material.color.lerp(entry.targetColour, 0.15)
+      const heightLeft = entry.targetHeight - m.scale.z
+      if (Math.abs(heightLeft) > 0.05) {
+        m.scale.z += heightLeft * heightBlend
+        hexAnimating = true
+      } else if (heightLeft !== 0) m.scale.z = entry.targetHeight
+      const colour = m.material.color
+      const colourLeft = Math.abs(colour.r - entry.targetColour.r) + Math.abs(colour.g - entry.targetColour.g) + Math.abs(colour.b - entry.targetColour.b)
+      if (colourLeft > 0.005) {
+        colour.lerp(entry.targetColour, colourBlend)
+        hexAnimating = true
+      } else if (colourLeft !== 0) colour.copy(entry.targetColour)
       if (entry.flashUntil > now) {
+        hexAnimating = true
         const t = (entry.flashUntil - now) / FLASH_MS
         const pulse = 0.5 + 0.5 * Math.sin(now / 80)
         m.material.emissive.set(0xffe9a8)
@@ -1417,6 +1593,10 @@ export class CityScene {
     // glance); close in, it crossfades into the 3D pin standing on the street (see exactly where). Hover swells it and sweeps
     // the rim yellow; a click hops. The coverage disc stays true to scale and breathes slowly.
     for (const m of this.nodes.values()) {
+      const oldPinVisible = m.pin.visible
+      const oldPinScaleX = m.pin.scale.x
+      const oldPinScaleY = m.pin.scale.y
+      const oldPinY = m.group.position.y
       const id = m.group.userData.nodeId as string
       const hovered = this.hoveredNode === id
       m.hoverT += ((hovered ? 1 : 0) - m.hoverT) * (1 - Math.exp(-dt * 12))
@@ -1443,6 +1623,10 @@ export class CityScene {
       m.ring.material.uniforms.sweep.value = m.sweepT
       m.hit.scale.set(Math.max(badgeR * 1.6, 18), Math.max(30, pinScale * 34), Math.max(badgeR * 1.6, 18))
       m.group.position.y = 0.5 + hop * badgeR * 0.9
+      if (oldPinVisible !== m.pin.visible || Math.abs(oldPinScaleX - m.pin.scale.x) > 0.0001 ||
+          Math.abs(oldPinScaleY - m.pin.scale.y) > 0.0001 || Math.abs(oldPinY - m.group.position.y) > 0.0001) {
+        this.renderer.shadowMap.needsUpdate = true
+      }
       m.rings.forEach((ring, k) => {
         const p = (now / NODE_PULSE_MS + m.phase + k / 2) % 1
         ring.scale.setScalar(NODE_RANGE * (0.1 + 0.9 * p))
@@ -1462,10 +1646,20 @@ export class CityScene {
       fog.near = this.look.fog[0] * s
       fog.far = this.look.fog[1] * s
     }
-    if (this.pointerDirty) this.pick()
     this.reportView(now, dist)
-    this.controls.update()
+    const renderStart = this.perf ? performance.now() : 0
     this.renderer.render(this.scene, this.camera)
+    if (this.perf) {
+      const end = performance.now()
+      const info = this.renderer.info
+      this.perf.sample(end, end - frameStart, end - renderStart, info.render.calls, info.render.triangles,
+        this.hexes.size, this.tiles.size, info.memory.geometries, info.memory.textures)
+    }
+    if (this.flight || this.keys.size > 0 || this.locator || hexAnimating || controlsChanged || this.nodes.size > 0 || this.spots.length > 0) {
+      this.scheduleFrame()
+    } else if (!this.raf) {
+      this.perf?.idle()
+    }
   }
 }
 

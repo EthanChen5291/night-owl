@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { markdown, streamAgent, type AgentEvent, type ClientCall, type ClientResult, type WireMessage } from '../agent'
 import { ChatIcon, CheckIcon, CloseIcon, NewChatIcon, SendIcon, SparkIcon, StopIcon } from './Icons'
 
@@ -45,13 +45,14 @@ function load(): { items: Item[]; history: WireMessage[] } {
 
 const CORNER = 150 // px from the bottom-right corner that wakes the button
 
-export default function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; month: string; planBudget: number; onShown?: (shown: boolean) => void }) {
+function AgentChat({ tools, month, planBudget, onShown }: { tools: ClientTools; month: string; planBudget: number; onShown?: (shown: boolean) => void }) {
   const [open, setOpen] = useState(false)
   const [near, setNear] = useState(false)
   // no hover on touch screens: there the button just stays out
   const [touch] = useState(() => typeof matchMedia !== 'undefined' && matchMedia('(hover: none)').matches)
-  const [items, setItems] = useState<Item[]>(() => load().items)
-  const historyRef = useRef<WireMessage[]>(load().history)
+  const [initial] = useState(load)
+  const [items, setItems] = useState<Item[]>(initial.items)
+  const historyRef = useRef<WireMessage[]>(initial.history)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [zoom, setZoom] = useState<Img | null>(null)
@@ -79,7 +80,9 @@ export default function AgentChat({ tools, month, planBudget, onShown }: { tools
   }, [items, open])
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 250)
+    if (!open) return
+    const timer = setTimeout(() => inputRef.current?.focus(), 250)
+    return () => clearTimeout(timer)
   }, [open])
 
   // the button hides off the right edge until the pointer comes into the bottom-right corner. A window listener
@@ -163,8 +166,13 @@ export default function AgentChat({ tools, month, planBudget, onShown }: { tools
             (e: AgentEvent) => {
               if (e.type === 'delta') patchBot((b) => ({ ...b, text: b.text + e.text }))
               else if (e.type === 'thinking') {
-                if (e.state === 'start') patchBot((b) => ({ ...b, steps: [...b.steps, { id: `think-${++thinkSeq.current}`, label: 'Thinking', state: 'start' }] }))
-                else patchBot((b) => ({ ...b, steps: b.steps.map((s) => (s.id === `think-${thinkSeq.current}` ? { ...s, state: 'done' } : s)) }))
+                if (e.state === 'start') {
+                  const id = `think-${++thinkSeq.current}`
+                  patchBot((b) => ({ ...b, steps: [...b.steps, { id, label: 'Thinking', state: 'start' }] }))
+                } else {
+                  const id = `think-${thinkSeq.current}`
+                  patchBot((b) => ({ ...b, steps: b.steps.map((s) => (s.id === id ? { ...s, state: 'done' } : s)) }))
+                }
               } else if (e.type === 'tool')
                 patchBot((b) => {
                   const has = b.steps.some((s) => s.id === e.id)
@@ -358,3 +366,5 @@ export default function AgentChat({ tools, month, planBudget, onShown }: { tools
     </>
   )
 }
+
+export default memo(AgentChat)
