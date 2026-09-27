@@ -2,27 +2,38 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { markdown } from '../agent'
 import { BackIcon, CheckIcon, ChevronIcon, CloseIcon, NewChatIcon, StopIcon } from '../components/Icons'
 import ChartCard from './ChartCard'
-import { fetchCatalog, refreshDashboard, streamDashboardChat } from './client'
+import { refreshDashboard, streamDashboardChat } from './client'
 import { downloadDashboard } from './export'
+import { linkClick } from '../nav'
 import { ArrowUpIcon, DashIcon, DownloadIcon, OwlMark, RefreshIcon } from './icons'
 import { emptySession, forActiveRequest, forCurrentGeneration, isActiveRequest, MAX_ARTIFACTS, restoreSession, STORE_KEY, type RequestIdentity, type Turn } from './requestSession'
 import type { DashboardArtifact } from './types'
 import { resolvedKind, sortedRows, visibleSeries, type CardView } from './view'
 import './dashboard.css'
 
-interface Catalog {
-  datasets: Record<string, { label: string; notes: string[] }>
-  max_cards: number
-}
-
 const STARTERS = [
-  { title: 'Bronx vs Manhattan', prompt: 'Compare monthly rat complaints per 100k residents in the Bronx and Manhattan since 2015.' },
-  { title: 'COVID and income', prompt: 'Show the 10 richest ZIP code areas and their rat complaints before and after COVID-19.' },
-  { title: 'Income and findings', prompt: 'Compare complaints and inspections finding rat activity across years by income band.' },
-  { title: 'Compare boroughs', prompt: 'Compare rat complaints and model likelihood by borough.' },
+  'Compare monthly rat complaints per 100k residents in the Bronx and Manhattan since 2015.',
+  'Show the 10 richest ZIP code areas and their rat complaints before and after COVID-19.',
+  'Compare complaints and inspections finding rat activity across years by income band.',
+  'Compare rat complaints and model likelihood by borough.',
 ]
+const HEADLINE = 'What should we look into?'
+let headlineTyped = false
 
-const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
+/** Types the headline once per page load; later empty states and reduced-motion users get it at once. */
+function TypedHeadline({ text }: { text: string }) {
+  const [count, setCount] = useState(() => headlineTyped || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? text.length : 0)
+  const typing = count < text.length
+  useEffect(() => {
+    if (!typing) { headlineTyped = true; return }
+    const timer = setTimeout(() => setCount((value) => Math.min(text.length, value + 1)), count === 0 ? 260 : text[count - 1] === ' ' ? 46 : 26)
+    return () => clearTimeout(timer)
+  }, [count, text, typing])
+  return <h1 className={typing ? 'typing' : ''} aria-label={text}>
+    <span className="dx-typed-ghost" aria-hidden="true">{text}</span>
+    <span className="dx-typed-live" aria-hidden="true">{text.slice(0, count)}</span>
+  </h1>
+}
 
 function dashboardMarkdown(content: string): string {
   const withoutLinks = content.replace(/\[([^\]]+)\]\(https?:\/\/[^\s)]+\)/g, '$1').replace(/https?:\/\/[^\s<)]+/g, '')
@@ -83,7 +94,6 @@ export default function DashboardPage() {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
   const [notice, setNotice] = useState('')
-  const [catalog, setCatalog] = useState<Catalog | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const activeRequestRef = useRef<RequestIdentity | null>(null)
   const generationRef = useRef(0)
@@ -92,12 +102,6 @@ export default function DashboardPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const openKey = session.open
   const artifact = openKey ? session.artifacts[openKey] ?? null : null
-
-  useEffect(() => {
-    const controller = new AbortController()
-    void fetchCatalog(controller.signal).then((data) => { if (record(data) && record(data.datasets)) setCatalog(data as unknown as Catalog) }, () => {})
-    return () => controller.abort()
-  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -240,7 +244,7 @@ export default function DashboardPage() {
     </div>}
     <div className="dx-input">
       <textarea ref={inputRef} aria-label="Ask about the data" rows={1} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onPromptKey}
-        placeholder={session.selection ? `Ask about ${session.selection.value}…` : artifact ? 'Refine this dashboard…' : 'Ask about rats, inspections, or cameras…'} autoFocus />
+        placeholder={session.selection ? `Ask about ${session.selection.value}…` : artifact ? 'Refine this dashboard…' : 'Ask about rats, inspections, or cameras…'} autoFocus={!empty} />
       {busy
         ? <button type="button" className="dx-send stop" onClick={() => abortRef.current?.abort()} aria-label="Stop"><StopIcon size={14} /></button>
         : <button type="submit" className="dx-send" disabled={!draft.trim()} aria-label="Send"><ArrowUpIcon size={17} /></button>}
@@ -250,20 +254,18 @@ export default function DashboardPage() {
   return <div className={`dx${canvas ? ' has-canvas' : ''}${empty ? ' is-empty' : ''}`}>
     <section className="dx-chat" aria-label="Conversation">
       <header className="dx-bar">
-        <a className="dx-pill" href="/" title="Back to the map"><BackIcon size={15} /><span>Map</span></a>
+        <a className="dx-pill" href="/" title="Back to the map" onClick={linkClick('/')}><BackIcon size={15} /><span>Map</span></a>
         <div className="dx-brand"><OwlMark size={20} /><b>Night Owl</b><span>Explore</span></div>
         {empty ? <span className="dx-bar-spacer" /> : <button type="button" className="dx-icon-btn" onClick={newChat} title="New chat" aria-label="New chat"><NewChatIcon size={17} /></button>}
       </header>
 
       {empty ? <div className="dx-hero">
         <div className="dx-hero-mark" aria-hidden="true"><OwlMark size={34} /></div>
-        <h1>What should we look into?</h1>
-        <p>Ask a question and Night Owl builds an interactive dashboard from the model, 16 years of NYC complaints and inspections, ACS income, and camera events.</p>
+        <TypedHeadline text={HEADLINE} />
         {composer}
-        <div className="dx-starters">{STARTERS.map((starter, i) => <button key={starter.title} type="button" style={{ '--i': i } as CSSProperties} onClick={() => void send(starter.prompt)}>
-          <b>{starter.title}</b><span>{starter.prompt}</span>
+        <div className="dx-starters">{STARTERS.map((prompt, i) => <button key={prompt} type="button" style={{ '--i': i } as CSSProperties} onClick={() => void send(prompt)}>
+          {prompt}
         </button>)}</div>
-        {catalog && <p className="dx-sources">Built on {Object.values(catalog.datasets).map((dataset) => dataset.label.toLowerCase()).join(' · ')}</p>}
       </div> : <>
         <div className="dx-thread" ref={threadRef} onScroll={(event) => { const node = event.currentTarget; stickRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80 }}>
           <div className="dx-thread-inner" aria-live="polite">

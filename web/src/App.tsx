@@ -1,4 +1,5 @@
 import { readSavedValue } from './storage'
+import { linkClick } from './nav'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cellToLatLng, cellToParent, latLngToCell } from 'h3-js'
 import { fetchBacktest, fetchCells, fetchPlacements, fetchPlan, fetchPublic, fetchQueue } from './api'
@@ -826,7 +827,7 @@ export default function App() {
         />
         <ModeBar mode={mode} onMode={setMode} preset={preset} onPreset={setPreset} />
         <Header source={cellsSource} cells={cells} onPick={goToPlace}>
-          <a className="header-dashboard panel" href="/dashboards">Dashboards</a>
+          <a className="header-dashboard panel" href="/dashboards" onClick={linkClick('/dashboards')}>Dashboards</a>
         </Header>
         {area && <Legend mode={mode} lifted={chartOpen} />}
 
