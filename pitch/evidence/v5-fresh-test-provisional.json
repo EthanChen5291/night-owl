@@ -1,0 +1,446 @@
+{
+  "all_gates_pass": false,
+  "box_ap_delta_pt_vs_onnx": {
+    "person": 0.0,
+    "rat": 0.0
+  },
+  "box_parity_pass": true,
+  "box_parity_tolerance": 0.02,
+  "box_scores": {
+    "clips": {
+      "fresh_031823": {
+        "frames": 176,
+        "onnx": {
+          "ap50": {
+            "person": 0.48787469099098046,
+            "rat": null
+          },
+          "map50": 0.48787469099098046
+        },
+        "pt": {
+          "ap50": {
+            "person": 0.48787469099098046,
+            "rat": null
+          },
+          "map50": 0.48787469099098046
+        }
+      },
+      "fresh_032300": {
+        "frames": 193,
+        "onnx": {
+          "ap50": {
+            "person": 0.5086851178761256,
+            "rat": 0.7031024779579291
+          },
+          "map50": 0.6058937979170274
+        },
+        "pt": {
+          "ap50": {
+            "person": 0.5086851178761256,
+            "rat": 0.7031024779579291
+          },
+          "map50": 0.6058937979170274
+        }
+      }
+    },
+    "combined": {
+      "frames": 369,
+      "onnx": {
+        "ap50": {
+          "person": 0.49268811967470993,
+          "rat": 0.6157791928693146
+        },
+        "map50": 0.5542336562720123
+      },
+      "pt": {
+        "ap50": {
+          "person": 0.49268811967470993,
+          "rat": 0.6157791928693146
+        },
+        "map50": 0.5542336562720123
+      }
+    }
+  },
+  "candidate_lock_sha256": "22ffcee2d241eb0c016d0a3ae5d178ef8d35e1f6541d1b20674f2c9a81237259",
+  "formal_event_gate_pass": null,
+  "frozen": {
+    "manifest_sha256": "f60fbeb8a0eab8fbd5f2a8e2f3541fc1c0981f1ed53c98b059ff82e872881c18",
+    "negative_seconds": 175.937013,
+    "provenance": {
+      "eval_image_label_sha256": "23d726139767189ef0dfc3bd06395386cf212bc818d7830e42caecedf8dc568a",
+      "excluded_frames": 2,
+      "exclusion_files": [
+        {
+          "path": "excluded_fresh_031823.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "excluded_fresh_032300.txt",
+          "sha256": "7f162b0ce1ba727ac36f0a7906a40979fb46da55bf12fc7a68c10ad07c24f032"
+        }
+      ],
+      "reviewed_frames": 369,
+      "source_clips": [
+        {
+          "path": "clips/fresh_031823.mp4",
+          "sha256": "2d8bd9acc713ae884276c63072cf0e22f9b8c51007aa49bc33f52e6465cabf31"
+        },
+        {
+          "path": "clips/fresh_032300.mp4",
+          "sha256": "0a6d20a27cc9b9980b75ed437cef1211ce1deee2014f91bce04898a15b305e63"
+        }
+      ],
+      "source_image_label_sha256": "05d0eab4422572afad35bd83060c74acfacdf8fef406ab5e6510256c269cefea",
+      "source_markers": [
+        {
+          "path": "labels/_reviewed_fresh_031823.txt",
+          "sha256": "4f76f50ade3c9ea2c694715a20ec226250bac8ee7ec4d426b43d0e7514d71120"
+        },
+        {
+          "path": "labels/_reviewed_fresh_032300.txt",
+          "sha256": "01fc00e766dcee8b8991c8ac2d451964e5a16ea79372ab8fea9e93887034d1b9"
+        }
+      ]
+    },
+    "selection": {
+      "selection_manifest_sha256": "d9a872f4b7e0a479e3983701c6d0751f692619d677b1ec7bf7eeb72240b7edcf",
+      "selection_train_tags": [
+        "fresh_204211",
+        "new_room_014605",
+        "new_room_020101",
+        "new_scene_203035",
+        "short_15",
+        "short_16",
+        "short_17",
+        "short_18",
+        "short_19",
+        "short_20",
+        "short_21",
+        "short_22",
+        "short_23",
+        "short_24",
+        "short_25",
+        "short_26",
+        "short_27",
+        "short_28",
+        "short_29",
+        "table_a",
+        "table_a_dense",
+        "table_b",
+        "table_b_dense",
+        "zoom15_a",
+        "zoom15_a_dense",
+        "zoom2_a",
+        "zoom2_a_dense"
+      ],
+      "selection_val_tags": [
+        "new_room_014327",
+        "table_c",
+        "zoom15_b"
+      ],
+      "test_tags": [
+        "fresh_031823",
+        "fresh_032300"
+      ]
+    },
+    "truth_sha256": "d2cb55c5970f6bab2a9d8abe3a1ce9939531bff68aded02240ebdce3da3fc731"
+  },
+  "limits": "This is one held-out source test on the recorded scenes; it does not establish performance across other cameras or sites. No live worker or API POST was used.",
+  "machine_event_gate_candidate": false,
+  "onnx_sha256": "652a05e8c08aaee11a2b4d3c9ae4c737387bf8ffcac3372a4d83d0df7d80ed3d",
+  "pt_sha256": "0906a038d9795e1606d6890627fefe4e4d5eaa4efdadbdb8cab11aaf304b4aa9",
+  "rat_ap50_gate": false,
+  "source_event_scoring": {
+    "annotated_passes": 2,
+    "duplicate_pass_events": [
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 2,
+        "conf": 0.8624427318572998,
+        "crop_glob": "replay/fresh_032300/events/event_0002_*.jpg",
+        "frame_index": 76,
+        "t_sec": 5.069
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 3,
+        "conf": 0.7945867776870728,
+        "crop_glob": "replay/fresh_032300/events/event_0003_*.jpg",
+        "frame_index": 108,
+        "t_sec": 7.203
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 4,
+        "conf": 0.8101169466972351,
+        "crop_glob": "replay/fresh_032300/events/event_0004_*.jpg",
+        "frame_index": 141,
+        "t_sec": 9.404
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 5,
+        "conf": 0.7874352931976318,
+        "crop_glob": "replay/fresh_032300/events/event_0005_*.jpg",
+        "frame_index": 173,
+        "t_sec": 11.538
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 6,
+        "conf": 0.7895675897598267,
+        "crop_glob": "replay/fresh_032300/events/event_0006_*.jpg",
+        "frame_index": 205,
+        "t_sec": 13.672
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 7,
+        "conf": 0.8414943218231201,
+        "crop_glob": "replay/fresh_032300/events/event_0007_*.jpg",
+        "frame_index": 281,
+        "t_sec": 18.741
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 8,
+        "conf": 0.8473474383354187,
+        "crop_glob": "replay/fresh_032300/events/event_0008_*.jpg",
+        "frame_index": 313,
+        "t_sec": 20.875
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 9,
+        "conf": 0.8795357346534729,
+        "crop_glob": "replay/fresh_032300/events/event_0009_*.jpg",
+        "frame_index": 345,
+        "t_sec": 23.009
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 10,
+        "conf": 0.8216364979743958,
+        "crop_glob": "replay/fresh_032300/events/event_0010_*.jpg",
+        "frame_index": 388,
+        "t_sec": 25.877
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 11,
+        "conf": 0.7516127228736877,
+        "crop_glob": "replay/fresh_032300/events/event_0011_*.jpg",
+        "frame_index": 420,
+        "t_sec": 28.011
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 12,
+        "conf": 0.7457312345504761,
+        "crop_glob": "replay/fresh_032300/events/event_0012_*.jpg",
+        "frame_index": 452,
+        "t_sec": 30.145
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 13,
+        "conf": 0.8075510859489441,
+        "crop_glob": "replay/fresh_032300/events/event_0013_*.jpg",
+        "frame_index": 494,
+        "t_sec": 32.947
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 14,
+        "conf": 0.8739151954650879,
+        "crop_glob": "replay/fresh_032300/events/event_0014_*.jpg",
+        "frame_index": 526,
+        "t_sec": 35.081
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 15,
+        "conf": 0.833528995513916,
+        "crop_glob": "replay/fresh_032300/events/event_0015_*.jpg",
+        "frame_index": 558,
+        "t_sec": 37.215
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 17,
+        "conf": 0.9254265427589417,
+        "crop_glob": "replay/fresh_032300/events/event_0017_*.jpg",
+        "frame_index": 1625,
+        "t_sec": 108.377
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 18,
+        "conf": 0.7937394380569458,
+        "crop_glob": "replay/fresh_032300/events/event_0018_*.jpg",
+        "frame_index": 1674,
+        "t_sec": 111.645
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 19,
+        "conf": 0.8091285824775696,
+        "crop_glob": "replay/fresh_032300/events/event_0019_*.jpg",
+        "frame_index": 1706,
+        "t_sec": 113.779
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 20,
+        "conf": 0.812788724899292,
+        "crop_glob": "replay/fresh_032300/events/event_0020_*.jpg",
+        "frame_index": 1738,
+        "t_sec": 115.913
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 21,
+        "conf": 0.8046191930770874,
+        "crop_glob": "replay/fresh_032300/events/event_0021_*.jpg",
+        "frame_index": 2208,
+        "t_sec": 147.259
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 22,
+        "conf": 0.8184618949890137,
+        "crop_glob": "replay/fresh_032300/events/event_0022_*.jpg",
+        "frame_index": 2240,
+        "t_sec": 149.393
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 23,
+        "conf": 0.8059582710266113,
+        "crop_glob": "replay/fresh_032300/events/event_0023_*.jpg",
+        "frame_index": 2272,
+        "t_sec": 151.527
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 24,
+        "conf": 0.8469480872154236,
+        "crop_glob": "replay/fresh_032300/events/event_0024_*.jpg",
+        "frame_index": 2334,
+        "t_sec": 155.662
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 25,
+        "conf": 0.8908568620681763,
+        "crop_glob": "replay/fresh_032300/events/event_0025_*.jpg",
+        "frame_index": 2366,
+        "t_sec": 157.796
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 26,
+        "conf": 0.8998461961746216,
+        "crop_glob": "replay/fresh_032300/events/event_0026_*.jpg",
+        "frame_index": 2398,
+        "t_sec": 159.931
+      }
+    ],
+    "false_events_per_minute": 0.0,
+    "matched": [
+      {
+        "clip": "fresh_032300",
+        "crop_glob": "replay/fresh_032300/events/event_0001_*.jpg",
+        "event_index": 0,
+        "event_t_sec": 2.935,
+        "pass_id": "presence_001"
+      },
+      {
+        "clip": "fresh_032300",
+        "crop_glob": "replay/fresh_032300/events/event_0016_*.jpg",
+        "event_index": 15,
+        "event_t_sec": 106.242,
+        "pass_id": "presence_002"
+      }
+    ],
+    "matched_passes": 2,
+    "missed_pass_ids": [],
+    "negative_duration_sec": 175.937013,
+    "negative_events": [],
+    "negative_gate": false,
+    "note": "Machine matches are provisional: a reviewer must confirm the matched crop actually shows plush in the source video. Parked plush is neither a pass nor a no-rat negative. Events outside reviewed intervals are unscored.",
+    "outside_reviewed_intervals": [
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 27,
+        "conf": 0.7088342905044556,
+        "crop_glob": "replay/fresh_032300/events/event_0027_*.jpg",
+        "frame_index": 2694,
+        "t_sec": 179.672
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 28,
+        "conf": 0.803781270980835,
+        "crop_glob": "replay/fresh_032300/events/event_0028_*.jpg",
+        "frame_index": 2726,
+        "t_sec": 181.806
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 29,
+        "conf": 0.8120465874671936,
+        "crop_glob": "replay/fresh_032300/events/event_0029_*.jpg",
+        "frame_index": 2758,
+        "t_sec": 183.94
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 30,
+        "conf": 0.7387048006057739,
+        "crop_glob": "replay/fresh_032300/events/event_0030_*.jpg",
+        "frame_index": 2790,
+        "t_sec": 186.074
+      }
+    ],
+    "parked_events": [
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 31,
+        "conf": 0.7771472930908203,
+        "crop_glob": "replay/fresh_032300/events/event_0031_*.jpg",
+        "frame_index": 2822,
+        "t_sec": 188.209
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 32,
+        "conf": 0.8482380509376526,
+        "crop_glob": "replay/fresh_032300/events/event_0032_*.jpg",
+        "frame_index": 2854,
+        "t_sec": 190.343
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 33,
+        "conf": 0.8763384819030762,
+        "crop_glob": "replay/fresh_032300/events/event_0033_*.jpg",
+        "frame_index": 2886,
+        "t_sec": 192.477
+      },
+      {
+        "clip": "fresh_032300",
+        "clip_event_ordinal": 34,
+        "conf": 0.887394905090332,
+        "crop_glob": "replay/fresh_032300/events/event_0034_*.jpg",
+        "frame_index": 2918,
+        "t_sec": 194.611
+      }
+    ],
+    "pass_gate": false,
+    "required_hits": 2,
+    "total_events": 34
+  },
+  "status": "PROVISIONAL_AWAITING_EVENT_AUDIT",
+  "visual_source_crop_audit": "PENDING"
+}

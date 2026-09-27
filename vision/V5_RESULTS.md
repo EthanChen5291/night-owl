@@ -1,6 +1,6 @@
 # V5 plush-detector development result
 
-**Status: locked candidate; fresh independent test pending.** V5 was trained after V4 missed a parked plush and fired once on a dark case in newly recorded room footage. All three V4 new-room test clips were deliberately consumed as V5 **development** data. V5 results on them measure adaptation, not generalization. The V4 candidate and its new-room failure supplement remain unchanged.
+**Status: locked development candidate; the first fresh test did not establish the 0.90 target.** The preserved as-run rat AP50 was 0.615779, with annotation errors found in a separate source-label audit afterward. No corrected-label score has been calculated. A real edge-of-frame miss delayed the second presence's first alert by 58.890 seconds. See [fresh-test evidence and limits](V5_FRESH_RESULTS.md). V5 was trained after V4 missed a parked plush and fired once on a dark case in newly recorded room footage. All three V4 new-room test clips were deliberately consumed as V5 **development** data. V5 results on them measure adaptation, not generalization. The V4 candidate and its new-room failure supplement remain unchanged.
 
 ## Fixed run and selection
 
@@ -36,4 +36,4 @@ The moving clip's V4 dark-case false event at 0.267 seconds disappeared. V5's fi
 
 A saved-frame smoke test on Raspberry Pi ARM64 with ONNX Runtime 1.22.1 gave one plush proposal at confidence 0.931 and no proposal on one negative saved frame, with median inference about 60 ms. It did not test positive live-camera event accuracy. Formal 20-push recall, a separate untouched three-minute negative test, live-rat/infrared behavior, and fresh-room generalization remain unverified. The candidate is not promoted to `pi/rat.onnx`.
 
-See the candidate bundle README for artifact contents and exact hashes. Full source MP4s remain in the immutable V4 model and new-room evaluation archives, identified by SHA256 in each replay report. A genuinely fresh post-V5 recording must be reserved and visually labeled before any V5 prediction to test improvement without selection leakage.
+See the candidate bundle README for artifact contents and exact hashes. Full development source MP4s remain in the immutable V4 model and new-room evaluation archives, identified by SHA256 in each replay report. Two genuinely fresh post-V5 recordings were reserved and labeled before the first V5 prediction; their separate result and post-run annotation caveat are recorded in [V5_FRESH_RESULTS.md](V5_FRESH_RESULTS.md). The already delivered development archive remains unchanged.

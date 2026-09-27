@@ -19,6 +19,7 @@ final_test/
 v4_test/
 new_room_test/
 v5_fresh_test/
+v5_formal_test/
 runs/
 events/
 *.pt
