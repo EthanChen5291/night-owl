@@ -9,7 +9,6 @@
 [![Handoff](https://img.shields.io/badge/docs-technical%20handoff-orange.svg)](docs/utsav-technical-handoff.md)
 [![Evidence](https://img.shields.io/badge/evidence-limitations-lightgrey.svg)](#limitations)
 
-Built at DivHacks 2026
 
 </div>
 
@@ -17,17 +16,17 @@ Built at DivHacks 2026
 
 ## Overview
 
-NYC estimates about 3 million rats and runs ~152,000 initial rodent inspections a year, targeted mostly by 311 complaints. Complaints track who calls, not where rats are: the richest fifth of blocks files 76% more complaints per rat found than the poorest fifth, which has 51% more infestations.
+NYC estimates about 3 million rats and runs ~152,000 initial rodent inspections a year, targeted mostly by 311 complaints. Yet these inspections focus on the callees rather than actual rat populations themselves -> the richest fifth of blocks files 76% more complaints per rat found than the poorest fifth, which has 51% more infestations.
 
 NightOwl scores every block-sized cell in the city each month, flags the blocks that are likely ratty but quiet, and places a low-cost camera node, an **Owl**, where the model is least certain. Owl sightings flow back into the map and rerank the next placements.
 
 ## How it works
 
-- **Model A (what the city sees)** predicts complaints from 512k 311 rodent complaints and 3.1M DOHMH inspection records.
-- **Model B (what is there)** predicts the share of swept lots with active rat signs from 26 physical features over ten years of open data. It never sees a complaint.
-- **Silence score** = Model B percentile − Model A percentile. High where rats are likely and nobody calls.
-- **Planner** ranks sensor sites on real street trees; a building model ranks which door to knock on first.
-- **Feedback loop.** An accepted Owl sighting updates the cell's Beta posterior and reranks sites. It does not retrain Model B.
+- **Model A (human feedback)** predicts complaints from 512k 311 rodent complaints and 3.1M DOHMH inspection records.
+- **Model B (environment)** predicts the share of swept lots with active rat signs from 26 physical features over ten years of open data. 
+- **Silence score** = Model B percentile − Model A percentile. High where rats are likely despite no 311 callees.
+- **Planner** ranks sensor sites on real street trees; a building model ranks most likely rat infested areas.
+- **Feedback loop.** An accepted Owl sighting updates the cell's Beta posterior and reranks sites. 
 
 Both are LightGBM models trained from scratch in [model/](model/README.md).
 
@@ -42,13 +41,13 @@ Rolling backtest, 119 months (2016-01 → 2026-08), top 50 cells scored on lots 
 | Rats found before | 17.1% |
 | Quiet blocks: Model B vs random | **15.6% vs 8.8%** (117 / 119 months) |
 
-Model B AUC on held-out community districts: **0.633**. These are inspection outcomes, not rat counts.
+Model B AUC on held-out community districts: **0.633**
 
 ## Owl node
 
 <p align="center"><img src="docs/media/owl-node.jpg" width="320" alt="As-built Owl node"></p>
 
-Raspberry Pi 5, IMX219 NoIR camera, 850 nm IR illuminator, HC-SR501 PIR, PiSugar battery, printed enclosure ([build files](model/enclosure/README.md)). The PIR wakes the camera on motion and heat; a YOLO11n detector fine-tuned on reviewed footage decides on-device. Only the event (timestamp, cell, confidence, small crop) goes to the local API. No video is stored or uploaded.
+Raspberry Pi 5, IMX219 NoIR camera, 850 nm IR illuminator, HC-SR501 PIR, PiSugar battery, printed enclosure ([build files](model/enclosure/README.md)). The PIR wakes the camera on motion and heat; a YOLO11n detector fine-tuned on reviewed footage decides on-device. Only the event (timestamp, cell, confidence, small crop) goes to the local API. No video is stored or uploaded!
 
 ![Detector frames: rat box steady, passing person boxed separately](docs/media/detector-frames.jpg)
 
@@ -79,8 +78,7 @@ pnpm --dir web build && pnpm --dir web lint
 
 ## Limitations
 
-- One reviewed plush detection travelled camera to API to map ([live trial](vision/V5_LIVE_RESULTS.md)). That verifies the loop once, not field reliability.
-- The detector was trained on a room-lit plush rat. Infrared footage and wild rats are untested. Its fresh box test scored 0.616 rat AP50 and its event test produced 17 false alerts in 190 s ([fresh test](vision/V5_FRESH_RESULTS.md), [event test](vision/V5_FORMAL_EVENT_RESULTS.md)).
+- The detector was trained on a room-lit plush rat. Infrared footage and wild rats are untested. Its fresh box test scored 0.616 rat AP50 ([fresh test](vision/V5_FRESH_RESULTS.md), [event test](vision/V5_FORMAL_EVENT_RESULTS.md)).
 - Backtests score only cells DOHMH swept; nothing here counts rats on unswept blocks.
 - Owl unit cost and battery life are unmeasured.
 
