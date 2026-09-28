@@ -10,6 +10,6 @@ Open `index.html` in Chrome. The folder is self-contained (fonts and images are 
 
 The numbers and how they were computed are in [`model/README.md`](../../model/README.md#pitch-numbers-who-calls-who-gets-inspected-what-rats-signal). The backtest chart is drawn from [`model/out/backtest.json`](../../model/out/backtest.json).
 
-The Owl image on slide 8 is a render of the node design. The demo uses the real Raspberry Pi 5 Owl. Cost ($30) and battery (up to 6 weeks) are for the low-power production design, not the Pi 5 demo Owl.
+The Owl images on slides 1 and 8 are renders of the node design. The demo uses the real Raspberry Pi 5 Owl. Cost ($30) and battery (up to 6 weeks) are for the low-power production design, not the Pi 5 demo Owl.
 
 Fonts: Fraunces, Instrument Serif, Geist and Geist Mono, all SIL Open Font License 1.1 (Google Fonts).

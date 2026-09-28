@@ -135,7 +135,10 @@
   .hero-sub em { color: var(--accent); }
   .hero-sub span { display: block; font-family: var(--f-sans); font-style: normal; font-size: 18px; color: var(--ink-dim); margin-top: 12px; }
   .hero-art { position: absolute; right: 110px; top: 112px; width: 470px; height: 600px; }
-  .hero-art img { width: 100%; height: 100%; object-fit: cover; object-position: 71% 42%; }
+  .hero-art img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; }
+  .hero-art.cutout { left: 890px; right: auto; top: 84px; width: 560px; height: 628px; margin: 0;   /* no frame: the Owl floats on the page */
+                     background: radial-gradient(closest-side, rgba(242,213,68,.07), transparent); }
+  .hero-art.cutout img { object-fit: contain; filter: drop-shadow(0 30px 44px rgba(0,0,0,.7)); }
   .meta { position: absolute; left: 130px; right: 110px; bottom: 116px; display: grid; grid-template-columns: 1fr 1fr 1fr 1.6fr; gap: 30px;
           border-top: 1px solid var(--rule); padding-top: 16px; }
   .meta b { display: block; font-family: var(--f-mono); font-weight: 400; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-2); margin-top: 6px; }
@@ -449,9 +452,7 @@
       <div class="rule reveal r3"></div>
       <p class="hero-sub reveal r4">Nothing hides from the <em>Owl.</em><span>Finding the rats New York isn't looking for.</span></p>
     </div>
-    <figure class="frame hero-art reveal r3"><img src="assets/title_art.png" alt="An owl on a New York water tower at night">
-      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
-      <span class="tag">No. 001</span><figcaption class="mono">Fig. 01 · The watch</figcaption></figure>
+    <figure class="hero-art cutout reveal r3"><img src="assets/hero_owl_node.png" alt="The NightOwl sensor node, with the owl logo on its side"></figure>
     <div class="meta reveal r5">
       <div><span class="mono">Pitch no.</span><b>01 / NightOwl</b></div>
       <div><span class="mono">Runtime</span><b>~3 minutes</b></div>
