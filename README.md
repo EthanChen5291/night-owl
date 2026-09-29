@@ -79,8 +79,6 @@ pnpm --dir web build && pnpm --dir web lint
 ## Limitations
 
 - The detector was trained on a room-lit plush rat. Infrared footage and wild rats are untested. Its fresh box test scored 0.616 rat AP50 ([fresh test](vision/V5_FRESH_RESULTS.md), [event test](vision/V5_FORMAL_EVENT_RESULTS.md)).
-- Backtests score only cells DOHMH swept; nothing here counts rats on unswept blocks.
-- Owl unit cost and battery life are unmeasured.
 
 ## Repository
 
