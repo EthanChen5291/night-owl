@@ -2,7 +2,7 @@
 
 # NightOwl
 
-**Predicting where New York's rats are, not just where people complain.**
+**NYC's automated rat surveillance system**
 
 [![Site](https://img.shields.io/badge/site-barn--owl.tech-blue.svg)](https://barn-owl.tech)
 [![Pitch](https://img.shields.io/badge/pitch-deck-green.svg)](pitch/README.md)
@@ -22,13 +22,15 @@ NightOwl scores every block-sized cell in the city each month, flags the blocks 
 
 ## How it works
 
-- **Model A (human feedback)** predicts complaints from 512k 311 rodent complaints and 3.1M DOHMH inspection records.
-- **Model B (environment)** predicts the share of swept lots with active rat signs from 26 physical features over ten years of open data. 
-- **Silence score** = Model B percentile − Model A percentile. High where rats are likely despite no 311 callees.
-- **Planner** ranks sensor sites on real street trees; a building model ranks most likely rat infested areas.
-- **Feedback loop.** An accepted Owl sighting updates the cell's Beta posterior and reranks sites. 
-
-Both are LightGBM models trained from scratch in [model/](model/README.md).
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="docs/media/model-a.png" alt="Model A: 311 complaints, pest history, and violations"></td>
+    <td width="50%" align="center"><img src="docs/media/model-b.png" alt="Model B: rat inspections, environment, buildings, and food"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><img src="docs/media/owl-loop.png" width="46%" alt="The Owl loop: placement model, PIR trigger, camera and classifier, server and map"></td>
+  </tr>
+</table>
 
 ## Results
 
@@ -40,8 +42,6 @@ Rolling backtest, 119 months (2016-01 → 2026-08), top 50 cells scored on lots 
 | Most 311 complaints | 15.2% |
 | Rats found before | 17.1% |
 | Quiet blocks: Model B vs random | **15.6% vs 8.8%** (117 / 119 months) |
-
-Model B AUC on held-out community districts: **0.633**
 
 ## Owl node
 
