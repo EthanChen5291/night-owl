@@ -32,7 +32,7 @@ Gradient boosting is helpful in our context because rat infestations can stem fr
 
 A linear model gives each factor a fixed weight everywhere, so it won't be able to capture that smoothly. Gradient boosting builds many small decision trees, and each one splits on various conditions. Each new tree focuses on the blocks the earlier trees got wrong. That way, the model can learn which combinations actually predict rats, without us setting a weight for each one. This shows in the results: a logistic regression baseline scored 0.567 AUC against our boosted model's 0.633.
 
-We separated location prediction between two models: A, and B. 
+We separated location prediction between two models: **Model A** and **Model B**. 
 
 - Model A takes 311 rat complaints, past complaint history, and HPD rodent violations, and predicts how many rat complaints each cell will get that month. It aims to predict rats based only on what people see, and nothing more.
 
