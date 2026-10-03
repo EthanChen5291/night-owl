@@ -24,7 +24,7 @@ Night Owl scores every block-sized cell in the city each month. Then, it flags t
 
 This project can be separated into two core parts: two gradient-boosted models for location prediction, and a sensor node (Owl).
 
-## Location Prediction
+***Location Prediction***
 
 Gradient boosting is helpful in our context because rat infestations can stem from a lot of potential environmental factors (ie. poor trash collection record, many restaurants with safety violations), where any given one connects to many other factors. Heavy trash is exacerbated by blocks of old, low-rise walk-ups (where bags sit on the curb overnight). Moreover, a high-rise with an indoor trash room barely changes, no matter the quantity of trash left out. 
 
@@ -53,7 +53,7 @@ Backtesting results:
 | Rats found before | 17.1% |
 | Quiet blocks: Model B vs random | **15.6% vs 8.8%** (117 / 119 months) |
 
-## Owl node
+***Owl node***
 
 <p align="center"><img src="docs/media/owl-node.png" width="320" alt="As-built Owl node"></p>
 
@@ -63,7 +63,7 @@ Our node sensor consists of a Raspberry Pi 5, IMX219 NoIR camera, 850 nm IR illu
 
 The camera only wakes up upon heat or motion direction through the PIR, and once on, our fine-tuned YOLO11n detector decides on-device. Through local classification, only the event (timestamp, cell, confidence, small crop) goes to the local API, and no video is stored or uploaded. We respect the privacy of New Yorkers, and the last thing they'd like are cameras everywhere - these node sensors can physically only record rats!
 
-**Why can't we just stick with inspectors?**
+## Why can't we just stick with inspectors?
 
 NYC funds over 150,000 inspections. When multiplied by the average NYC Health Sanitarian salary (~$35/hr), this comes down to $5.25 million dollars spent just on inspections every year. 
 
