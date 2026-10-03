@@ -55,7 +55,7 @@ Backtesting results:
 
 ## Owl node
 
-<p align="center"><img src="docs/media/owl-node.jpg" width="320" alt="As-built Owl node"></p>
+<p align="center"><img src="docs/media/owl-node.png" width="320" alt="As-built Owl node"></p>
 
 Our node sensor consists of a Raspberry Pi 5, IMX219 NoIR camera, 850 nm IR illuminator, HC-SR501 PIR, PiSugar battery, printed enclosure ([build files](model/enclosure/README.md)). 
 
@@ -65,7 +65,7 @@ The camera only wakes up upon heat or motion direction through the PIR, and once
 
 **Why can't we just stick with inspectors?**
 
-As mentioned prior, NYC funds over 150,000 inspections. When multiplied by the average NYC Health Sanitarian salary (~$35/hr), this comes down to $5.25 million dollars spent just on inspections every year. 
+NYC funds over 150,000 inspections. When multiplied by the average NYC Health Sanitarian salary (~$35/hr), this comes down to $5.25 million dollars spent just on inspections every year. 
 
 A production node sensor running on XIAO ESP32S3 costs ~$30 to make, and can run for years (in 6 week intervals to recharge). Each sensor covers a 1.5 m<sup>2</sup> radius. Combined with the location prediction model, sensors can be placed in actual rat routes and eventually traced back to their burrows to be passed to DOHMH. 
 
