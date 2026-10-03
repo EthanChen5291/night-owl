@@ -16,9 +16,9 @@
 
 ## Rats?
 
-NYC estimates about 3 million rats and runs ~152,000 initial rodent inspections a year, targeted mostly by 311 complaints. Yet these inspections focus on the callees rather than actual rat populations themselves -> the richest fifth of blocks files 76% more complaints per rat found than the poorest fifth, which has 51% more infestations. 
+NYC estimates about 3 million rats and runs ~152,000 initial rodent inspections a year, targeted mostly by 311 complaints. Yet these inspections focus on the callees rather than actual rat populations themselves. The richest fifth of blocks files 76% more complaints per rat found than the poorest fifth, yet the poor have 51% more infestations. 
 
-NightOwl scores every block-sized cell in the city each month, flags the blocks that are likely rat-infested but quiet, and places a low-cost camera node, an **Owl**, where the model is least certain. Owl sightings flow back into the map and rerank the next placements.
+Night Owl scores every block-sized cell in the city each month. Then, it flags the blocks that are likely rat-infested but quiet, and places a low-cost camera node, an **Owl**, where the model is least certain. Owl sightings flow back into the map and rerank the next placements.
 
 ## How we find rats
 
