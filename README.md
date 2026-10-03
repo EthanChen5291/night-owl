@@ -22,26 +22,23 @@ Night Owl scores every block-sized cell in the city each month. Then, it flags t
 
 ## How we find rats
 
-<table>
-  <tr>
-    <td width="50%" align="center"><img src="docs/media/model-a.png" alt="Model A: 311 complaints, pest history, and violations"></td>
-    <td width="50%" align="center"><img src="docs/media/model-b.png" alt="Model B: rat inspections, environment, buildings, and food"></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><img src="docs/media/owl-loop.png" width="46%" alt="The Owl loop: placement model, PIR trigger, camera and classifier, server and map"></td>
-  </tr>
-</table>
-
 This project can be separated into two core parts: two gradient-boosted models for location prediction, and a sensor node (Owl).
 
-## Location Prediction**
+## Location Prediction
 
-Gradient boosting is helpful in our context because rat infestations can stem from a lot of potential environmental factors (ie. poor trash collection record, many restaurants with safety violations), and these factors combine in ways a simple linear model misses. For example, a logistic regression baseline scored 0.567 AUC, which pales in comparison our boosted model's 0.633. Through this way, we can learn which conditions actually predict rats without hand-setting a weight for each one.
+Gradient boosting is helpful in our context because rat infestations can stem from a lot of potential environmental factors (ie. poor trash collection record, many restaurants with safety violations), where any given one connects to many other factors. Heavy trash is exacerbated by blocks of old, low-rise walk-ups (where bags sit on the curb overnight). Moreover, a high-rise with an indoor trash room barely changes, no matter the quantity of trash left out. 
+
+A linear model gives each factor a fixed weight everywhere, so it won't be able to capture that smoothly. Gradient boosting builds many small decision trees, and each one splits on various conditions. Each new tree focuses on the blocks the earlier trees got wrong. That way, the model can learn which combinations actually predict rats, without us setting a weight for each one. This shows in the results: a logistic regression baseline scored 0.567 AUC against our boosted model's 0.633.
 
 We separated location prediction between two models: A, and B. 
 
 - Model A takes 311 rat complaints, past complaint history, and HPD rodent violations, and predicts how many rat complaints each cell will get that month. It aims to predict rats based only on what people see, and nothing more.\n
+
+<p align="center"><img src="docs/media/model-a.png" width="360" alt="Model A: 311 complaints, pest history, and violations"></p>
+
 - Model B takes 26 physical features per cell: building height and age, district trash tonnage, DSNY bin rules, street trees, and weather, with income and population as controls. It's trained on the share of lots where inspectors found rats during sweeps. It aims to predict based only on what the environment is actually like.
+
+<p align="center"><img src="docs/media/model-b.png" width="360" alt="Model B: rat inspections, environment, buildings, and food"></p>
 
 This separation of responsibilities allows us to compare where people complain against where rats likely are, and flag "silent" blocks where Model B expects rats but Model A doesn't expect calls.
 
