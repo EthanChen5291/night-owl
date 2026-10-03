@@ -24,6 +24,7 @@ Night Owl scores every block-sized cell in the city each month. Then, it flags t
 
 This project can be separated into two core parts: two gradient-boosted models for location prediction, and a sensor node (Owl).
 
+<br>
 
 ***Location Prediction***
 
@@ -33,7 +34,7 @@ A linear model gives each factor a fixed weight everywhere, so it won't be able 
 
 We separated location prediction between two models: A, and B. 
 
-- Model A takes 311 rat complaints, past complaint history, and HPD rodent violations, and predicts how many rat complaints each cell will get that month. It aims to predict rats based only on what people see, and nothing more.\n
+- Model A takes 311 rat complaints, past complaint history, and HPD rodent violations, and predicts how many rat complaints each cell will get that month. It aims to predict rats based only on what people see, and nothing more.
 
 <p align="center"><img src="docs/media/model-a.png" width="360" alt="Model A: 311 complaints, pest history, and violations"></p>
 
