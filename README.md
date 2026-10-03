@@ -24,6 +24,7 @@ Night Owl scores every block-sized cell in the city each month. Then, it flags t
 
 This project can be separated into two core parts: two gradient-boosted models for location prediction, and a sensor node (Owl).
 
+
 ***Location Prediction***
 
 Gradient boosting is helpful in our context because rat infestations can stem from a lot of potential environmental factors (ie. poor trash collection record, many restaurants with safety violations), where any given one connects to many other factors. Heavy trash is exacerbated by blocks of old, low-rise walk-ups (where bags sit on the curb overnight). Moreover, a high-rise with an indoor trash room barely changes, no matter the quantity of trash left out. 
